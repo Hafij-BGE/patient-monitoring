@@ -25,7 +25,7 @@ The Data import tab now reads CSV/JSON tables only. Manual entry and CSV/JSON ex
 
 ## 3. Watch data: Android app only
 
-The Android app (`android/`, package `edu.deu.pmsim`, version 1.3.0) wraps the same web page in a WebView. It is the **only** place where real watch data enters PM-SIM. The watch can be an HONOR watch or any other watch. There are three routes:
+The Android app (`android/`, package `edu.deu.pmsim`, version 1.3.1) wraps the same web page in a WebView. It is the **only** place where real watch data enters PM-SIM. The watch can be an HONOR watch or any other watch. There are three routes:
 
 | Route | How it works | Limits |
 |---|---|---|
@@ -64,4 +64,4 @@ A download link does nothing inside the Android WebView. When `window.PMAndroid`
 
 ## 5. Status
 
-**Not tested with real hardware.** An APK file has been built (`release/PM-SIM-1.3.0-android.apk`), but no watch, heart-rate sensor or Health Connect store has been used with it, and the app has not been tested on a phone. The page-side bridge is checked by unit tests with records and packets written in the test, and the panel was checked in a desktop browser with a mock `PMAndroid` object (records stored, an out-of-range record rejected, a BLE packet decoded, an export routed to `saveText`). A mock only imitates the app's interface; it is not a device test. The browser self-test lists "Watch data on Android (Health Connect / BLE / export file, hardware)" as **not run**, and it must stay that way until a real device test has been done and recorded. The parser is checked only against packets written from the specification (see `TEST_REPORT.md`).
+**Not tested with real hardware.** An APK file has been built (`release/PM-SIM-1.3.1-android.apk`), but no watch, heart-rate sensor or Health Connect store has been used with it, and the app has not been tested on a phone. The page-side bridge is checked by unit tests with records and packets written in the test, and the panel was checked in a desktop browser with a mock `PMAndroid` object (records stored, an out-of-range record rejected, a BLE packet decoded, an export routed to `saveText`). A mock only imitates the app's interface; it is not a device test. The browser self-test lists "Watch data on Android (Health Connect / BLE / export file, hardware)" as **not run**, and it must stay that way until a real device test has been done and recorded. The parser is checked only against packets written from the specification (see `TEST_REPORT.md`).
