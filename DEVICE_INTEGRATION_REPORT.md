@@ -60,7 +60,7 @@ A download link does nothing inside the Android WebView. When `window.PMAndroid`
 - No data leaves the device. The app has no `INTERNET` permission and cloud backup is off. The page's Content Security Policy sets `connect-src 'none'`.
 - Everything needs the user's permission: Health Connect read permissions, and the Bluetooth permissions on Android 12 and later.
 - A missing or invalid reading is stored as missing, never as 0. A packet reporting that the sensor has no skin contact is stored with quality `artifact`.
-- The best lesson quiz scores are the only other data the page keeps, in the browser's `localStorage`. They are not measurement data.
+- The only other data the page keeps, in the browser's `localStorage`, are the best lesson quiz scores, the Controls view choice and whether Bedside view is on. None of it is measurement data.
 
 ## 5. Status
 

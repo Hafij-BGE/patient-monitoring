@@ -182,3 +182,12 @@ Used by `src/sim/glucose.js` (TECHNICAL_REPORT.md section 3.13). The model is a 
     Supports: unwarmed anaesthetised patients become hypothermic by 1–2 °C; vasoconstriction and shivering as thermoregulatory defences; shivering as a complication (`postop-hypothermia`).
 68. **Miskovic A, Lumb AB.** Postoperative pulmonary complications. *Br J Anaesth.* 2017;118(3):317–334. doi:10.1093/bja/aex002. PMID 28186222.
     Supports: atelectasis develops in > 75 % of patients given a neuromuscular blocking drug; pulmonary complications are common after surgery and raise mortality (`postop-ppc`).
+
+## 12-lead ECG sources
+
+69. **Dower GE, Machado HB, Osborne JA.** On deriving the electrocardiogram from vectorcardiographic leads. *Clin Cardiol.* 1980;3(2):87–95. PMID 6993081.
+    Supports: the 12-lead ECG can be derived from the Frank X, Y, Z signals by a fixed linear transform close enough to the recorded ECG for serial comparison (`src/sim/ecg12.js`).
+70. **Edenbrandt L, Pahlm O.** Vectorcardiogram synthesized from a 12-lead ECG: superiority of the inverse Dower matrix. *J Electrocardiol.* 1988;21(4):361–367. doi:10.1016/0022-0736(88)90113-6. PMID 3241148.
+    Supports: the Dower matrix coefficients used for leads I, II and V1–V6 (`DOWER` in `src/sim/ecg12.js`).
+71. **Kligfield P, Gettes LS, Bailey JJ, et al.** Recommendations for the standardization and interpretation of the electrocardiogram, part I: the electrocardiogram and its technology. *Circulation.* 2007;115(10):1306–1324. doi:10.1161/CIRCULATIONAHA.106.180200. PMID 17322457.
+    Supports: the derived limb leads (III = II − I and the augmented leads), the standard 3 × 4 layout with a rhythm strip, 25 mm/s, 10 mm/mV, the 1 mV calibration pulse and the 0.05–150 Hz diagnostic bandwidth (12-lead view).

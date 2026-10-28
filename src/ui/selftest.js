@@ -94,6 +94,16 @@
         const low = st.active.some(a => a.id === 'glucose:low');
         return { pass: f.maxG > 120 && near(f.G[300], 90, 15) && on < off - 10 && low,
           observed: 'peak ' + fmt(f.maxG) + ', 5 h ' + fmt(f.G[300]) + ' mg/dL; type 1 at 4 h ' + fmt(off) + ' → ' + fmt(on) + ' mg/dL with bolus; glucose:low ' + (low ? 'active' : 'not active') }; } },
+    { name: 'Derived 12-lead ECG', expected: 'lead II identical to the monitor trace; I + III = II; normal axis +30…+75°; leads off gives no signal',
+      run() { const e = sim(preset('baseline'), 12).e, n = 1500;
+        const II = e.lead12[1].last(n), mon = e.ecgS.last(n), I = e.lead12[0].last(n), III = e.lead12[2].last(n);
+        let dII = 0, dE = 0;
+        for (let i = 0; i < n; i++) { dII = Math.max(dII, Math.abs(II[i] - mon[i])); dE = Math.max(dE, Math.abs(I[i] + III[i] - II[i])); }
+        const axis = PM.ecg.qrsAxis(e.p);
+        e.p.contact = 5; e.advance(2);
+        const off = e.lead12.every(rg => rg.last(200).every(Number.isNaN));
+        return { pass: dII < 1e-9 && dE < 1e-9 && axis > 30 && axis < 75 && off,
+          observed: 'max |II − monitor| ' + dII.toExponential(1) + ' mV, max |I + III − II| ' + dE.toExponential(1) + ' mV, axis ' + fmt(axis) + '°, leads off ' + (off ? 'no signal' : 'signal drawn') }; } },
     { name: 'Watch data on Android (Health Connect / BLE / export file, hardware)', expected: 'readings arrive with source "device" and the route in the provenance', hardware: true },
   ];
 

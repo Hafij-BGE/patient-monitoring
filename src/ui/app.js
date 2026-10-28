@@ -386,6 +386,8 @@
   engine.startNibp(); // first cuff reading at start-up; then every nibp_interval minutes
   renderAlarms();
   PM.panels.renderNibpTable($('#nibpTable tbody'), nibpRows);
+  PM.ecg12Panel.attach(engine);
+
   root.PM.app = { engine, alarms, store, showTab, setRunning, glucose: () => glucose };
   requestAnimationFrame(loop);
   if (/[?&]selftest=1\b/.test(root.location.search)) { showTab('tests'); PM.selftest.run(); }

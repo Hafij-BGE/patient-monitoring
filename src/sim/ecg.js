@@ -10,11 +10,15 @@
  *   svt  normal narrow beat without a P wave (hidden in the QRS); timing as set
  *   pvc  occasional early wide beat (R at 0.6 × mean interval) + compensatory pause
  *   vt   every beat wide at the set rate      vf  fibrillatory signal, no beats
- *   asystole  flat line, no beats */
+ *   asystole  flat line, no beats
+ * The equation is linear in z, so z = Σ z_i with dz_i/dt = −a_i Δθ_i exp(…) − z_i.
+ * Each event's share z_i is integrated alongside z (same RK4 points) and placed
+ * along its own spatial direction to give a dipole (vector) ECG for the derived
+ * 12-lead view (ecg12.js). Lead II of that view equals the monitor ECG. */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./rng.js'), require('./arrhythmia.js'));
-  else (root.PM = root.PM || {}).ecg = factory(root.PM.rng, root.PM.arrhythmia);
-})(this, function (rngMod, arr) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./rng.js'), require('./arrhythmia.js'), require('./ecg12.js'));
+  else (root.PM = root.PM || {}).ecg = factory(root.PM.rng, root.PM.arrhythmia, root.PM.ecg12);
+})(this, function (rngMod, arr, e12) {
   'use strict';
 
   const TWO_PI = 2 * Math.PI;
@@ -59,6 +63,14 @@
     return z + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4);
   }
 
+  /** Per-event forcing a_i Δθ_i exp(−Δθ_i²/2b_i²) at phase theta, written into f. */
+  function forcing(theta, w, f) {
+    for (let i = 0; i < 5; i++) {
+      const d = wrap(theta - w.theta[i]);
+      f[i] = w.a[i] * d * Math.exp(-d * d / (2 * w.b[i] * w.b[i]));
+    }
+  }
+
   /** Gain (mV per model unit) so that the clean R peak equals ampMv above baseline. */
   function calibrate(w, hr, ampMv) {
     const dt = 1e-3, omega = TWO_PI * hr / 60;
@@ -82,12 +94,16 @@
 
   /** Streaming generator at a fixed internal step (default 1 ms). */
   class EcgGenerator {
-    constructor(params, rng, dt, fibRng) {
+    constructor(params, rng, dt, fibRng, vcgRng) {
       this.dt = dt || 1e-3;
       this.rng = rng || new rngMod.Rng(1);
       this.fibRng = fibRng || new rngMod.Rng(97531);
       this.theta = -Math.PI;
       this.z = 0;
+      this.zi = new Float64Array(5);       // share of z from each event P, Q, R, S, T
+      this.f = [new Float64Array(5), new Float64Array(5), new Float64Array(5)];
+      this.vcg = new Float64Array(3);      // dipole (Frank X, Y, Z) in mV, see ecg12.js
+      this.vcgRng = vcgRng || new rngMod.Rng(24680);
       this.t = 0;
       this.kind = 'normal';
       this.setParams(params, true);
@@ -117,11 +133,17 @@
       this.kind = kind;
       this.w = kind === 'vt' ? P.vw : kind === 'pvc' ? P.pw : P.w;
       const gain = kind === 'vt' || kind === 'pvc' ? P.vgain : P.gain;
-      if (this.gain) this.z *= this.gain / gain; // keep the output continuous when the beat scale changes
+      if (this.gain) { // keep the output continuous when the beat scale changes
+        const k = this.gain / gain;
+        this.z *= k;
+        for (let i = 0; i < 5; i++) this.zi[i] *= k;
+      }
       this.gain = gain;
       if (!this.fib && (mode === 'af' || mode === 'vf')) this.fib = {};
       if (mode === 'af' && !this.fib.af) this.fib.af = new arr.Fibrillation(this.fibRng, 6, 9, 4);
       if (mode === 'vf' && !this.fib.vf) this.fib.vf = new arr.Fibrillation(this.fibRng, 3, 7, 4);
+      // second VF source for the chest leads only, from its own random stream
+      if (mode === 'vf' && !this.fib.vf2) this.fib.vf2 = new arr.Fibrillation(this.vcgRng, 3, 7, 4);
     }
 
     drawRR() {
@@ -137,8 +159,18 @@
     /** Advance one internal step; returns the clean ECG value in mV. */
     step() {
       const omega = TWO_PI / this.rr;
-      const th0 = this.theta, thR = this.w.theta[2];
-      this.z = rk4(th0, this.z, omega, this.dt, this.w);
+      const th0 = this.theta, thR = this.w.theta[2], dt = this.dt, h = omega * dt;
+      const [f0, f1, f2] = this.f, zi = this.zi;
+      forcing(th0, this.w, f0); forcing(th0 + h / 2, this.w, f1); forcing(th0 + h, this.w, f2);
+      // RK4 on the sum (bit-identical to rk4()) and on each event's share
+      let s0 = 0, s1 = 0, s2 = 0;
+      for (let i = 0; i < 5; i++) {
+        s0 += f0[i]; s1 += f1[i]; s2 += f2[i];
+        const z = zi[i], k1 = -f0[i] - z, k2 = -f1[i] - (z + dt * k1 / 2), k3 = -f1[i] - (z + dt * k2 / 2), k4 = -f2[i] - (z + dt * k3);
+        zi[i] = z + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4);
+      }
+      const z = this.z, k1 = -s0 - z, k2 = -s1 - (z + dt * k1 / 2), k3 = -s1 - (z + dt * k2 / 2), k4 = -s2 - (z + dt * k3);
+      this.z = z + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4);
       let th1 = th0 + omega * this.dt;
       if (th0 < thR && th1 >= thR && this.kind !== 'none' && this.onR)
         this.onR(this.t + this.dt * (thR - th0) / (th1 - th0), this.rr, { kind: this.kind, amp: arr.PULSE_AMP[this.kind] });
@@ -151,13 +183,47 @@
         if (this.onBeat) this.onBeat(this.t, this.rr);
       }
       this.theta = th1;
-      const amp = this.p.ecg_amp_mv;
-      if (this.mode === 'asystole') return 0;
-      if (this.mode === 'vf') return 0.5 * amp * this.fib.vf.step(this.dt);
-      if (this.mode === 'af') return this.gain * this.z + 0.07 * amp * this.fib.af.step(this.dt);
+      const amp = this.p.ecg_amp_mv, v = this.vcg;
+      if (this.mode === 'asystole') { v.fill(0); return 0; }
+      if (this.mode === 'vf') {
+        const a = 0.5 * amp * this.fib.vf.step(dt), b = 0.5 * amp * this.fib.vf2.step(dt), R = e12.BASIS.ventricular[2], N = e12.N_II;
+        for (let j = 0; j < 3; j++) v[j] = a * R[j] + b * N[j];
+        return a;
+      }
+      const B = e12.BASIS[this.kind === 'vt' || this.kind === 'pvc' ? 'ventricular' : 'normal'];
+      for (let j = 0; j < 3; j++) {
+        let s = 0;
+        for (let i = 0; i < 5; i++) s += zi[i] * B[i][j];
+        v[j] = this.gain * s;
+      }
+      if (this.mode === 'af') {
+        const fa = 0.07 * amp * this.fib.af.step(dt);
+        for (let j = 0; j < 3; j++) v[j] += fa * e12.F_AF[j];
+        return this.gain * this.z + fa;
+      }
       return this.gain * this.z;
     }
   }
 
-  return { EcgGenerator, waveParams, calibrate, BASE, wrap };
+  /** Frontal-plane QRS axis (degrees) of the clean model beat for settings p: net
+   *  area of the Q, R and S events only (P and T left out, so overlap with a T wave at
+   *  high rates does not shift it) in leads I and aVF of the derived 12-lead ECG.
+   *  For PVCs it is the axis of the dominant (normal) beat; NaN without beats. */
+  function qrsAxis(p) {
+    const mode = p.arrhythmia || 'none';
+    if (mode === 'vf' || mode === 'asystole') return NaN;
+    const q = Object.assign({}, p, { arrhythmia: mode === 'vt' ? 'vt' : 'none', hrv_ms: 0, rhythm: 'regular' });
+    const g = new EcgGenerator(q, new rngMod.Rng(1), 1e-3, new rngMod.Rng(2), new rngMod.Rng(3));
+    const B = e12.BASIS[mode === 'vt' ? 'ventricular' : 'normal'], n = Math.round(60 / q.hr / g.dt);
+    const v = [0, 0, 0], out = new Array(12);
+    for (let k = 0; k < 3 * n; k++) {
+      g.step();
+      if (k < 2 * n) continue; // let the start-up transient settle, then sum one full cycle
+      for (let j = 0; j < 3; j++) v[j] += g.zi[1] * B[1][j] + g.zi[2] * B[2][j] + g.zi[3] * B[3][j];
+    }
+    e12.leads(v, out);
+    return e12.frontalAxis(out[0], out[5]);
+  }
+
+  return { EcgGenerator, waveParams, calibrate, qrsAxis, BASE, wrap };
 });

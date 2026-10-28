@@ -407,6 +407,30 @@ The model starts in steady state at the set fasting glucose Gb and the set basal
 
 **Measured behaviour** (`tests/unit/glucose.test.js`). Fasting 90 mg/dL, 50 g meal, no basal insulin. Peak / 2 h / 4 h values: no diabetes 167 / 120 / 83 mg/dL; type 2 183 / 162 / 100; type 1 without insulin 185 / 167 / 105. In type 1 (fasting 200 mg/dL, basal 0.8 U/h) a 6 U bolus lowers the 4 h value by more than 10 mg/dL.
 
+### 3.14 Derived 12-lead ECG
+
+**Model** (`src/sim/ecg12.js`). The McSharry equation for z is linear in z, so its solution is the sum of five parts z_i(t), one per event (P, Q, R, S, T), each driven by its own Gaussian term. `ecg.js` integrates every z_i with RK4 using the same forcing values as the sum, so the monitor ECG is unchanged. Each event is given a fixed spatial direction d_i in Frank coordinates (X left, Y feet, Z back), and the heart vector is
+
+  VCG(t) = g · Σ_i z_i(t) · d_i / (h_II · d_i)
+
+where h_II is the lead II row of the Dower matrix. The scaling makes the projection on lead II equal to the single-lead monitor ECG at every sample. Leads I, II and V1–V6 come from the Dower transform s = D · VCG [69, 70]; III, aVR, aVL and aVF from Einthoven's and Goldberger's relations [71]. Ventricular beats (PVC, VT) use a second set of directions: broad QRS negative in V1 and positive in V6, inferior axis, T opposite the QRS. AF f-waves lie along an atrial direction that is large in V1. VF adds a second fibrillation signal along a direction that lead II cannot see (h_II · n = 0), so the chest leads differ from lead II. Asystole gives a zero vector.
+
+**Acquisition** (`acquireLeads12` in `src/sim/engine.js`). Lead II of the 12-lead ring is the monitor signal itself. Lead I and V1–V6 get the same baseline wander and mains interference as lead II plus their own white noise; III, aVR, aVL and aVF are then formed from the noisy I and II, as an ECG cart does. Every lead passes through its own copy of the display filter chain. When the electrodes are off (contact < 10 %) all 12 leads are missing (NaN), never zero.
+
+**View** (`src/ui/ecg12Panel.js`). Clicking the ECG waveform, or its *12-lead* button, opens a dialog with the last 10 s in the standard 3 × 4 layout (each column 2.5 s of the same recording) and a 10 s lead II rhythm strip, on 1 mm / 5 mm grid paper at 25 mm/s and 10 mm/mV with a 1 mV calibration pulse [71]. The header gives the monitor HR, the filter, the sampling rate and the frontal QRS axis. The axis is computed from the model beat (net Q + R + S area in I and aVF, one noise-free cycle): +49° for a normal beat and +83° for VT, stable within 5° from 40 to 200 bpm and QRS width 0.8–1.5×. The view refreshes once a second and can be held or saved as a PNG that carries the educational notice.
+
+**Event directions** (unit vectors before scaling):
+
+| Event | Normal beat (X, Y, Z) | Ventricular beat (X, Y, Z) |
+|---|---|---|
+| P | (0.85, 0.5, −0.1) | (0.85, 0.5, −0.1) |
+| Q | (−0.5, −0.6, −0.4) | (−0.4, −0.8, −0.45) |
+| R | (0.8, 0.5, 0.3) | (0.4, 0.8, 0.45) |
+| S | (−0.6, −0.2, 0.8) | (−0.3, −0.5, 0.4) |
+| T | (0.85, 0.45, −0.3) | (−0.4, −0.8, −0.45) |
+
+These are teaching values chosen to give a normal adult pattern (rS in V1, transition V3–V4, qR in V5–V6, upright T in I, II and V3–V6, everything negative in aVR). They are not fitted to recorded vectorcardiograms.
+
 ## 4. Data model and provenance
 
 Every stored value is an immutable observation:
@@ -556,6 +580,7 @@ These were observed or are known from the model design:
 - **NIBP set-point change.** A measurement is aborted when the simulated SBP or DBP changes by more than 5 mmHg while it runs (section 3.6). The simulator can do this because it knows the set point. A real monitor has to detect an unstable patient from the oscillations themselves, and the oscillogram analysis here does not test for a two-level envelope. Gradual changes of up to 5 mmHg are accepted and can bias the reading by a similar amount.
 - **SpO₂ under motion** is biased toward about 85 % (R → 1). The value is not corrected. SQI (consistency of R across four 1-s windows) drops for mild motion (mean 43 at motion 15, 60 s run) but rises again under strong motion (mean 75 at motion 70), because then the artefact itself sets a steady R ≈ 1. The low-SQI flag (SQI < 40) therefore catches only some mild-motion windows and misses strong motion (`motion` and `postop-hypothermia` scenarios: 0 flagged frames in 90 s).
 - **Hypotension preset.** At 82/48 mmHg the oscillometric DBP estimate can land just above the 50 mmHg limit, so the DIA-low alarm may not fire. This is a real-world limitation of fixed-ratio estimation and is left visible as a teaching example.
+- **12-lead ECG** is derived from one moving dipole with fixed directions per wave. It shows textbook normal and ventricular patterns only. It cannot show regional ST changes, infarct Q waves, bundle-branch blocks other than the VT shape, a biphasic P in V1 or electrode misplacement. Scenarios that change a wave (for example the raised-potassium T wave) change it in every lead in the same proportion. It is not a diagnostic ECG.
 - **QRS detector** has no search-back, so dropouts and very noisy ECG can cause missed beats and HR errors.
 - **HR in the AF pattern reads low.** With a set HR of 110 the displayed HR is about 75–85 bpm. The ECG model scales the QRS amplitude with the beat interval, so the short beats of AF have a small QRS that does not cross the detection threshold. The irregular-rhythm alarm still fires. Not fixed.
 - **RR estimate** is null for the first breaths after a start or reset.
@@ -566,7 +591,7 @@ These were observed or are known from the model design:
 - **Capnography and arterial line** parameters (wave shape constants, f_n, ζ, the perfusion time constants) are illustrative. They show the effects qualitatively and are not fitted to measured data.
 - **Watch data** (Android app only) has not been tested with any real watch, heart-rate sensor or Health Connect store. Consumer wearable readings are not clinical measurements (see `TEST_REPORT.md`).
 - **Glucose model.** Population parameters only; no person is fitted. Renal glucose excretion, glucagon, counter-regulation, exercise and the change of endogenous glucose output with insulin are not modelled. Without insulin action, glucose still returns towards fasting through SG (glucose effectiveness), so untreated type 1 hyperglycaemia resolves slowly in the model, unlike in reality. Minimal-model SI is lower than clamp-derived sensitivity (about 66 % lower in [54]), so a bolus has a modest effect. Secretion gain σ, the type 2 factor 0.5 and fasting insulin are illustrative. There is no CGM or glucose meter model (no sensor lag, no noise). Ketones and pH are not modelled.
-- Measurements are not persisted between sessions. Only the best lesson quiz scores and the Controls view choice are kept, in the browser's `localStorage`.
+- Measurements are not persisted between sessions. Only the best lesson quiz scores, the Controls view choice and the Bedside view on/off state are kept, in the browser's `localStorage` (keys `pmsim.lessons.v1`, `pmsim.controls.v1`, `pmsim.bedside`).
 
 ## 10. References
 

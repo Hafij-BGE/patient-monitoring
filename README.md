@@ -1,46 +1,187 @@
-# PM-SIM: Patient Monitor Simulator
+<div align="center">
 
-Homework 2, *Interactive Medical Device Simulator*. Assigned device: multiparameter bedside **patient monitor**.
-Author: Md. Hafijur Rahman (BMT master's programme, Dokuz Eylül University). Built with Vibe Coding (see `VIBE_CODING_PROMPT.md`).
+# PM-SIM
 
+### An interactive bedside patient-monitor simulator for teaching
+
+Simulated physiology → simulated sensors → the monitor's own estimators → numbers, alarms and trends.
+Every number on the screen sits next to the value that generated it, so measurement error is visible.
+
+[![Live demo](https://img.shields.io/badge/live%20demo-GitHub%20Pages-2ea44f?logo=github)](https://hafij-bge.github.io/patient-monitoring/)
+[![Release](https://img.shields.io/github/v/release/Hafij-BGE/patient-monitoring?label=release)](https://github.com/Hafij-BGE/patient-monitoring/releases/latest)
+[![Pages](https://github.com/Hafij-BGE/patient-monitoring/actions/workflows/pages.yml/badge.svg)](https://github.com/Hafij-BGE/patient-monitoring/actions/workflows/pages.yml)
+![Unit tests](https://img.shields.io/badge/unit%20tests-93%20pass-brightgreen)
+![Dependencies](https://img.shields.io/badge/runtime%20dependencies-none-blue)
+![Platforms](https://img.shields.io/badge/runs%20on-web%20%7C%20Linux%20%7C%20Windows%20%7C%20Android-informational)
+
+**[Open the live demo](https://hafij-bge.github.io/patient-monitoring/)** ·
+**[Download v1.3.0](https://github.com/Hafij-BGE/patient-monitoring/releases/tag/v1.3.0)** ·
+**[Watch the video](docs/media/demo.mp4)** ·
+**[Technical report](TECHNICAL_REPORT.md)**
+
+</div>
+
+> [!WARNING]
 > **Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.**
 
-PM-SIM simulates the signals a bedside monitor acquires: ECG (with teaching arrhythmias), pulse oximetry (red/IR photoplethysmogram), invasive arterial pressure (ART), impedance respiration, capnography (CO₂), oscillometric non-invasive blood pressure (NIBP) and temperature. It then runs simplified versions of the monitor's own estimators on those signals: a QRS detector with a rhythm classifier, the ratio-of-ratios SpO₂ estimate, the oscillometric envelope, a breath detector, end-tidal CO₂ detection and arterial SYS/DIA/MAP. Each numeric is shown next to the set point that generated it, so the measurement error is visible.
+<div align="center">
+  <img src="docs/media/demo.gif" alt="PM-SIM demo: normal rhythm, SVT, deterioration, peri-arrest and heart failure on the bedside view, then the Controls and Signal chain tabs" width="100%">
+  <sub>Recorded from the app. Full-quality video (43 s, 1280 × 800, H.264): <a href="docs/media/demo.mp4">docs/media/demo.mp4</a></sub>
+</div>
 
-The app can also hold real data next to the simulation, kept strictly separate from it:
+---
 
-- files exported from devices or apps (CSV or JSON tables),
-- values typed in by hand,
-- in the **Android app only**: readings from a watch or other wearable, through Android Health Connect, a Bluetooth LE heart-rate sensor (Heart Rate Service 0x180D) or a health-app export file. The Android app is still in development and has not been tested with real hardware (see `DEVICE_INTEGRATION_REPORT.md`).
+## Contents
 
-Real data is never used to drive the simulation. For example, the ECG is never generated from a heart rate received from a watch.
+- [About](#about)
+- [Screenshots](#screenshots)
+- [What it simulates](#what-it-simulates)
+- [Features](#features)
+- [Derived 12-lead ECG](#derived-12-lead-ecg)
+- [Get it](#get-it)
+- [Tests](#tests)
+- [How it works](#how-it-works)
+- [Data provenance](#data-provenance)
+- [Known limitations](#known-limitations)
+- [Privacy and safety](#privacy-and-safety)
+- [Documents](#documents)
+- [Credits](#credits)
 
-## How to run
+## About
 
-PM-SIM needs no installation, no build step, no network access after loading and no backend. All computation happens in the browser tab.
+PM-SIM is Homework 2, *Interactive Medical Device Simulator*, for the Biomedical Technologies master's programme at Dokuz Eylül University. The assigned device is a multiparameter bedside **patient monitor**. Author: Md. Hafijur Rahman. The app was built with Vibe Coding; the prompts are in [`VIBE_CODING_PROMPT.md`](VIBE_CODING_PROMPT.md).
 
-1. **Website:** open https://hafij-bge.github.io/patient-monitoring/ in a current browser (Chrome, Edge, Firefox, Safari). It is the same page as the app, published as a static site on GitHub Pages by `.github/workflows/pages.yml` (the workflow runs the unit tests, copies `index.html`, `css`, `src` and `fixtures` to `_site` and deploys). The page makes no network requests of its own (Content Security Policy `connect-src 'none'`).
-2. **Locally with a server:**
+The design goal is scientific correctness and meaningful interaction, not decoration. A real monitor does not *know* the patient's heart rate: it estimates it from a noisy signal. PM-SIM shows that whole chain. You set the "true" physiology, choose how the sensors behave (motion, poor contact, mains noise, probe off), and watch the monitor's estimators get it right or wrong.
 
-   ```bash
-   python3 -m http.server 8766
-   ```
+## Screenshots
 
-   (also `npm start`, see `package.json`), then open `http://localhost:8766/`.
-3. **Directly from the file:** open `index.html` in a browser. This works from `file://` because the page uses plain scripts and no network calls.
-4. **Android app (in development):** `android/` holds a WebView wrapper (package `edu.deu.pmsim`, version 1.3.0) that loads the same web page from the app's own assets. It is the **only** place where real watch data enters the app, through three routes: Android Health Connect (read with the user's permission), native Bluetooth LE Heart Rate Service 0x180D, and import of a health-app export file. The app is still being built and **nothing has been tested with real hardware**. Build notes are in `android/README.md`. 
-5. **Linux desktop app (.deb):** `desktop/` holds a small Electron shell that shows the same page from inside the package (no preload, no device access, same CSP). `desktop/build-deb.sh` builds `release/PM-SIM-1.3.0-amd64.deb`; install with `sudo apt install ./PM-SIM-1.3.0-amd64.deb` and start **PM-SIM** from the application menu.
-6. **Windows desktop app (.exe):** the same Electron shell, built on a GitHub Windows runner by `.github/workflows/windows.yml` (run it by hand with a release tag). It adds an NSIS installer, a portable `.exe` and a `.zip` to that release. The files are not code-signed, so Windows SmartScreen shows a warning.
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/monitor.png" alt="Main monitor view during the deterioration scenario"><br><sub><b>Monitor.</b> Six sweeping waveforms and numerics tiles, each with its set point and source badge. Scenario: deterioration before arrest.</sub></td>
+    <td width="50%"><img src="docs/media/bedside-periarrest.png" alt="Bedside view during the peri-arrest scenario"><br><sub><b>Bedside view</b> (key <kbd>B</kbd>). Large numerics, alarm strip and softkeys. Scenario: peri-arrest, high-priority alarms.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/twelve-lead.png" alt="Derived 12-lead ECG dialog on ECG grid paper"><br><sub><b>Derived 12-lead ECG.</b> Click the ECG waveform. 3 × 4 layout plus a 10 s lead II rhythm strip, 25 mm/s, 10 mm/mV.</sub></td>
+    <td><img src="docs/media/controls.png" alt="Controls tab, Simple view"><br><sub><b>Controls.</b> Simple view shows the main controls plus any the scenario changed; Advanced shows all 62.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/signal-chain.png" alt="Signal chain tab showing ECG processing stages"><br><sub><b>Signal chain.</b> Each processing stage as a live plot, from the clean model signal to the detector output.</sub></td>
+    <td><img src="docs/media/lessons.png" alt="Lessons tab"><br><sub><b>Lessons.</b> Eight guided lessons with buttons that set the controls, and a graded quiz.</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/media/trends.png" alt="Trends tab"><br><sub><b>Trends.</b> Any parameter from any source over a chosen window. Gaps are drawn as breaks, never as zeros.</sub></td>
+  </tr>
+</table>
 
-Useful URL options:
+## What it simulates
 
-- `index.html?selftest=1` opens the Tests tab and runs the browser self-test.
+| Channel | Simulated signal | Monitor estimator in the app |
+|---|---|---|
+| **ECG** | Dynamical ECG model (McSharry type) with teaching arrhythmias: AF, PVCs, VT, VF, asystole, SVT | Simplified Pan–Tompkins QRS detector with a rhythm classifier and PVC count |
+| **12-lead ECG** | Derived from the same beat as a moving heart vector (Dower transform) | Frontal QRS axis from leads I and aVF |
+| **SpO₂** | Red and infrared photoplethysmogram | Ratio-of-ratios R → SpO₂, signal-quality index, perfusion index |
+| **Arterial line (ART)** | Invasive pressure waveform, 0–200 mmHg, with damping and transducer height error | Beat-by-beat SYS / DIA / MAP |
+| **Respiration** | Thoracic impedance | Breath detector, RR, apnea |
+| **Capnography (CO₂)** | Capnogram with rebreathing and bronchospasm shapes | EtCO₂, FiCO₂, airway RR |
+| **NIBP** | Oscillometric cuff deflation | Envelope method: MAP at maximum oscillation, SYS / DIA by fixed ratios |
+| **Temperature** | Core temperature | Direct reading |
+| **Glucose and insulin** | Bergman minimal model with meal absorption and subcutaneous insulin (Hovorka) | Model value with a "model" badge, projection 2–4 h ahead |
 
-Keyboard: `Space` toggles run/pause.
+The equations, parameters and their sources are in [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) and [`REFERENCES.md`](REFERENCES.md).
 
-Tabs: Controls, NIBP, Alarms, Trends, Glucose, Signal chain, Lessons, Data import/export, Profile, Science, Tests, References.
+## Features
 
-## Unit tests
+<details open>
+<summary><b>50 teaching scenarios</b></summary>
+
+A scenario sets every patient, physiology and sensor control (its own values, all others at default). Editing any of them by hand shows **Custom (edited)**.
+
+- **25 simple scenarios:** baseline, tachycardia, bradycardia, irregular timing, desaturation, low and high blood pressure, fast and slow breathing, temperature elevation, sensor disconnection, motion artifact, noisy ECG, missing observations, apnea, atrial fibrillation, PVCs, ventricular tachycardia, ventricular fibrillation, asystole, hypoventilation, bronchospasm, rebreathing, under-damped arterial line, transducer height error.
+- **25 combined-sign patterns from the literature**, each with its sources and a note shown on load: blood loss (ATLS class II and III), infection screening (SIRS / qSOFA), acute allergic reaction, hypoventilation masked by O₂, compensatory hyperventilation, dead-space (PE-type) pattern, hypothermia, early and late hypermetabolic (MH-type) pattern, obstructive hypercapnic (COPD-type) pattern, early and late raised-potassium ECG, raised-ICP (Cushing) reflex, SVT, hyperglycaemic crisis (DKA-type), pre-arrest deterioration, peri-arrest, acute stroke with high blood pressure, three heart-failure profiles (warm-wet, cold-wet, cardiogenic shock) and three post-operative patterns (opioid respiratory depression, hypothermia with shivering, pulmonary complication).
+
+These are illustrative patterns for education only. They are not diagnostic.
+</details>
+
+<details>
+<summary><b>62 validated controls, Simple and Advanced views</b></summary>
+
+Five groups: patient profile, physiology, glucose and insulin, sensor, processing. Each control has a label, a unit, a range and a short explanation. **Simple** shows 11 main controls (HR, arrhythmia, SYS, DIA, SpO₂, RR, EtCO₂, temperature, motion, SpO₂ probe state, NIBP interval) plus any control the scenario changed or an alarm points to. **Advanced** shows all 62. Invalid input is rejected with a message, for example DIA ≥ SYS.
+</details>
+
+<details>
+<summary><b>Alarms</b></summary>
+
+Limits and delays for the physiological parameters, rhythm alarms (for example V-tach, frequent PVCs), apnea, and 9 technical conditions. Physiological and technical alarms are kept apart, with priorities, acknowledge, a 2-minute audio pause with countdown, history and CSV export. Extra high-priority alarms below HR 40 bpm and SpO₂ 80 % (illustrative values). Optional Web Audio tones.
+</details>
+
+<details>
+<summary><b>NIBP, trends, signal chain, lessons</b></summary>
+
+- **NIBP:** manual start and stop, or an automatic interval (default every 5 min). Live cuff-pressure trace, the oscillogram with the detected points, and a results table.
+- **Trends:** any parameter from any source over a chosen window, with pause, PNG, CSV and summary statistics. Missing values are breaks, never zeros.
+- **Signal chain:** pick ECG, PPG, respiration, arterial line or capnography and see each stage as a live plot with units and a note, for example the QRS detector's integrated signal with its threshold and detections.
+- **Lessons:** 8 guided lessons (ECG chain, SpO₂, NIBP, rhythms, capnography, arterial line, alarms, deterioration before cardiac arrest). Each has objectives, steps with buttons that set the controls, and a 3-question quiz graded in the page.
+</details>
+
+<details>
+<summary><b>Glucose model, patient profile, data import and export</b></summary>
+
+- **Glucose and insulin:** meal or bolus now, or a 2–4 h **model projection** with a planned meal and bolus: the curve, time to cross 70 / 54 / 180 / 250 mg/dL and time in 70–180 mg/dL. It is a model projection, not a clinical prediction, and not dosing advice.
+- **Patient profile:** age, sex, height, weight and diabetes status, BMI and BSA (Mosteller). Adult BMI categories only from age 20.
+- **Data import / export:** CSV and JSON tables (wide or long, unit conversion, time zones, missing tokens, duplicates and conflicts), manual entry, CSV / JSON export by source and a waveform CSV export.
+- **Android only:** readings from a watch or other wearable through Android Health Connect, a Bluetooth LE heart-rate sensor (Heart Rate Service 0x180D) or a health-app export file. Real data is shown next to the simulation and never drives it.
+</details>
+
+<details>
+<summary><b>Run control and views</b></summary>
+
+Run / pause (<kbd>Space</kbd>), playback speed 0.25–4×, freeze, reset (also restores default alarm limits) and a PNG snapshot that carries the educational notice. Bedside view: toolbar button, <kbd>B</kbd>, or `?bedside=1`. The layout adapts to narrow screens and phones.
+</details>
+
+## Derived 12-lead ECG
+
+> [!NOTE]
+> New after v1.3.0. It is on the [live site](https://hafij-bge.github.io/patient-monitoring/) and in `main`, but **not** in the v1.3.0 installers.
+
+**Click the ECG waveform** (or its **12-lead** button) to open the last 10 s as a standard 12-lead printout: 3 × 4 layout, each column 2.5 s of the same recording, plus a 10 s lead II rhythm strip, on 1 mm / 5 mm grid paper at 25 mm/s and 10 mm/mV with a 1 mV calibration pulse. The header shows the monitor HR, the frontal QRS axis, the filter, the time and the educational notice. **Hold** freezes the view; **Save PNG** exports it.
+
+How the leads are made:
+
+- Each event of the model beat (P, Q, R, S, T) is given a fixed direction in space. The sum is a moving heart vector, scaled so that **lead II equals the monitor's ECG exactly** (unit test: difference below 10⁻⁹ mV in 7 rhythms).
+- The Dower transform turns the vector into I, II and V1–V6. III, aVR, aVL and aVF follow from Einthoven's and Goldberger's relations.
+- A normal beat gives a frontal axis of about +49°, rS in V1, R-wave progression to V5–V6 and upright T waves in I, II and V3–V6. A ventricular beat (PVC, VT) is wide with a negative V1, an inferior axis and a T wave opposite the QRS. VF has no axis.
+- Leads off or signal dropout leave the trace blank, never drawn as zero.
+
+A single moving dipole gives textbook shapes only: no regional ST changes, no infarct Q waves. It is a teaching view, **not a diagnostic ECG**. Sources: Dower et al. 1980, Edenbrandt and Pahlm 1988, Kligfield et al. 2007 (AHA/ACCF/HRS), [`REFERENCES.md`](REFERENCES.md) entries 69–71.
+
+## Get it
+
+No installation, no build step, no backend and no network access after loading. All computation runs on your device.
+
+| Platform | How | Status |
+|---|---|---|
+| 🌐 **Web** | Open <https://hafij-bge.github.io/patient-monitoring/> in a current Chrome, Edge, Firefox or Safari | Tested |
+| 🐧 **Linux** (.deb) | [`PM-SIM-1.3.0-amd64.deb`](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.3.0/PM-SIM-1.3.0-amd64.deb), then `sudo apt install ./PM-SIM-1.3.0-amd64.deb` and start **PM-SIM** from the menu | Installed on the author's Linux PC |
+| 🪟 **Windows** | [Setup](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.3.0/PM-SIM-1.3.0-setup-x64.exe), [portable .exe](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.3.0/PM-SIM-1.3.0-portable-x64.exe) or [.zip](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.3.0/PM-SIM-1.3.0-win-x64.zip). Not code-signed, so SmartScreen shows a warning | Built on a GitHub Windows runner; **not yet run on a real Windows PC** |
+| 🤖 **Android** | [`PM-SIM-1.3.0-android.apk`](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.3.0/PM-SIM-1.3.0-android.apk) (package `edu.deu.pmsim`) | In development; watch routes **not tested with real hardware** |
+
+Checksums for every file are in `SHA256SUMS` on the [release page](https://github.com/Hafij-BGE/patient-monitoring/releases/tag/v1.3.0).
+
+**Run from source:**
+
+```bash
+git clone https://github.com/Hafij-BGE/patient-monitoring.git
+```
+
+```bash
+cd patient-monitoring && python3 -m http.server 8766
+```
+
+Then open `http://localhost:8766/`. `npm start` does the same. Opening `index.html` directly from the file system also works, because the page uses plain scripts and no network calls.
+
+URL options: `?selftest=1` opens the Tests tab and runs the browser self-test; `?bedside=1` starts in the bedside view.
+
+## Tests
 
 Requires Node.js 18 or later. No packages to install.
 
@@ -48,80 +189,104 @@ Requires Node.js 18 or later. No packages to install.
 node --test tests/unit/*.test.js
 ```
 
-Current result: 86 tests, 86 pass. Details are in `TEST_REPORT.md`.
-
-## Features
-
-| Area | What it does |
+| Suite | Result |
 |---|---|
-| Monitor | Six sweeping waveforms (ECG, pleth, arterial pressure 0–200 mmHg, respiration, CO₂ 0–60 mmHg, cuff pressure) and numerics tiles for HR (with rhythm label and PVC/min), SpO₂ (with SQI and PI), pulse rate, ART (SYS/DIA and MAP), EtCO₂ (with FiCO₂ and airway RR), NIBP (SYS/DIA, oscillometric MAP, formula MAP, pulse pressure), RR and temperature. Each tile shows the set point and a source badge. The layout adapts to narrow screens and phones. |
-| Controls | 62 validated controls in five groups: patient profile, physiology, glucose and insulin, sensor and processing. Each has a label, a unit, a range and a short explanation (hover the name, or tick *Show explanations*). **Simple** view shows 11 main controls (HR, arrhythmia, SYS, DIA, SpO₂, RR, EtCO₂, temperature, motion, SpO₂ probe state, NIBP interval) plus any control the scenario changed or an alarm points to; **Advanced** shows all 62. Invalid input is rejected with a message, for example DIA ≥ SYS. |
-| Presets | 50 teaching scenarios. A scenario sets every patient, physiology and sensor control (its own values, all others at default); editing any of them by hand shows **Custom (edited)**. 25 simple scenarios: baseline, tachycardia, bradycardia, irregular timing, desaturation, low and high blood pressure, fast and slow breathing, temperature elevation, sensor disconnection, motion artifact, noisy ECG, missing observations, apnea, atrial fibrillation, PVCs, ventricular tachycardia, ventricular fibrillation, asystole, hypoventilation, bronchospasm, rebreathing, under-damped arterial line and transducer height error. 25 combined-sign patterns from the literature, each with its sources (REFERENCES.md entries 28–44, 51 and 55–68) and a note shown on load: blood loss ATLS class II and III, infection screening (SIRS/qSOFA), acute allergic reaction, hypoventilation masked by O₂, compensatory hyperventilation, dead-space (PE-type) pattern, hypothermia, early and late hypermetabolic (MH-type) pattern, obstructive hypercapnic (COPD-type) pattern, early and late raised-potassium ECG, the raised-ICP (Cushing) reflex, an SVT pattern, a hyperglycaemic-crisis (DKA-type) pattern, pre-arrest deterioration, peri-arrest, acute stroke (high blood pressure), three heart-failure profiles (warm-wet pulmonary oedema, cold-wet low output, cardiogenic shock) and three post-operative patterns (opioid respiratory depression, hypothermia with shivering, pulmonary complication). Illustrative patterns for education only; not diagnostic. |
-| Run control | Run/pause, playback speed (0.25–4×), freeze, reset (also restores default alarm limits) and a PNG snapshot that carries the educational notice. |
-| NIBP | Manual start and stop, or an automatic interval (default every 5 min; a reading also starts on load, scenario change and Reset). The live cuff-pressure trace, the oscillogram with the detected points, and a results table. |
-| Alarms | Limits and delays for the physiological parameters (including EtCO₂, arterial SYS and MAP) and rhythm alarms (for example V-tach, frequent PVCs), apnea, and 9 technical conditions. Physiological and technical alarms are kept apart, with priorities, acknowledge, a 2-minute audio pause with countdown, history and CSV export. Optional Web Audio tones. |
-| Trends | Any parameter from any source over a chosen window. Gaps and missing values are drawn as breaks, never as zeros. Pause, PNG, CSV and summary statistics. |
-| Glucose and insulin | A population glucose–insulin model: Bergman minimal model with meal absorption and subcutaneous insulin (Hovorka), parameters from published studies (REFERENCES.md 45–54). Diabetes status none, type 1 or type 2 changes insulin sensitivity and secretion. The GLU tile shows glucose (mg/dL and mmol/L) and insulin with a "model" badge; alarms below 70, above 180 and a high-priority level 2 below 54 mg/dL. Extra high-priority alarms below HR 40 bpm and SpO₂ 80 % (illustrative values). The **Glucose** tab gives a meal or an insulin bolus now, and draws a 2–4 h **model projection** with a planned meal and bolus: the curve, the time to cross 70/54/180/250 mg/dL and the time in 70–180 mg/dL. It is a model projection, not a clinical prediction, and not dosing advice. |
-| Patient profile | Age, sex, height, weight and diabetes status are the same parameters as Controls → Patient profile (changing either sets the scenario to Custom). Shows BMI and BSA (Mosteller). Adult BMI categories are applied only from age 20. Weight history with change. |
-| Data import/export | CSV/JSON table import only (wide or long tables, unit conversion, time zones, missing tokens, duplicates and conflicts), manual entry, CSV/JSON export by source and a waveform CSV export. In the Android app an extra "On this phone" section reads Health Connect records and a Bluetooth heart-rate sensor after the user starts each one; out-of-range values are rejected with a reason, never clamped. |
-| Signal chain | Pick a channel (ECG, PPG, respiration, arterial line, capnography) and watch each processing stage as a live plot, with units and a note per stage: for example clean ECG, acquired ECG with noise, display filter, the QRS detector's integrated signal with its threshold and detections. Any stage can be saved as PNG. |
-| Lessons | 8 guided lessons (ECG chain, SpO₂, NIBP, rhythms, capnography, arterial line, alarms, deterioration before cardiac arrest). Each has objectives, steps with buttons that set the controls, and a 3-question quiz graded in the page with explanations. |
-| Science and references | The models, assumptions and engineering limitations summarised in the app, and the reference list. |
-| Tests | Browser self-test: 15 automated scenarios (including V-tach, hypoventilation, arterial-line damping, the glucose model, the Bluetooth Heart Rate Measurement parser and the Health Connect record conversion used by the Android app) plus 1 hardware entry (watch data on Android: Health Connect, BLE, export file) that is always reported as "not run" when no hardware is present. |
+| Node unit tests | **93 tests in 12 files, 93 pass** |
+| Browser self-test (`?selftest=1`, or the Tests tab) | 17 entries: **16 pass, 0 fail, 1 not run** |
 
-## Data provenance
+The entry that is not run is the Android watch-hardware check (Health Connect, BLE, export file). It is always reported as "not run" when no hardware is present, never as passed. Scenarios, expected and observed results, and what was not tested are in [`TEST_REPORT.md`](TEST_REPORT.md).
 
-Every value the app stores is an *observation* with:
+## How it works
 
-- a **source**: `simulated`, `derived`, `device`, `imported` or `user`,
-- a **quality** flag: `ok`, `low-quality`, `missing`, `invalid` or `artifact`,
-- a unit, a timestamp and a **provenance** record (method, set point, file name, device, and so on).
+```mermaid
+flowchart LR
+    A["Controls and scenarios<br/>true physiology"] --> B["Signal models<br/>ECG, PPG, ART, resp, CO₂, cuff"]
+    B --> C["Sensor layer<br/>noise, motion, contact,<br/>mains, probe off"]
+    C --> D["Monitor estimators<br/>QRS detector, ratio-of-ratios,<br/>oscillometry, breath, EtCO₂"]
+    D --> E["Numerics tiles<br/>value next to set point"]
+    D --> F["Alarm engine<br/>physiological and technical"]
+    D --> G["Trends and<br/>observation store"]
+    B --> H["Heart vector<br/>Dower transform"]
+    H --> I["Derived 12-lead ECG"]
+    J["Imported files, manual entry,<br/>Android wearables"] --> G
+```
 
-A missing value is stored as `null` with quality `missing`. It is never stored as 0. Series from different sources are never merged. Values from a Bluetooth heart-rate sensor (Android route) use `device`; values loaded from files use `imported`. Values typed in use `user`.
+Real data enters only the observation store. It never drives the simulation; for example, the ECG is never generated from a heart rate received from a watch.
 
-## Project structure
+<details>
+<summary><b>Project structure</b></summary>
 
 ```
 index.html              single page, loads plain <script> files (no modules, works from file://)
 css/                    styles
 src/core/               observation model, units, patient profile, observation store
-src/sim/                parameters and presets, RNG, DSP, ECG, arrhythmias, pulse, sensors, NIBP, detectors, glucose model, engine
+src/sim/                parameters and presets, RNG, DSP, ECG, derived 12-lead, arrhythmias,
+                        pulse, sensors, NIBP, detectors, glucose model, engine
 src/alarms/             alarm engine, alarm-to-tile/control links (severity)
 src/data/               CSV reader, importer (mapping, units, timestamps, validation)
-src/devices/
-  gatt.js               Bluetooth Heart Rate Measurement (0x2A37) parser, used by the Android app's BLE route
-  androidBridge.js      turns Health Connect records and BLE notifications from the Android app into observations
+src/devices/            Bluetooth Heart Rate Measurement parser, Android bridge (Health Connect, BLE)
 src/lessons/            lesson content and quiz grading (no DOM)
-src/ui/                 canvas waveforms and trends, panels (signal chain, lessons, Android section, glucose), data tab, self-test, app wiring
-android/                Android WebView app (edu.deu.pmsim 1.3.0, in development): Health Connect and BLE bridge
-desktop/                Linux .deb and Windows .exe: Electron shell (main.cjs), package config and build-deb.sh
-.github/workflows/
-  pages.yml             runs the unit tests and deploys the site to GitHub Pages
-tests/unit/             Node unit tests (node --test): sim, arrhythmia, alarms, core, data, devices, androidBridge, lessons, scenario, glucose
-fixtures/               synthetic CSV/JSON import files (see fixtures/README.md)
-package.json            "test" and "start" scripts
+src/ui/                 canvas waveforms and trends, panels, 12-lead dialog, bedside view,
+                        data tab, self-test, app wiring
+android/                Android WebView app (edu.deu.pmsim, in development)
+desktop/                Electron shell for the Linux .deb and Windows .exe
+.github/workflows/      pages.yml (tests + GitHub Pages), windows.yml (Windows builds)
+tests/unit/             Node unit tests (node --test)
+fixtures/               synthetic CSV/JSON import files
+docs/media/             screenshots and demo video
 ```
 
 The simulation, alarm, data and parser modules do not touch the DOM. They load in the browser as `window.PM.*` and in Node through `require`, so the same code is tested in both places.
+</details>
+
+## Data provenance
+
+Every value the app stores is an *observation* with:
+
+- a **source**: `simulated`, `derived`, `device`, `imported` or `user`;
+- a **quality** flag: `ok`, `low-quality`, `missing`, `invalid` or `artifact`;
+- a unit, a timestamp and a **provenance** record (method, set point, file name, device, and so on).
+
+A missing value is stored as `null` with quality `missing`, never as 0. Series from different sources are never merged. Out-of-range imported or device values are rejected with a reason, never clamped.
+
+## Known limitations
+
+Stated plainly, so nobody relies on a feature that has not been shown to work:
+
+- **AF heart rate under-reads.** In the atrial-fibrillation scenario the displayed HR is about 75–85 bpm while the set rate is 110 bpm.
+- **The SpO₂ signal-quality index misses some artifacts.** Strong motion and shivering are not always flagged.
+- **Windows builds have never been run on a real Windows PC.** They were built and checksummed on a GitHub runner only.
+- **The Android app has not been tested with real hardware.** Health Connect, BLE and export-file routes are implemented but unverified.
+- **The 12-lead ECG is a single-dipole teaching model**, not diagnostic. Its **Save PNG** button was not clicked in testing; the drawing itself was checked.
+- All physiology is a population model with illustrative parameters. It does not represent any individual patient.
+
+The full list is in section 9 of [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) and in [`TEST_REPORT.md`](TEST_REPORT.md).
+
+## Privacy and safety
+
+- The page makes **no network requests**. Its Content Security Policy sets `connect-src 'none'` and loads scripts and styles only from its own folder. The website, the Android app and the desktop apps all use the same page.
+- Imported files are read in the browser tab and are not uploaded anywhere.
+- No measurement data is saved between sessions; reloading the page clears it. Only three settings are kept in this browser's `localStorage`: the best quiz score per lesson (`pmsim.lessons.v1`), the Controls view choice (`pmsim.controls.v1`) and the Bedside view on/off state (`pmsim.bedside`).
+- The Android app has no `INTERNET` permission and disables cloud backup. Health Connect permissions are read-only and requested from the user. This is the intended design; it has not yet been verified with real devices.
+- Only documented, vendor-neutral interfaces are used (Android Health Connect, the Bluetooth SIG Heart Rate Service, the user's own export files). No proprietary protocol is reverse-engineered.
+- PM-SIM is an original educational design. It does not reproduce the interface of any monitor manufacturer.
+- It is not a medical device, has not been validated, and must not be used for diagnosis or patient monitoring.
 
 ## Documents
 
 | File | Content |
 |---|---|
-| `TECHNICAL_REPORT.md` | Models, equations, assumptions, architecture, alarms, limitations |
-| `REFERENCES.md` | Sources and what each one supports |
-| `TEST_REPORT.md` | Test scenarios, expected and observed results, what was not tested |
-| `DEMO_SCRIPT.md` | Step-by-step demonstration (about 11 minutes) |
-| `DEVICE_INTEGRATION_REPORT.md` | What device integration was removed and why; the Android-only watch routes, their limits and status |
-| `VIBE_CODING_PROMPT.md` | The prompts used to build the app |
-| `PLAN.md` | Implementation plan and environment notes |
+| [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) | Models, equations, assumptions, architecture, alarms, limitations |
+| [`REFERENCES.md`](REFERENCES.md) | 71 sources and what each one supports |
+| [`TEST_REPORT.md`](TEST_REPORT.md) | Test scenarios, expected and observed results, what was not tested |
+| [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) | Step-by-step demonstration (about 11 minutes) |
+| [`DEVICE_INTEGRATION_REPORT.md`](DEVICE_INTEGRATION_REPORT.md) | Device integration removed and why; the Android-only watch routes and their status |
+| [`VIBE_CODING_PROMPT.md`](VIBE_CODING_PROMPT.md) | The prompts used to build the app |
+| [`PLAN.md`](PLAN.md) | Implementation plan and environment notes |
 
-## Privacy and safety
+## Credits
 
-- The page makes no network requests. Its Content Security Policy sets `connect-src 'none'` and loads scripts and styles only from the page's own folder. The same page is served as the website and wrapped in the Android app and the Linux desktop app.
-- Imported files are read in the browser tab and are not uploaded anywhere.
-- No measurement data is saved between sessions. Reloading the page clears all data. Only two things are kept in this browser's `localStorage`: the best quiz score per lesson (key `pmsim.lessons.v1`) and the Controls view choice, Simple or Advanced and explanations on or off (key `pmsim.controls.v1`).
-- The Android app has no `INTERNET` permission and disables cloud backup. Health Connect permissions are read-only, requested from the user, and the data goes only to the local page. This is the intended design; it has not yet been verified with real devices.
-- Only documented, vendor-neutral interfaces are used (Android Health Connect, Bluetooth SIG Heart Rate Service, the user's own export files). No proprietary protocol is reverse-engineered.
-- PM-SIM is an original educational design. It does not reproduce the interface of any monitor manufacturer.
-- It is not a medical device, has not been validated, and must not be used for diagnosis or patient monitoring.
+Md. Hafijur Rahman, Biomedical Technologies master's programme, Dokuz Eylül University, İzmir.
+Built with Vibe Coding using Claude Code. Models and parameters come from the published sources listed in [`REFERENCES.md`](REFERENCES.md).
+
+<div align="center"><sub>Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.</sub></div>

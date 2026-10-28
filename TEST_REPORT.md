@@ -8,8 +8,8 @@ PM-SIM, Patient Monitor Simulator. Updated 2026-10-28 after the device integrati
 
 | Test level | Result |
 |---|---|
-| Node unit tests (`node --test tests/unit/*.test.js`) | **86 tests in 11 files, 86 pass, 0 fail** (run 2026-10-28 after the critical-illness, stroke, heart-failure and post-operative scenarios and the extreme-low alarms; 80 after the SVT scenario and the QRS beat-time fix, 79 after the NIBP set-point fix, 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
-| Browser self-test (`index.html?selftest=1`) | **16 entries: 15 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-28: **15 pass, 0 fail, 1 not run** (section 3). |
+| Node unit tests (`node --test tests/unit/*.test.js`) | **93 tests in 12 files, 93 pass, 0 fail** (run 2026-10-28 after the derived 12-lead ECG; 86 after the critical-illness, stroke, heart-failure and post-operative scenarios and the extreme-low alarms; 80 after the SVT scenario and the QRS beat-time fix, 79 after the NIBP set-point fix, 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
+| Browser self-test (`index.html?selftest=1`) | **17 entries: 16 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-28: **16 pass, 0 fail, 1 not run** (section 3). |
 | Manual interaction checks in a browser | 9 earlier checks (section 4.1) and 5 checks of the new features made on 2026-10-28 (section 4.2), all as expected. |
 | Hardware tests (watch data on Android through Health Connect, native BLE Heart Rate Service, export file) | **Not run.** No watch, heart-rate sensor or Health Connect store was used. |
 | Android app | Not tested on a device. An APK file (`release/PM-SIM-1.3.0-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
@@ -44,9 +44,10 @@ The self-test runs each scenario on a fresh engine instance with a fixed seed. T
 | 13 | Arterial line: optimal vs under-damped, 120/80 mmHg, 20 s each | Optimal SYS/DIA within ±5 of 120/80; under-damped SYS ≥ 8 mmHg higher with MAP within ±2 | optimal about 120/79 (90), under-damped about 133/74 (91) | pass |
 | 14 | Health Connect records (Android bridge logic): one valid heart-rate record and one SpO₂ record of 150 % | Valid record stored as source `device`; SpO₂ 150 % rejected, not clamped | 1 stored (hr 61, device), 1 rejected | pass |
 | 15 | Glucose model (no diabetes: 50 g meal, 5 h; type 1: fasting 200 mg/dL, basal 0.8 U/h, 6 U bolus, 4 h; alarm engine at 60 mg/dL) | Meal peak above 120 mg/dL and back within ±15 of 90 by 5 h; bolus lowers the 4 h value by ≥ 10 mg/dL; glucose-low alarm active | peak 167, 5 h 84 mg/dL; type 1 at 4 h 200 → 159 mg/dL with bolus; glucose:low active | pass |
-| 16 | Watch data on Android (Health Connect, BLE, export file): readings arrive with source `device` and the route in the provenance | Live readings from a real watch or sensor | **not run**: no hardware available | not run |
+| 16 | Derived 12-lead ECG: baseline preset, 12 s, then electrode contact 5 % for 2 s | Lead II of the 12-lead identical to the monitor trace; I + III = II; frontal axis +30…+75°; leads off gives no signal in all 12 leads | largest II − monitor difference 0 mV, largest I + III − II residual 2.2 × 10⁻¹⁴ mV, axis +49°, leads off: no signal (browser self-test, 2026-10-28) | pass |
+| 17 | Watch data on Android (Health Connect, BLE, export file): readings arrive with source `device` and the route in the provenance | Live readings from a real watch or sensor | **not run**: no hardware available | not run |
 
-Entry 14 tests only the page-side conversion code with records written in the test. It does not involve Health Connect or a phone. Entry 16 is reported as "not run" by design. The code never marks a hardware test as passed without hardware. Earlier versions of the self-test also had scenarios for the BLE packet replay, HL7 v2, the HL7 bed filter and MLLP framing, and FHIR/SDC import (15 entries: 13 pass, 2 not run). They were removed together with those features.
+Entry 14 tests only the page-side conversion code with records written in the test. It does not involve Health Connect or a phone. Entry 17 is reported as "not run" by design. The code never marks a hardware test as passed without hardware. Earlier versions of the self-test also had scenarios for the BLE packet replay, HL7 v2, the HL7 bed filter and MLLP framing, and FHIR/SDC import (15 entries: 13 pass, 2 not run). They were removed together with those features.
 
 ## 4. Manual interaction checks
 
@@ -80,6 +81,23 @@ Performed on 2026-10-28 in the same browser pane, after capnography, the arteria
 
 The mock object only imitates the app's interface in a desktop browser. It is not a test of the Android app, Health Connect or a Bluetooth device.
 
+### 4.3 Derived 12-lead view
+
+Performed on 2026-10-28 in the browser pane (Chromium) served from `localhost`, and in offscreen Electron for the README screenshot.
+
+| Check | Expected | Observed |
+|---|---|---|
+| Click on the ECG waveform, and the *12-lead* button | Dialog opens with 12 labelled leads, a rhythm strip, the header and the notice | Opens from both; layout as expected; no console errors |
+| Baseline (72 bpm) | Normal pattern, axis about +50° | Axis +49° (normal); rS in V1, tall R in V4–V6, aVR negative |
+| VT preset | Wide complexes, V1 negative, V6 positive | As expected; axis +83° |
+| VF preset | Chaotic activity in all leads, no axis | As expected; message "no QRS complexes, no axis" |
+| Asystole preset | Message, no axis | As expected |
+| Contact set to 5 % for 4 s, then 12 s | First: gaps left blank with a partial-signal message; then: no traces and "No ECG signal" | As expected (a first version reported "No ECG signal" for a partial gap; fixed to use the 10 s rhythm strip) |
+| Hold / Close buttons | Hold freezes and relabels; Close closes and stops the refresh | As expected |
+| Bedside view and 375 px width | Button reachable; dialog fits the screen; the ECG paper scrolls sideways inside it, the page does not | As expected (page width 375 px) |
+
+The *Save PNG* button uses the same `canvasPng` helper as the other PNG buttons; the download itself was not clicked in this session.
+
 ## 5. Offline and `file://` operation
 
 The page was not opened from `file://` in a browser during this session. The local Chromium-based browser available here (a snap package) could not read files under `/tmp` or `/mnt` because of its sandbox, and the browser pane cannot open `file://` URLs. Instead the following was checked statically:
@@ -93,7 +111,7 @@ When served over `http://localhost`, the app made no network requests other than
 
 ## 6. Node unit and integration tests
 
-86 tests in 11 files (18 + 10 + 4 + 13 + 3 + 11 + 3 + 4 + 6 + 8 + 6). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
+93 tests in 12 files (18 + 10 + 4 + 13 + 3 + 11 + 3 + 4 + 6 + 8 + 6 + 7). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
 
 The first five files were already described before the new features were added. Their counts did not change.
 
@@ -225,6 +243,16 @@ Each test runs the full simulation of a scenario (40–60 s) and passes every fr
 - Post-operative: opioid depression raises RR-low, EtCO₂-high and SpO₂-low with EtCO₂ > 55; shivering raises TEMP-low and shows SpO₂ < 90 % (set point 97 %) **without** the low-SQI flag; the pulmonary complication raises only SpO₂-low with RR > 24 and HR > 100.
 
 The cold-wet and shivering checks record limitations on purpose: the monitor misses the first, and the quality index misses the artefact in the second.
+
+### `tests/unit/ecg12.test.js` (7 tests)
+
+- Derived lead II equals the single-lead monitor ECG to < 10⁻⁹ mV at every sample in all seven rhythm patterns (none, AF, PVC, VT, VF, asystole, SVT).
+- Einthoven (I + III = II) and Goldberger (aVR + aVL + aVF = 0) hold at every sample.
+- Every scaled event direction projects on lead II with value 1, and the extra VF direction projects to 0.
+- Normal beat: frontal axis between +30 and +75°; R/S < 1 in V1 and > 1 in V5 and V6, rising from V1 to V3 to V5; T upright in I, II, V3–V6 and inverted in aVR; aVR mainly negative.
+- Ventricular beat (VT, 70 bpm): V1 negative, V6 positive, axis +60…+100°, T opposite the QRS in II.
+- The axis stays within 5° of its reference at 40–200 bpm and QRS width 0.8–1.5×; it is undefined (NaN) in VF and asystole.
+- Engine: 12 rings filled; the 12-lead lead II ring equals the monitor ECG ring sample for sample; all 12 are NaN while the electrode contact is 5 %.
 
 ## 7. Defects found and fixed during testing
 

@@ -84,6 +84,21 @@ code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 12.5
 .wave[data-ch="resp"] .wave-label { color: var(--resp); } .wave[data-ch="cuff"] .wave-label { color: var(--cuff); }
 .wave[data-ch="art"] .wave-label { color: var(--art); } .wave[data-ch="co2"] .wave-label { color: var(--co2); }
 .wave-scale { font-weight: 400; }
+.wave.clickable { cursor: pointer; }
+.wave-btn { position: absolute; right: 4px; top: 3px; z-index: 2; font-size: 11px; padding: 1px 7px; border-radius: 5px;
+  background: rgba(12,16,22,.7); color: var(--ecg); border-color: var(--screen-line); }
+.wave-btn:hover { border-color: var(--ecg); }
+
+/* derived 12-lead ECG dialog: printed-paper look in both themes */
+dialog.e12 { width: min(1180px, calc(100vw - 16px)); max-width: none; max-height: calc(100vh - 16px); padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); }
+dialog.e12::backdrop { background: rgba(0,0,0,.55); }
+.e12-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.e12-head h2 { margin: 0; }
+.e12-btns { display: flex; gap: 6px; }
+.e12-info { margin: 6px 0; font-size: 13px; }
+.e12-paper { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.e12-paper canvas { display: block; width: 100%; min-width: 760px; }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: start; }
 .tile { border: 1px solid var(--screen-line); border-radius: 10px; padding: 6px 9px; min-height: 88px; position: relative;
   background: linear-gradient(180deg, rgba(255,255,255,.035), transparent 60%); }

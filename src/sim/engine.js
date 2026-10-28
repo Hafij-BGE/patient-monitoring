@@ -10,12 +10,12 @@
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./dsp.js'), require('./rng.js'), require('./ecg.js'), require('./pulse.js'),
       require('./sensors.js'), require('./nibp.js'), require('./detectors.js'), require('./params.js'),
-      require('../core/observation.js'), require('./arrhythmia.js'), require('./glucose.js'));
+      require('../core/observation.js'), require('./arrhythmia.js'), require('./glucose.js'), require('./ecg12.js'));
   } else {
     const P = root.PM;
-    P.engine = factory(P.dsp, P.rng, P.ecg, P.pulse, P.sensors, P.nibp, P.detectors, P.params, P.observation, P.arrhythmia, P.glucose);
+    P.engine = factory(P.dsp, P.rng, P.ecg, P.pulse, P.sensors, P.nibp, P.detectors, P.params, P.observation, P.arrhythmia, P.glucose, P.ecg12);
   }
-})(this, function (dsp, rngMod, ecgMod, pulse, sensors, nibpMod, det, params, observation, arr, glucoseMod) {
+})(this, function (dsp, rngMod, ecgMod, pulse, sensors, nibpMod, det, params, observation, arr, glucoseMod, ecg12) {
   'use strict';
 
   const DT = 1e-3;
@@ -23,6 +23,7 @@
   const PAT = 0.20;       // s, R peak → peripheral pulse foot (pulse arrival time, illustrative)
   const BUFFER_S = 60;    // seconds of waveform kept for display
   const TAP_S = 12;       // seconds kept per signal-chain probe point
+  const LEAD12_S = 12;    // seconds kept per lead of the derived 12-lead ECG
 
   const PMSF = 10;        // mmHg, pressure the arteries settle to without heartbeats (illustrative mean systemic filling pressure)
   const HYDRO_MMHG_PER_CM = 0.7356; // 1 cmH2O in mmHg (saline column between transducer and heart level)
@@ -49,7 +50,7 @@
       this.trueR = []; this.trueKinds = [];
       this.lastBeatT = 0; this.perf = 1;
       if (this.taps) this.taps = {}; // probes stay enabled across a reset
-      this.ecg = new ecgMod.EcgGenerator(this.p, new rngMod.Rng(seed + 2), DT, new rngMod.Rng(seed + 10));
+      this.ecg = new ecgMod.EcgGenerator(this.p, new rngMod.Rng(seed + 2), DT, new rngMod.Rng(seed + 10), new rngMod.Rng(seed + 13));
       this.ecg.onR = (tR, rr, beat) => {
         this.trueR.push(tR); if (this.trueR.length > 64) this.trueR.shift();
         this.trueKinds.push(beat.kind); if (this.trueKinds.length > 64) this.trueKinds.shift();
@@ -66,6 +67,8 @@
       this.nibp.onDone = res => { this.nibpEvent = res; if (this.onNibp) this.onNibp(res, this.t); };
       this.ecgDrop = new sensors.Dropouts(new rngMod.Rng(seed + 8));
       this.ecgNoise = new rngMod.Rng(seed + 9);
+      this.lead12Noise = new rngMod.Rng(seed + 14);
+      this.lead12 = null; this.lead12V = new Array(12);
       this.plethS = new dsp.Ring(PPG_FS * BUFFER_S);
       this.respS = new dsp.Ring(RESP_FS * BUFFER_S);
       this.cuffS = new dsp.Ring(CUFF_FS * BUFFER_S);
@@ -91,11 +94,20 @@
         this.rhythm = new arr.RhythmAnalyzer(fs);
         this.rhythm.reset(this.t);
       }
-      const st = [];
-      if (p.ecg_filter === 'monitor') st.push(dsp.bandpass(0.5, 40, fs));
-      else if (p.ecg_filter === 'diagnostic') st.push(dsp.bandpass(0.05, 150, fs));
-      if (p.notch === 'on' && p.mains_hz < fs / 2) st.push(dsp.notch(p.mains_hz, fs, 30));
-      this.ecgFilter = new dsp.Chain(st);
+      const chain = () => {
+        const st = [];
+        if (p.ecg_filter === 'monitor') st.push(dsp.bandpass(0.5, 40, fs));
+        else if (p.ecg_filter === 'diagnostic') st.push(dsp.bandpass(0.05, 150, fs));
+        if (p.notch === 'on' && p.mains_hz < fs / 2) st.push(dsp.notch(p.mains_hz, fs, 30));
+        return new dsp.Chain(st);
+      };
+      this.ecgFilter = chain();
+      // Derived 12-lead ECG: one ring and one copy of the display filter per lead.
+      if (!this.lead12 || this.lead12[0].fs !== fs) {
+        this.lead12 = [];
+        for (let j = 0; j < 12; j++) { const r = new dsp.Ring(fs * LEAD12_S); r.fs = fs; this.lead12.push(r); }
+      }
+      this.lead12Filter = this.lead12.map(chain);
       this.ecgDec = Math.round(1000 / fs);
     }
 
@@ -162,7 +174,7 @@
       const drop = this.ecgDrop.active(t, p.ecg_dropout, 1 / fs);
       if (p.contact >= 10 && !drop) {
         const wander = p.ecg_wander_mv * (Math.sin(2 * Math.PI * this.resp.phase) + 0.3 * Math.sin(2 * Math.PI * 0.05 * t));
-        const noise = this.ecgNoise.gauss() * p.ecg_noise_uv / 1000 * (1 + 4 * (1 - q) * (1 - q));
+        const noise = this.lastEcgNoise = this.ecgNoise.gauss() * p.ecg_noise_uv / 1000 * (1 + 4 * (1 - q) * (1 - q));
         const mains = p.mains_uv / 1000 * (1 + 4 * (1 - q)) * Math.sin(2 * Math.PI * p.mains_hz * t);
         x = clean + wander + noise + mains;
       } else this.lastNaN.ecg = t;
@@ -171,11 +183,29 @@
       if (r !== null) { this.qrsTimes.push(r); if (this.qrsTimes.length > 64) this.qrsTimes.shift(); this.rhythm.onQrs(r); }
       const y = this.ecgFilter.process(x);
       this.ecgS.push(y);
+      this.acquireLeads12(x, x - clean);
       if (this.taps) {
         this.tap('ecg.clean', fs, clean); this.tap('ecg.acq', fs, x); this.tap('ecg.disp', fs, y);
         this.tap('ecg.mwi', fs, Number.isFinite(x) ? this.qrs.m1 : NaN);
         this.tap('ecg.thr', fs, Number.isFinite(this.qrs.thr) && Number.isFinite(x) ? this.qrs.thr : NaN);
       }
+    }
+
+    /** Derived 12-lead ECG (ecg12.js). Lead II is the monitor signal x itself;
+     *  lead I and V1–V6 get the same wander and mains plus their own noise, and
+     *  III, aVR, aVL, aVF are formed from the noisy I and II as an ECG cart does. */
+    acquireLeads12(x, common) {
+      const v = this.lead12V;
+      if (Number.isFinite(x)) {
+        ecg12.leads(this.ecg.vcg, v);
+        const p = this.p, q = p.contact / 100, sd = p.ecg_noise_uv / 1000 * (1 + 4 * (1 - q) * (1 - q));
+        // common = wander + noise + mains of lead II; drop lead II's own noise sample
+        const shared = common - this.lastEcgNoise;
+        const I = v[0] + shared + this.lead12Noise.gauss() * sd, II = x;
+        v[0] = I; v[1] = II; v[2] = II - I; v[3] = -(I + II) / 2; v[4] = I - II / 2; v[5] = II - I / 2;
+        for (let j = 6; j < 12; j++) v[j] += shared + this.lead12Noise.gauss() * sd;
+      } else v.fill(NaN);
+      for (let j = 0; j < 12; j++) this.lead12[j].push(this.lead12Filter[j].process(v[j]));
     }
 
     acquirePpg(t) {
@@ -333,5 +363,5 @@
   /** MAP ≈ (SBP + 2·DBP)/3 — the textbook single-beat approximation (derived, not measured). */
   const mapFormula = (sbp, dbp) => (sbp + 2 * dbp) / 3;
 
-  return { Engine, frameObservations, mapFormula, DT, PPG_FS, RESP_FS, CUFF_FS, CAP_FS, ART_FS, PAT, IBP_DAMPING, HYDRO_MMHG_PER_CM, TAP_S };
+  return { Engine, frameObservations, mapFormula, DT, PPG_FS, RESP_FS, CUFF_FS, CAP_FS, ART_FS, PAT, IBP_DAMPING, HYDRO_MMHG_PER_CM, TAP_S, LEAD12_S };
 });
