@@ -35,12 +35,12 @@
       }
     }
 
-    /** Detects the format (CSV/JSON table, HL7 v2, FHIR, SDC) and stores the result. extra: { acceptLocation, source, box } */
+    /** Imports a CSV/JSON table and stores the result. extra: { source, box } */
     function importOne(text, name, extra) {
       extra = extra || {};
       const opts = { timezone: $('#impTz').value.trim() || 'local', dateOrder: $('#impOrder').value, duplicates: $('#impDup').value,
-        acceptLocation: extra.acceptLocation, source: extra.source };
-      const r = PM.catalog.importAny(text, name, opts);
+        source: extra.source };
+      const r = PM.importer.importText(text, name, opts);
       store.addMany(r.observations);
       showReport(r.report, extra.box);
       renderSummary();

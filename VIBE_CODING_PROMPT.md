@@ -2,13 +2,13 @@
 
 PM-SIM was built with Vibe Coding. The author described the goal, constraints and acceptance criteria in natural language. An AI coding agent (Claude Code, Anthropic, model Claude Opus) then inspected the environment, wrote a plan, wrote the code and tests, ran them, and fixed defects. The author reviewed the results and gave follow-up instructions.
 
-This file records the prompts in the order they were given. Prompts 1, 3 and 4, and the two prompts in the revision note at the end, are reproduced verbatim. Nothing was added to them afterwards. Prompt 3 still describes the original wearable integration task; that integration was later removed (see the revision note).
+This file records the prompts in the order they were given. Prompts 1, 3 and 4, and the prompts in the two revision notes at the end, are reproduced verbatim. Nothing was added to them afterwards. Prompt 3 still describes the original wearable integration task; that integration was removed in the first revision note and an Android-only watch route was added in the second (2026-10-28).
 
 ## How the work was run
 
 1. **Environment inspection.** Node.js, Python, browsers, the Bluetooth adapter and `adb` were checked before any code was written (see `PLAN.md`).
 2. **Plan.** `PLAN.md` fixed the architecture (logic modules without DOM access, plain scripts so the page works from `file://`), the workstreams and the rules (provenance, missing ≠ 0, no hardware test marked passed without hardware).
-3. **Research.** The Bluetooth SIG GATT specifications, the HL7 v2, IHE PCD, FHIR and IEEE 11073 SDC documents and the FDA documents were used as the sources for the integration code (see `REFERENCES.md` and `DEVICE_INTEGRATION_REPORT.md`). Of the MDC numeric codes, only those marked `checked: true` in `src/devices/mdc.js` were cross-checked against published values.
+3. **Research.** The Bluetooth SIG GATT specifications, the HL7 v2, IHE PCD, FHIR and IEEE 11073 SDC documents and the FDA documents were used as the sources for the integration code. That hospital and Web Bluetooth integration, and its references, were removed on 2026-10-28 (see the last revision note, `REFERENCES.md` and `DEVICE_INTEGRATION_REPORT.md`).
 4. **Build in layers.** Core data model, then simulation, alarms, data import, device parsers and finally the UI. Unit tests were written alongside each layer.
 5. **Verification.** `node --test` after each layer, then the app was driven in a browser: the self-test, presets, NIBP, import, manual entry, trends, reset, a 375 px mobile layout and the console. Defects found this way were fixed and re-tested (see `TEST_REPORT.md`).
 6. **Documentation.** The reports were written last, from the source code and the observed test results.
@@ -538,7 +538,7 @@ This led to the Bluetooth SIG standard-profile client (heart rate, pulse oximete
 
 - The agent wrote the code, tests and draft documents. The author set the requirements and reviewed the output.
 - Equations and constants were taken from the cited literature, not invented. Where a value is a teaching choice rather than a published constant (for example the pulse-shape Gaussians or the 0.20 s pulse arrival time), `TECHNICAL_REPORT.md` says so.
-- Claims about Bluetooth profiles and hospital device interfaces come from the documents listed in `REFERENCES.md`. Anything that could not be verified is marked as unverified or not tested.
+- Claims about the Bluetooth Heart Rate Service and the Android APIs come from the documents listed in `REFERENCES.md`. Anything that could not be verified is marked as unverified or not tested.
 
 ## Revision note (2026-10-28)
 
@@ -558,3 +558,47 @@ What was built in response:
 - The Devices tab now starts with a picker of 12 generic device classes and a bed/location field. It adds HL7 v2 ORU^R01 (IHE PCD-01) over MLLP in the desktop app and over a serial port, HL7 v2, FHIR R4 and SDC MDIB file import, a bed filter, a synthetic HL7 feed and a message log (`DEVICE_INTEGRATION_REPORT.md`).
 - The mobile build was dropped. The desktop app is built for Linux (`.deb`) and Windows: a zip built locally, and an NSIS installer and portable `.exe` from a GitHub Actions workflow that has not been run yet.
 - Tests grew to 71 unit tests and 15 self-test entries (13 pass, 2 hardware tests not run). No real hospital device was connected.
+
+## Revision note 2 (2026-10-28, later the same day)
+
+The simulator was then extended and slimmed down. The prompts and answers below are reproduced verbatim.
+
+The first prompt reverses the earlier decision to exclude the HONOR watch, this time for an Android app only:
+
+````text
+can you add more modern and informative simulator . make a apk of android, with data from honor watch. will only work on android
+````
+
+The agent offered options. The follow-up choices for the simulator side were:
+
+````text
+Signal-chain view, More waveforms, Guided lessons + quiz, Modern UI refresh
+````
+
+For the HONOR watch data route the answer was:
+
+````text
+Don't know, build all
+````
+
+Next, the owner asked for a website and for a list of removable parts to choose from:
+
+````text
+make a web site and delete extra things that is not needed for a simulator, list them fist. i will choose what to remove
+website will work at same way to app
+````
+
+The choices from that list were:
+
+````text
+Hospital routes, Web Bluetooth devices, Whole Devices tab; Old local builds (875 MB), Electron desktop app; host on GitHub Pages
+````
+
+What was done in response:
+
+- The whole Devices tab and all device integration were removed from the web page: HL7 v2 (MLLP, serial, files), FHIR R4 and SDC import, MDC mapping, the synthetic HL7 feed, the bed filter, the device-type catalogue, Web Bluetooth, Web Serial and the GATT packet replay. The Data import tab reads CSV/JSON tables only.
+- `src/devices/gatt.js` stayed, trimmed to the Bluetooth Heart Rate Measurement parser (0x2A37) for the Android app. The unit tests dropped from 71 to 47, and the browser self-test from 15 to 11 entries (10 automated, 1 hardware entry reported as not run).
+- The Electron desktop app, its build configuration, the Windows workflow and the local release builds were removed. The published GitHub release v1.0.0 stays online as an old version that is no longer built.
+- The app is published as a static website on GitHub Pages (https://hafij-bge.github.io/patient-monitoring/) by `.github/workflows/pages.yml`. It works the same way as the app.
+- An Android app (`edu.deu.pmsim`, 1.1.0, in `android/`) wraps the same page and is the only place where real watch data enters: Android Health Connect, native BLE Heart Rate Service, or a health-app export file. It is still being built and nothing has been tested with real hardware. HONOR's own protocol is proprietary and is not used.
+- Which of the simulator-side choices (signal-chain view, more waveforms, guided lessons and quiz, modern UI refresh) are finished is not recorded in these documents; the Tests tab, README and TECHNICAL_REPORT describe only what exists in the code.

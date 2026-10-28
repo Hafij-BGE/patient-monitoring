@@ -27,14 +27,13 @@ The set point of every parameter is known, so the app shows each estimate next t
 | Simulation | `src/sim/params.js`, `rng.js`, `dsp.js`, `ecg.js`, `pulse.js`, `sensors.js`, `nibp.js`, `detectors.js`, `engine.js` | Parameters, presets, signal models, estimators, the time-stepping engine |
 | Alarms | `src/alarms/alarmEngine.js` | Limit checks, delays, priorities, acknowledge, audio pause, history |
 | Data I/O | `src/data/csv.js`, `importer.js` | CSV/JSON parsing, column mapping, units, time zones, validation |
-| Devices | `src/devices/gatt.js`, `webBluetooth.js`, `replay.js` | Bluetooth SIG characteristic parsers, Web Bluetooth connector, synthetic replay |
-| Hospital interfaces | `src/devices/hl7v2.js`, `fhir.js`, `sdc.js`, `mdc.js`, `webSerial.js`, `catalog.js`, `samples.js` | HL7 v2 ORU^R01 parser with MLLP framing and ACK, FHIR R4 and SDC MDIB importers, MDC/LOINC/UCUM code tables, serial framer, device-class catalogue, synthetic examples and feed |
-| UI | `src/ui/*.js`, `index.html`, `css/` | Canvas rendering, panels and wiring |
-| Desktop shell | `electron/main.cjs`, `preload.cjs`, `mllpServer.cjs` | Electron window on the `app://pm-sim` origin, HL7 MLLP listener, serial and Bluetooth chooser dialogs |
+| Device parser | `src/devices/gatt.js` | Parser for the Bluetooth Heart Rate Measurement characteristic (0x2A37), used by the Android app's BLE route |
+| UI | `src/ui/*.js`, `index.html`, `css/` | Canvas rendering, panels (Controls, NIBP, Alarms, Trends, Data import/export, Profile, Science, Tests, References) and wiring |
+| Android host | `android/` (Kotlin) | WebView wrapper around the same page, with a Health Connect reader and a native BLE Heart Rate client (in development) |
 
 The simulation, alarm, data and parser modules never touch the DOM. Each uses a UMD wrapper, so the same file runs in the browser (`window.PM.*`) and in Node for the unit tests. There is no build step and no ES-module import, so `index.html` also works from `file://`.
 
-**Desktop app.** The same page is packaged with Electron as a Linux `.deb` and a Windows build (zip, NSIS installer and portable `.exe`). The window loads the page from a private `app://pm-sim` protocol with `contextIsolation`, `sandbox` and no Node integration. The desktop shell adds only what a web page cannot do: a TCP listener for HL7 MLLP, which runs in the main process and is reached through a fixed `contextBridge` API, and chooser dialogs for serial ports and Bluetooth devices, which Electron does not provide itself. The page's Content Security Policy (`connect-src 'none'`) is unchanged, so the page still makes no network requests.
+**Website and Android app.** The page is published as a static website at https://hafij-bge.github.io/patient-monitoring/ by the GitHub Actions workflow `.github/workflows/pages.yml`, which runs the unit tests and then deploys `index.html`, `css/`, `src/` and `fixtures/`. It can also be served locally (`python3 -m http.server 8766`) or opened from `file://`. The Content Security Policy (`connect-src 'none'`) means the page makes no network requests. The Android app (`android/`, package `edu.deu.pmsim`, version 1.1.0) wraps the same page in a WebView. It is the only place where real watch data enters (section 7.2) and it is still in development. An earlier Electron desktop app (Linux `.deb`, Windows build) was removed on 2026-10-28; the published GitHub release v1.0.0 stays online as an old version that is no longer built.
 
 ### 2.1 Time base
 
@@ -216,13 +215,11 @@ Every stored value is an immutable observation:
 |---|---|---|
 | `simulated` | produced by the engine, including its estimators | HR from the QRS detector, SpO₂ from the ratio of ratios |
 | `derived` | calculated from other values | BMI, BSA, pulse pressure, MAP formula |
-| `device` | received from a connected device | Bluetooth heart-rate strap; HL7 v2 message received over MLLP or a serial port; packet replay and synthetic HL7 feed (with `provenance.replay`) |
-| `imported` | loaded from a file | CSV/JSON table; HL7 v2 message file; FHIR R4 Observation or Bundle; SDC MDIB XML |
+| `device` | received live from a connected sensor | Bluetooth Heart Rate Measurement packets (`gatt.js`; Android route, page-side wiring in development) |
+| `imported` | loaded from a file or read from another app's store | CSV/JSON table; planned for Android Health Connect records |
 | `user` | typed in by hand | a temperature read from a thermometer |
 
-Quality is one of `ok`, `low-quality`, `missing`, `invalid` and `artifact`. When the value is `null`, NaN or absent, the observation is always stored with value `null` and quality `missing`. **A missing value is never stored as 0.** Each simulated observation records the method and the set point in its provenance. Each imported one records the file, line and original unit. Each observation from a hospital interface also records the protocol, the original code and code system, the original unit, the equipment or device identifier, the bed/location and the message control ID when present. Patient identity fields are never recorded.
-
-Some parameters exist only as device data: invasive arterial pressure (`art_sys`, `art_dia`, `art_map`, mmHg) and end-tidal CO₂ (`etco2`, mmHg, converted from kPa when needed). They are not simulated. They appear in the trends and can be entered by hand.
+Quality is one of `ok`, `low-quality`, `missing`, `invalid` and `artifact`. When the value is `null`, NaN or absent, the observation is always stored with value `null` and quality `missing`. **A missing value is never stored as 0.** Each simulated observation records the method and the set point in its provenance. Each imported one records the file, line and original unit. Each device observation records the route, the device name and the raw packet bytes.
 
 The store keeps one series per (source, parameter). Series are never merged across sources. The trend view draws each source separately and draws gaps (no data for longer than 3 × the median sample interval, and at least 3 s) and missing values as breaks in the line.
 
@@ -267,11 +264,11 @@ These defaults are illustrative and editable. They are not clinical recommendati
 - Alarms are non-latching: an alarm ends when its condition ends.
 - Every alarm is written to the history with condition start, activation, end and acknowledge times. The history can be exported as CSV.
 
-## 7. Data import and devices
+## 7. Data import and watch data
 
 ### 7.1 File import
 
-CSV and JSON files are read locally with `FileReader`. The importer:
+CSV and JSON files are read locally with `FileReader`. The importer handles CSV and JSON tables only. It:
 
 - detects the delimiter (`,` `;` tab) and the decimal comma,
 - recognises wide tables (one column per parameter) and long tables (`timestamp, parameter, value, unit`),
@@ -282,36 +279,21 @@ CSV and JSON files are read locally with `FileReader`. The importer:
 - range-checks values, drops exact duplicates and reports conflicting duplicates,
 - produces an import report: rows read, accepted, missing, invalid lines with reasons, and the column mapping.
 
-Imported data is stored as `imported` and never drives the simulation.
+Imported data is stored as `imported` and never drives the simulation. Values can also be typed in (manual entry, source `user`) and exported as CSV or JSON by source.
 
-### 7.2 Bluetooth LE standard profiles
+### 7.2 Watch data in the Android app (in development)
 
-`src/devices/gatt.js` implements parsers for the Bluetooth SIG characteristics below, written from the GATT Specification Supplement:
+On 2026-10-28 the Devices tab and all other device integration were removed from the web page: HL7 v2 (MLLP, serial, files), FHIR R4 and IEEE 11073 SDC import, the MDC code mapping, Web Bluetooth, Web Serial and the packet replay. The reason is the owner's decision to keep the project focused on the simulator. See `DEVICE_INTEGRATION_REPORT.md`.
 
-| Service | Characteristic | Values |
-|---|---|---|
-| Heart Rate 0x180D | Heart Rate Measurement 0x2A37 | HR (uint8 or uint16), sensor contact, energy, RR intervals |
-| Pulse Oximeter 0x1822 | PLX Continuous 0x2A5F, PLX Spot-Check 0x2A5E | SpO₂, PR, status words |
-| Blood Pressure 0x1810 | BP Measurement 0x2A35, Intermediate Cuff Pressure 0x2A36 | SYS, DIA, MAP in mmHg or kPa, pulse, status bits |
-| Health Thermometer 0x1809 | Temperature Measurement 0x2A1C, Intermediate 0x2A1E | °C or °F, measurement site |
-| Weight Scale 0x181D | Weight Measurement 0x2A9D | kg or lb, BMI, height |
+Real wearable data now enters only through the Android app (`android/`), by three routes:
 
-Device Information (0x180A) and Battery (0x180F) are read when present. Numbers use the IEEE 11073-20601 SFLOAT and FLOAT formats. Their special values (NaN, NRes, ±INFINITY) become missing, never 0.
+1. **Android Health Connect.** The app reads heart rate, SpO₂, respiratory rate, blood pressure, body temperature, weight, height and steps, read-only, after the user grants each permission. Any watch that writes to Health Connect can be a source (for example through its own companion app).
+2. **Native Bluetooth LE Heart Rate Service 0x180D.** The Kotlin side scans for the service, connects over GATT and subscribes to the Heart Rate Measurement characteristic 0x2A37. It passes the raw bytes to the page as hex.
+3. **Import of a health-app export file** (CSV/JSON) through the table importer of section 7.1.
 
-`webBluetooth.js` requests a device through the browser's chooser, filtered by these services. It subscribes to notifications and indications, and reconnects with 1-2-4-8-16 s backoff after an unexpected disconnect. Web Bluetooth requires a secure context (https or `http://localhost`) and a Chromium-based browser, so it does not work from `file://`.
+`src/devices/gatt.js` is the only device module that remains. It parses the Heart Rate Measurement characteristic (written from the Bluetooth SIG GATT Specification Supplement): flags, HR as uint8 or uint16, sensor contact, energy expended and RR intervals (units of 1/1024 s). A packet with the contact bits reporting "not detected" is stored with quality `artifact`; HR 0 is stored as missing, never as 0; a truncated packet is rejected. The parser is covered by 3 Node tests and one browser self-test scenario. The page-side wiring of the Android bridge (`window.PMAndroid` events to observations) is not yet part of `src/ui/`; the Android README documents the bridge.
 
-**Packet replay.** `replay.js` plays a fixed, synthetic script of 138 packets through the same parsers. The script includes a truncated packet and a NaN temperature. Replayed observations have source `device` but carry `provenance.replay` and are shown with a SYNTHETIC badge. Replay lets the device path be demonstrated and tested without hardware. It is not a device test.
-
-### 7.3 Hospital device interfaces
-
-See `DEVICE_INTEGRATION_REPORT.md` for the full description. In summary:
-
-- The **Devices** tab starts with a device-type picker of 12 generic classes (bedside monitor, central station or gateway, spot-check monitor, pulse oximeter, automated BP monitor, thermometer, ECG telemetry, capnograph, ventilator, scale, wearable patch or hub, EHR export). Each class lists the routes such devices typically offer, and each route shows whether it is available in the current runtime.
-- **HL7 v2 ORU^R01** in the IHE PCD-01 style is read from three routes: a TCP listener using MLLP framing (desktop app only, binds to `127.0.0.1` by default, answers with an ACK), a serial port through Web Serial (no ACK, the app never writes to the port), and a file or pasted text.
-- **FHIR R4** Observation resources and Bundles, and **SDC MDIB** XML snapshots (IEEE 11073-10207), are read from files. Live SDC networking is not implemented.
-- Codes are mapped from MDC reference identifiers, then MDC numeric codes, then LOINC. Only seven MDC numeric codes were cross-checked against published values; matches through the others are labelled "numeric code not confirmed" in the provenance.
-- A **bed/location** filter (HL7 PV1-3) can drop messages for other beds. Patient identity segments (PID and similar) and FHIR person resources are counted and ignored, never stored. Messages with processing ID `T` or `D` are flagged as synthetic.
-- A **synthetic HL7 feed** of 20 messages for two beds demonstrates the live path without hardware. It is not a device test.
+The WebView page is served from the app's own assets and has no network access; the app has no `INTERNET` permission. HONOR's own watch protocol is proprietary and is not used. **Status: not hardware-tested.** The Android app is still being built and no watch, heart-rate sensor or Health Connect store was used in any test.
 
 ## 8. Assumptions
 
@@ -336,13 +318,8 @@ These were observed or are known from the model design:
 - **SpO₂ calibration** is the linear example line, not a device calibration.
 - **Imported timestamps without a time zone** are read in the zone chosen in the import panel. Device clocks that carry no zone information cannot be corrected automatically.
 - A column named `rr` is read as respiratory rate, not as an RR interval.
-- **Web Bluetooth and Web Serial** need a Chromium browser and a secure context, or the desktop app. No real BLE device, serial device, monitor, central station or gateway was connected in this project (see `TEST_REPORT.md`).
-- **MDC numeric codes.** Only the seven codes marked `checked: true` in `src/devices/mdc.js` were cross-checked. A device that sends only numeric codes for the other parameters (for example NIBP, invasive pressure, EtCO₂ or pulse rate) may be mapped wrongly or not at all until the codes are confirmed in NIST RTMMS.
-- **MLLP listener** was tested in Node only. It was not exercised inside the packaged desktop app, because headless Electron crashes on the test machine (exit code 139). MLLP has no encryption and no authentication.
-- **Serial route** sends no ACK. A sender that waits for an ACK will stall.
-- **SDC** is file-only. Live SDC (WS-Discovery, TLS, SOAP) is not implemented.
-- **Windows build.** The zip was built on Linux; the installer and portable `.exe` are built by a CI workflow that has not been run yet. No Windows build was started on Windows. The executable is unsigned, so Windows SmartScreen shows a warning.
-- Measurements are not persisted between sessions. Only the chosen device type and bed/location are kept in the browser's `localStorage`.
+- **Watch data** (Android app only) has not been tested with any real watch, heart-rate sensor or Health Connect store. Consumer wearable readings are not clinical measurements (see `TEST_REPORT.md`).
+- Measurements are not persisted between sessions.
 
 ## 10. References
 

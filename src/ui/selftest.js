@@ -59,45 +59,15 @@
         const ok = t && near(t.value, 37, 0.05) && w && near(w.value, 69.85, 0.05) && (!h || h.value === null);
         return { pass: !!ok, observed: 'temp ' + fmt(t && t.value, 2) + ' °C, weight ' + fmt(w && w.value, 2) + ' kg, hr ' + (h ? String(h.value) : 'not stored') };
       } },
-    { name: 'BLE packet replay through the GATT parser', expected: 'truncated packet rejected; NaN temperature stored as missing; all replay values flagged synthetic',
+    { name: 'Bluetooth Heart Rate Measurement parser (used by the Android app)', expected: 'u16 HR, contact and RR intervals decoded; no-contact packet flagged artifact; truncated packet rejected',
       run() {
-        const res = PM.replay.script().map(it => PM.replay.decode(it, Date.now()));
-        const errs = res.filter(x => x.error).length, obs = res.flatMap(x => x.observations);
-        const nanTemp = obs.some(o => o.param === 'temp' && o.value === null && o.quality === 'missing');
-        const allSyn = obs.every(o => o.source === 'device' && o.provenance && !!o.provenance.replay);
-        return { pass: errs >= 1 && nanTemp && allSyn, observed: res.length + ' packets, ' + errs + ' parse error(s), ' + obs.length + ' observations, NaN temp missing: ' + nanTemp };
+        const p = PM.gatt.parseHeartRate('1F 2C 01 0A 00 00 04 00 02');
+        const art = PM.gatt.toObservations(PM.gatt.parseHeartRate('04 50'), {})[0];
+        let rejected = false; try { PM.gatt.parseHeartRate('01 48'); } catch (e) { rejected = true; }
+        const ok = p.hr === 300 && p.contact === 'detected' && p.rrIntervals.join() === '1,0.5' && art.quality === 'artifact' && art.source === 'device' && rejected;
+        return { pass: ok, observed: 'hr ' + p.hr + ', contact ' + p.contact + ', RR ' + p.rrIntervals.join('/') + ' s; no-contact ' + art.quality + '; truncated rejected: ' + rejected };
       } },
-    { name: 'Real BLE health device (hardware)', expected: 'live readings from a standard-profile device', hardware: true },
-    { name: 'HL7 v2 ORU^R01 import (PCD-01 style)', expected: 'kPa and °F converted to mmHg and °C; empty OBX-5 stored as missing; identity segments not stored; values flagged synthetic',
-      run() {
-        const r = PM.hl7v2.importText(PM.samples.hl7(Date.now(), 'ICU^01^01'), { source: 'imported', file: 'selftest.hl7' });
-        const obs = r.observations, last = p => obs.filter(o => o.param === p).pop();
-        const sbp = last('sbp'), temp = last('temp'), rr = last('rr');
-        const noId = obs.every(o => !JSON.stringify(o.provenance).includes('PID'));
-        const ok = near(sbp && sbp.value, 123, 1) && near(temp && temp.value, 37.2, 0.1) && rr && rr.value === null && noId && obs.every(o => o.provenance.replay);
-        return { pass: !!ok, observed: obs.length + ' observations; sbp ' + fmt(sbp && sbp.value, 1) + ' mmHg, temp ' + fmt(temp && temp.value, 2) + ' °C, rr ' + (rr && rr.value === null ? 'missing' : '?') };
-      } },
-    { name: 'HL7 bed filter and MLLP framing/ACK', expected: 'messages for another bed dropped; framed message recovered; ACK carries MSA|AA and the control ID',
-      run() {
-        const feed = PM.samples.feed({ count: 8, now: Date.now(), location: 'ICU^01^01', otherLocation: 'ICU^01^02' });
-        let dropped = 0;
-        for (const it of feed) { const p = PM.hl7v2.parseMessage(it.text); if (PM.hl7v2.toObservations(p, { source: 'device', acceptLocation: 'ICU^01^01' }).rejected) dropped++; }
-        const d = PM.hl7v2.deframe('junk' + PM.hl7v2.frame(feed[0].text) + PM.hl7v2.VT + 'MSH|partial');
-        const ack = PM.hl7v2.ack(PM.hl7v2.parseMessage(d.messages[0] || ''), 'AA');
-        const ok = dropped === 2 && d.messages.length === 1 && d.rest.startsWith(PM.hl7v2.VT) && /MSA\|AA\|FEED0001/.test(ack);
-        return { pass: ok, observed: dropped + ' of ' + feed.length + ' dropped; ' + d.messages.length + ' framed message(s); ACK ' + (ack.match(/MSA\|[^\r]*/) || ['?'])[0] };
-      } },
-    { name: 'FHIR R4 Bundle and SDC MDIB import', expected: 'BP panel split into SBP/DBP/MAP; dataAbsentReason stored as missing; SDC questionable validity flagged low-quality',
-      run() {
-        const f = PM.fhir.importJSON(PM.samples.fhirBundle(Date.now()), { source: 'imported' }).observations;
-        const x = PM.sdc.importXML(PM.samples.sdcMdib(Date.now()), { source: 'imported' }).observations;
-        const has = (l, p) => l.some(o => o.param === p && o.value !== null);
-        const rrMissing = f.some(o => o.param === 'rr' && o.value === null);
-        const spo2 = x.find(o => o.param === 'spo2'), tMissing = x.some(o => o.param === 'temp' && o.value === null);
-        const ok = has(f, 'sbp') && has(f, 'dbp') && has(f, 'map') && rrMissing && spo2 && spo2.quality === 'low-quality' && tMissing;
-        return { pass: !!ok, observed: 'FHIR ' + f.length + ' observations (rr missing: ' + rrMissing + '); SDC ' + x.length + ' observations, spo2 ' + (spo2 ? spo2.quality : '?') };
-      } },
-    { name: 'Live HL7 feed from a real monitor or gateway (hardware)', expected: 'ORU^R01 messages arrive over MLLP or serial and are acknowledged', hardware: true },
+    { name: 'Watch data on Android (Health Connect / BLE / export file, hardware)', expected: 'readings arrive with source "device" and the route in the provenance', hardware: true },
   ];
 
   function run(done) {

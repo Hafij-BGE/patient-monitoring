@@ -300,8 +300,7 @@
 
   // ------------------------------------------------------------- other panels
   PM.panels.buildProfile(list => { store.addMany(list); refreshExt(); });
-  const dataPanel = PM.dataPanel.init({ store, getEngine: () => engine, onChange: refreshExt });
-  PM.devicesPanel.init({ store, onChange: refreshExt, importOne: dataPanel.importOne });
+  PM.dataPanel.init({ store, getEngine: () => engine, onChange: refreshExt });
   $('#btnSelfTest').addEventListener('click', () => PM.selftest.run());
 
   // ------------------------------------------------------------- start

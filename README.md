@@ -1,7 +1,7 @@
 # PM-SIM: Patient Monitor Simulator
 
 Homework 2, *Interactive Medical Device Simulator*. Assigned device: multiparameter bedside **patient monitor**.
-Author: Md. Hafijur Rahman (BME master's programme, Dokuz Eylül University). Built with Vibe Coding (see `VIBE_CODING_PROMPT.md`).
+Author: Md. Hafijur Rahman (BMT master's programme, Dokuz Eylül University). Built with Vibe Coding (see `VIBE_CODING_PROMPT.md`).
 
 > **Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.**
 
@@ -9,45 +9,34 @@ PM-SIM simulates the signals a bedside monitor acquires: ECG, pulse oximetry (re
 
 The app can also hold real data next to the simulation, kept strictly separate from it:
 
-- files exported from devices or apps (CSV or JSON),
+- files exported from devices or apps (CSV or JSON tables),
 - values typed in by hand,
-- live readings from Bluetooth LE health devices that use the standard Bluetooth SIG profiles (heart rate, pulse oximeter, blood pressure, thermometer, weight scale),
-- hospital-style device data: HL7 v2 ORU^R01 messages (IHE PCD-01 style) received over an MLLP/TCP listener (desktop app) or a serial port, and HL7 v2, FHIR R4 or IEEE 11073 SDC files.
+- in the **Android app only**: readings from a watch or other wearable, through Android Health Connect, a Bluetooth LE heart-rate sensor (Heart Rate Service 0x180D) or a health-app export file. The Android app is still in development and has not been tested with real hardware (see `DEVICE_INTEGRATION_REPORT.md`).
 
-Real data is never used to drive the simulation. For example, the ECG is never generated from a heart rate received from a device. Device integration is described in `DEVICE_INTEGRATION_REPORT.md`.
+Real data is never used to drive the simulation. For example, the ECG is never generated from a heart rate received from a watch.
 
 ## How to run
 
-The browser version needs no installation, no build step, no network access and no backend.
+PM-SIM needs no installation, no build step, no network access after loading and no backend. All computation happens in the browser tab.
 
-1. **Directly in a browser:** open `index.html` in a current browser (Chrome, Edge, Firefox, Safari). Everything works from `file://` except Web Bluetooth, Web Serial and the MLLP listener.
-2. **With a local server** (needed for Web Bluetooth and Web Serial, which require a secure context):
+1. **Website:** open https://hafij-bge.github.io/patient-monitoring/ in a current browser (Chrome, Edge, Firefox, Safari). It is the same page as the app, published as a static site on GitHub Pages by `.github/workflows/pages.yml` (the workflow runs the unit tests, copies `index.html`, `css`, `src` and `fixtures` to `_site` and deploys). The page makes no network requests of its own (Content Security Policy `connect-src 'none'`).
+2. **Locally with a server:**
 
    ```bash
-   python3 -m http.server 8000
+   python3 -m http.server 8766
    ```
 
-   Then open `http://localhost:8000/`. Web Bluetooth and Web Serial work only in Chromium-based browsers (Chrome, Edge). Firefox and Safari do not support them. Brave may have Web Bluetooth turned off by default. A web page cannot open a TCP port, so the HL7 MLLP listener is available only in the desktop app.
-3. **Desktop app, Linux:** install `release/PM-SIM-1.0.0-amd64.deb` (for example `sudo apt install ./release/PM-SIM-1.0.0-amd64.deb`) and start *PM-SIM* from the application menu. The desktop app (Electron) serves the same page from `app://pm-sim/`, which is a secure context, and adds the MLLP listener and serial-port and Bluetooth chooser dialogs.
-4. **Desktop app, Windows:** unzip `release/PM-SIM-1.0.0-win-x64.zip` and run `PM-SIM.exe`. An installer (`PM-SIM-1.0.0-setup-x64.exe`) and a portable `PM-SIM-1.0.0-portable-x64.exe` can be built as described below. The executable is not code-signed, so Windows SmartScreen will show a warning on first start.
-
-### Building the desktop app
-
-Requires Node.js and pnpm (`pnpm install` once).
-
-| Command | Output | Notes |
-|---|---|---|
-| `pnpm run build:deb` | `release/PM-SIM-1.0.0-amd64.deb` | Linux x64 |
-| `pnpm run build:win` | `release/PM-SIM-1.0.0-win-x64.zip` | Windows x64; built on Linux |
-| `pnpm run build:win-installer` | `PM-SIM-1.0.0-setup-x64.exe` (NSIS installer) and `PM-SIM-1.0.0-portable-x64.exe` | Needs Windows, or Wine and `makensis`, which the development machine does not have |
-
-`.github/workflows/windows.yml` builds the installer, the portable executable and the zip on a `windows-latest` GitHub Actions runner after running the unit tests. It runs on manual dispatch or on a `v*` tag. The project is not yet in a git repository, so this workflow has **not been run**.
+   (also `npm start`, see `package.json`), then open `http://localhost:8766/`.
+3. **Directly from the file:** open `index.html` in a browser. This works from `file://` because the page uses plain scripts and no network calls.
+4. **Android app (in development):** `android/` holds a WebView wrapper (package `edu.deu.pmsim`, version 1.1.0) that loads the same web page from the app's own assets. It is the **only** place where real watch data enters the app, through three routes: Android Health Connect (read with the user's permission), native Bluetooth LE Heart Rate Service 0x180D, and import of a health-app export file. The app is still being built and **nothing has been tested with real hardware**. Build notes are in `android/README.md`. No separate desktop app exists any more; use the website or the local server.
 
 Useful URL options:
 
 - `index.html?selftest=1` opens the Tests tab and runs the browser self-test.
 
 Keyboard: `Space` toggles run/pause.
+
+Tabs: Controls, NIBP, Alarms, Trends, Data import/export, Profile, Science, Tests, References.
 
 ## Unit tests
 
@@ -57,7 +46,7 @@ Requires Node.js 18 or later. No packages to install.
 node --test tests/unit/*.test.js
 ```
 
-Current result: 71 tests, 71 pass. Details are in `TEST_REPORT.md`.
+Current result: 47 tests, 47 pass. Details are in `TEST_REPORT.md`.
 
 ## Features
 
@@ -71,10 +60,9 @@ Current result: 71 tests, 71 pass. Details are in `TEST_REPORT.md`.
 | Alarms | Limits and delays for 7 parameters, apnea, and 9 technical conditions. Physiological and technical alarms are kept apart, with priorities, acknowledge, a 2-minute audio pause with countdown, history and CSV export. Optional Web Audio tones. |
 | Trends | Any parameter from any source over a chosen window. Gaps and missing values are drawn as breaks, never as zeros. Pause, PNG, CSV and summary statistics. |
 | Patient profile | Age, sex, height and weight, with BMI and BSA (Mosteller). Adult BMI categories are applied only from age 20. Weight history with change. |
-| Data | CSV/JSON import (HL7 v2, FHIR R4 and SDC XML files are detected automatically) (wide or long tables, unit conversion, time zones, missing tokens, duplicates and conflicts), manual entry, CSV/JSON export by source and a waveform CSV export. |
-| Devices | Device-type picker with 12 generic device classes (bedside monitor, central station, pulse oximeter, capnograph, ventilator and others), each listing its typical routes with an available/unavailable badge for the current runtime. Bed/location field (HL7 PV1-3) with an optional bed filter. Routes: HL7 v2 over MLLP (desktop app), HL7 v2 over serial (Web Serial), Bluetooth LE standard profiles (Web Bluetooth) with a synthetic packet replay, HL7 v2/FHIR R4/SDC file import with synthetic examples, and a synthetic HL7 feed from a two-bed central station. A message log shows every received message. Details in `DEVICE_INTEGRATION_REPORT.md`. |
-| Device parameters | Values from devices and files may also include invasive arterial pressure (systolic, diastolic, mean) and EtCO₂. These are not simulated; they are shown in Trends and the message log. |
-| Tests | Browser self-test: 13 automated scenarios plus 2 hardware tests (real BLE device, live HL7 feed) that are always reported as "not run" when no hardware is present. |
+| Data import/export | CSV/JSON table import only (wide or long tables, unit conversion, time zones, missing tokens, duplicates and conflicts), manual entry, CSV/JSON export by source and a waveform CSV export. |
+| Science and references | The models, assumptions and engineering limitations summarised in the app, and the reference list. |
+| Tests | Browser self-test: 10 automated scenarios (including the Bluetooth Heart Rate Measurement parser used by the Android app) plus 1 hardware entry (watch data on Android: Health Connect, BLE, export file) that is always reported as "not run" when no hardware is present. |
 
 ## Data provenance
 
@@ -84,7 +72,7 @@ Every value the app stores is an *observation* with:
 - a **quality** flag: `ok`, `low-quality`, `missing`, `invalid` or `artifact`,
 - a unit, a timestamp and a **provenance** record (method, set point, file name, device, and so on).
 
-A missing value is stored as `null` with quality `missing`. It is never stored as 0. Series from different sources are never merged. Live device routes store `device`; device files store `imported`. Packet-replay and synthetic-feed data, and any message the sender marks as test data (HL7 processing ID `T` or `D`, FHIR `HTEST`, SDC mode `Test` or `Demo`), carry `provenance.replay` and are labelled SYNTHETIC in the interface.
+A missing value is stored as `null` with quality `missing`. It is never stored as 0. Series from different sources are never merged. Values from a Bluetooth heart-rate sensor (Android route) use `device`; values loaded from files use `imported`. Values typed in use `user`.
 
 ## Project structure
 
@@ -96,29 +84,17 @@ src/sim/                parameters and presets, RNG, DSP, ECG, pulse, sensors, N
 src/alarms/             alarm engine
 src/data/               CSV reader, importer (mapping, units, timestamps, validation)
 src/devices/
-  gatt.js               Bluetooth SIG characteristic parsers, IEEE 11073-20601 SFLOAT/FLOAT
-  webBluetooth.js       Web Bluetooth connector
-  replay.js             synthetic BLE packet replay
-  mdc.js                ISO/IEEE 11073-10101 MDC, LOINC and UCUM code and unit tables
-  hl7v2.js              HL7 v2 ORU^R01 parser (IHE PCD-01 style), MLLP framing, ACK
-  fhir.js               FHIR R4 Observation/Bundle import
-  sdc.js                IEEE 11073-10207 SDC MDIB XML import
-  webSerial.js          Web Serial receiver and HL7 stream framer
-  samples.js            synthetic HL7/FHIR/SDC examples and the scripted HL7 feed
-  catalog.js            device classes, routes, availability, format detection
-src/ui/                 canvas waveforms and trends, panels, data and device tabs, self-test, app wiring
-electron/
-  main.cjs              desktop shell: app://pm-sim origin, Bluetooth and serial choosers, MLLP IPC
-  preload.cjs           exposes window.PMDesktop.mllp to the page
-  mllpServer.cjs        HL7 MLLP TCP listener (receive only, ACK)
+  gatt.js               Bluetooth Heart Rate Measurement (0x2A37) parser, used by the Android app's BLE route
+src/ui/                 canvas waveforms and trends, panels, data tab, self-test, app wiring
+android/                Android WebView app (edu.deu.pmsim 1.1.0, in development): Health Connect and BLE bridge
 .github/workflows/
-  windows.yml           Windows installer/portable/zip build on GitHub Actions (not yet run)
-tests/unit/             Node unit and integration tests (node --test), including hospital.test.js
-fixtures/               synthetic import files, GATT packets, hl7_oru_pcd01.hl7, fhir_vitals_bundle.json,
-                        sdc_mdib.xml (see fixtures/README.md)
+  pages.yml             runs the unit tests and deploys the site to GitHub Pages
+tests/unit/             Node unit tests (node --test): sim, alarms, core, data, devices
+fixtures/               synthetic CSV/JSON import files (see fixtures/README.md)
+package.json            "test" and "start" scripts
 ```
 
-The simulation, alarm, data and device-parser modules do not touch the DOM. They load in the browser as `window.PM.*` and in Node through `require`, so the same code is tested in both places.
+The simulation, alarm, data and parser modules do not touch the DOM. They load in the browser as `window.PM.*` and in Node through `require`, so the same code is tested in both places.
 
 ## Documents
 
@@ -128,17 +104,16 @@ The simulation, alarm, data and device-parser modules do not touch the DOM. They
 | `REFERENCES.md` | Sources and what each one supports |
 | `TEST_REPORT.md` | Test scenarios, expected and observed results, what was not tested |
 | `DEMO_SCRIPT.md` | Step-by-step demonstration (about 9 minutes) |
-| `DEVICE_INTEGRATION_REPORT.md` | Device classes, connection routes and standards, code mapping, privacy, test evidence |
+| `DEVICE_INTEGRATION_REPORT.md` | What device integration was removed and why; the Android-only watch routes, their limits and status |
 | `VIBE_CODING_PROMPT.md` | The prompts used to build the app |
 | `PLAN.md` | Implementation plan and environment notes |
 
 ## Privacy and safety
 
-- The page makes no network requests. Its Content Security Policy sets `connect-src 'none'` and loads scripts and styles only from the page's own folder.
+- The page makes no network requests. Its Content Security Policy sets `connect-src 'none'` and loads scripts and styles only from the page's own folder. The same page is served as the website and wrapped in the Android app.
 - Imported files are read in the browser tab and are not uploaded anywhere.
-- The desktop app's MLLP listener only receives. It binds to `127.0.0.1` unless the user chooses all interfaces (with a warning that MLLP has no encryption or login), and it never connects out.
-- Patient identity segments and resources (HL7 PID/PD1/NK1, FHIR Patient and other person resources) are never stored; only a count is reported.
-- Only vendor-neutral published standards are used. No proprietary protocol is reverse-engineered.
-- No measurement data is saved between sessions. Reloading the page clears all data. Only two settings, the chosen device type and the bed/location, are remembered in the browser's `localStorage`.
+- No measurement data is saved between sessions. Reloading the page clears all data.
+- The Android app has no `INTERNET` permission and disables cloud backup. Health Connect permissions are read-only, requested from the user, and the data goes only to the local page. This is the intended design; it has not yet been verified with real devices.
+- Only documented, vendor-neutral interfaces are used (Android Health Connect, Bluetooth SIG Heart Rate Service, the user's own export files). No proprietary protocol is reverse-engineered.
 - PM-SIM is an original educational design. It does not reproduce the interface of any monitor manufacturer.
 - It is not a medical device, has not been validated, and must not be used for diagnosis or patient monitoring.

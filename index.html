@@ -17,7 +17,7 @@
     <span class="logo" aria-hidden="true"></span>
     <div>
       <h1>PM-SIM</h1>
-      <p class="sub">Interactive multiparameter patient monitor simulator, homework 2 (BME, DEU)</p>
+      <p class="sub">Interactive multiparameter patient monitor simulator, homework 2 (BMT, DEU)</p>
     </div>
   </div>
   <div class="toolbar" role="toolbar" aria-label="Simulation controls">
@@ -101,7 +101,7 @@
     </div>
     <div class="tile external" id="tExt">
       <div class="t-head"><span>OTHER SOURCES</span><span class="unit">latest</span></div>
-      <div id="extList" class="ext-list"><span class="muted">No device, imported or manual data yet</span></div>
+      <div id="extList" class="ext-list"><span class="muted">No imported or manual data yet</span></div>
     </div>
   </div>
 </main>
@@ -115,7 +115,6 @@
   <button role="tab" data-tab="alarms">Alarms</button>
   <button role="tab" data-tab="trends">Trends</button>
   <button role="tab" data-tab="data">Data import/export</button>
-  <button role="tab" data-tab="devices">Devices</button>
   <button role="tab" data-tab="profile">Profile</button>
   <button role="tab" data-tab="science">Science</button>
   <button role="tab" data-tab="tests">Tests</button>
@@ -183,8 +182,8 @@
 <section class="panel" data-panel="data" hidden>
   <div class="split">
     <div>
-      <h3>Import files (CSV, JSON, HL7 v2, FHIR, SDC XML)</h3>
-      <div class="drop" id="drop">Drop files here, or <label class="filebtn">choose files<input type="file" id="fileIn" accept=".csv,.tsv,.txt,.json,.hl7,.xml" multiple></label></div>
+      <h3>Import files (CSV, JSON)</h3>
+      <div class="drop" id="drop">Drop files here, or <label class="filebtn">choose files<input type="file" id="fileIn" accept=".csv,.tsv,.txt,.json" multiple></label></div>
       <div class="row wrap">
         <label class="inline">Time zone for timestamps without one
           <input id="impTz" value="local" size="8" aria-label="Time zone for naive timestamps (local, UTC or ±HH:MM)"></label>
@@ -217,95 +216,6 @@
       <p class="hint">Every exported row keeps its source, quality and provenance. A JSON export can be imported again; its values then count as <i>imported</i>.</p>
       <h3>Stored observations</h3>
       <div id="storeSummary" class="table-wrap"></div>
-    </div>
-  </div>
-</section>
-
-<section class="panel" data-panel="devices" hidden>
-  <div class="devhead">
-    <label>Device type <select id="devClass" aria-label="Device type"></select></label>
-    <label>Bed / location <input id="devBed" placeholder="e.g. ICU^01^01" size="14" aria-label="Bed or location, HL7 PV1-3 point of care, room, bed"></label>
-    <label class="inline"><input type="checkbox" id="devBedOnly"> Accept HL7 messages for this bed only</label>
-  </div>
-  <p id="devClassInfo" class="hint"></p>
-  <div id="devRoutes" class="routes" role="radiogroup" aria-label="Connection route"></div>
-
-  <div class="split">
-    <div id="routePanels">
-      <div class="rpanel" data-route="ble" hidden>
-        <h3>Bluetooth LE standard health profile</h3>
-        <div id="bleAvail" class="msgs"></div>
-        <p class="hint">Works with devices that use the Bluetooth SIG standard health profiles. You choose the device in the browser's own dialog.
-          The page cannot see devices you do not choose. Readings are stored with source <i>device</i>.</p>
-        <div id="bleKinds" class="checks"></div>
-        <div class="row"><button id="btnBle" class="primary">Connect a device…</button></div>
-        <div id="bleList"></div>
-        <h3>Packet replay (no hardware)</h3>
-        <p class="hint">Plays 60 s of synthetic, byte-exact BLE packets through the same parser a real device uses, including a probe-off period,
-          lost skin contact, a movement-flagged BP reading, a truncated packet and a NaN value.</p>
-        <div class="row"><button id="btnReplay">Start BLE replay</button><span id="replayState" class="muted"></span></div>
-      </div>
-
-      <div class="rpanel" data-route="hl7-mllp" hidden>
-        <h3>HL7 v2 over MLLP</h3>
-        <div id="mllpAvail" class="msgs"></div>
-        <p class="hint">Starts a TCP listener in the desktop app. Point the monitor, central station or interface engine at this computer's address and port.
-          Each ORU^R01 message is answered with an HL7 ACK (MSA AA, or AE when the message cannot be read).</p>
-        <div class="row wrap">
-          <label class="inline">Port <input id="mllpPort" value="2575" size="6" inputmode="numeric"></label>
-          <label class="inline">Listen on <select id="mllpHost"><option value="127.0.0.1">this computer only (127.0.0.1)</option><option value="0.0.0.0">all network interfaces (0.0.0.0)</option></select></label>
-          <button id="btnMllp" class="primary">Start listener</button>
-        </div>
-        <p id="mllpWarn" class="warn" hidden>Listening on all interfaces lets any computer on the network send messages to this app. MLLP has no encryption or login.
-          Use it only on an isolated test network.</p>
-        <div id="mllpState" class="muted"></div>
-      </div>
-
-      <div class="rpanel" data-route="hl7-serial" hidden>
-        <h3>HL7 v2 over serial port</h3>
-        <div id="serialAvail" class="msgs"></div>
-        <p class="hint">For devices with an RS-232 or USB-serial HL7 output. Choose the port in the browser's dialog. MLLP framing and plain CR-separated messages are both read.
-          This route only listens; it never writes to the port.</p>
-        <div class="row wrap">
-          <label class="inline">Baud <select id="serialBaud"><option>9600</option><option>19200</option><option>38400</option><option>57600</option><option selected>115200</option></select></label>
-          <label class="inline">Format <select id="serialFmt"><option value="8N1">8N1</option><option value="7E1">7E1</option></select></label>
-          <button id="btnSerial" class="primary">Connect a port…</button>
-        </div>
-        <div id="serialState" class="muted"></div>
-      </div>
-
-      <div class="rpanel" data-route="file" hidden>
-        <h3 id="fileTitle">File import</h3>
-        <p id="fileHint" class="hint"></p>
-        <div class="row wrap">
-          <label class="filebtn">Choose a file<input type="file" id="devFile" accept=".hl7,.txt,.json,.xml"></label>
-          <button id="btnExample">Load synthetic example</button>
-        </div>
-        <textarea id="devPaste" rows="6" spellcheck="false" placeholder="…or paste the message text here" aria-label="Paste message text"></textarea>
-        <div class="row"><button id="btnPaste">Import pasted text</button></div>
-        <div id="devReport"></div>
-      </div>
-
-      <div class="rpanel" data-route="table" hidden>
-        <h3 id="tableTitle">Table import or manual entry</h3>
-        <p class="hint">CSV/JSON tables and manual entry use the <i>Data import</i> tab, which converts units, checks ranges and reports every rejected row.</p>
-        <div class="row"><button id="btnGoData" class="primary">Open Data import</button></div>
-      </div>
-
-      <div class="rpanel" data-route="demo" hidden>
-        <h3>Synthetic HL7 feed (no hardware)</h3>
-        <p class="hint">Plays 20 ORU^R01 messages, one every 2 s, from a synthetic central station that serves two beds (your bed and ICU^01^02).
-          It includes an SpO₂ drop, a missing respiratory rate and an implausible temperature. Turn on the bed filter to see the other bed's messages rejected.
-          Values carry a <span class="badge replay">SYNTHETIC</span> badge.</p>
-        <div class="row"><button id="btnFeed" class="primary">Start feed</button><span id="feedState" class="muted"></span></div>
-      </div>
-    </div>
-
-    <div>
-      <h3>Message log</h3>
-      <div class="table-wrap tall"><table id="pktTable"><thead><tr><th>t</th><th>From</th><th>Channel</th><th>Raw</th><th>Decoded</th></tr></thead><tbody></tbody></table></div>
-      <p class="hint">Patient identity segments and resources (HL7 PID/PD1/NK1, FHIR Patient) are counted and ignored. No patient identifiers are stored.
-        This app uses only published standards. It does not reverse-engineer vendor protocols and it does not write to devices.</p>
     </div>
   </div>
 </section>
@@ -368,7 +278,7 @@
     <li><b>SpO₂ channel:</b> a probe with a red LED, an infrared LED and one photodiode → transimpedance amplifier → red and IR signals separated by time multiplexing → AC/DC extraction → ratio of ratios R → calibration curve → SpO₂ and pulse rate.</li>
     <li><b>NIBP channel:</b> cuff, air pump, deflation valve and pressure transducer → the controller inflates, then deflates → the oscillations on the cuff pressure are extracted → envelope → MAP, then SBP and DBP by ratio rules. An over-pressure limit stops inflation.</li>
     <li><b>Temperature channel:</b> thermistor probe in a bridge or divider → ADC → linearisation to °C. The probe responds with a time lag.</li>
-    <li><b>Processing and output:</b> processor; display of waveforms and numerics; alarm system with limits, priorities, delays and audio/visual signals (IEC 60601-1-8); trend storage; network or serial interface (HL7) to a central station.</li>
+    <li><b>Processing and output:</b> processor; display of waveforms and numerics; alarm system with limits, priorities, delays and audio/visual signals (IEC 60601-1-8); trend storage; network or serial interface to a central station.</li>
   </ul>
   <p>In this app each channel is a module in <code>src/sim/</code>. Each sensor control (noise, mains, contact, motion, probe state, time constant) acts on the stage of the chain that it names.</p>
 
@@ -410,7 +320,7 @@
 <section class="panel" data-panel="tests" hidden>
   <div class="row"><button id="btnSelfTest" class="primary">Run browser self-test</button><span id="stSummary" class="muted"></span></div>
   <div class="table-wrap"><table id="stTable"><thead><tr><th>#</th><th>Test</th><th>Expected</th><th>Observed</th><th>Result</th></tr></thead><tbody></tbody></table></div>
-  <p class="hint">The unit tests run with <code>node --test tests/unit/*.test.js</code>. Tests that need real hardware (a BLE device, a serial or network HL7 feed) are listed as <b>not run</b>. They are never marked passed without hardware.</p>
+  <p class="hint">The unit tests run with <code>node --test tests/unit/*.test.js</code>. Tests that need real hardware (a watch or heart-rate sensor on Android) are listed as <b>not run</b>. They are never marked passed without hardware.</p>
 </section>
 
 <section class="panel prose" data-panel="refs" hidden>
@@ -428,28 +338,15 @@
     <li>Mosteller RD. Simplified calculation of body-surface area. <i>N Engl J Med</i>. 1987;317(17):1098.</li>
     <li>World Health Organization. Body mass index (BMI) classification for adults.</li>
     <li>IEC 60601-1-8: Medical electrical equipment, general requirements for alarm systems (vocabulary only; this app is not a compliant alarm system).</li>
-    <li>Bluetooth SIG. GATT Specification Supplement; Heart Rate, Pulse Oximeter, Blood Pressure, Health Thermometer and Weight Scale Service specifications.</li>
-    <li>IEEE 11073-20601. Health informatics, personal health device communication (SFLOAT/FLOAT number formats).</li>
-    <li>W3C Web Bluetooth Community Group. Web Bluetooth draft specification.</li>
-    <li>Health Level Seven International. HL7 Version 2 Product Suite. https://www.hl7.org/implement/standards/product_brief.cfm?product_id=185</li>
-    <li>Health Level Seven International. HL7 Version 2.x Implementation Guide: Transport Specification, MLLP Release 2.</li>
-    <li>IHE International. IHE Patient Care Device (PCD) Technical Framework, Volume 2, transaction PCD-01. https://www.ihe.net/resources/technical_frameworks/#pcd</li>
-    <li>ISO/IEEE 11073-10101. Health informatics, point-of-care medical device communication, nomenclature; NIST Rosetta Terminology Mapping Management System (RTMMS). https://rtmms.nist.gov/</li>
-    <li>IEEE 11073-10207. Domain information and service model for service-oriented point-of-care medical device communication. https://standards.ieee.org/ieee/11073-10207/6152/</li>
-    <li>IEEE 11073-20701. Service-oriented medical device exchange architecture and protocol binding. https://standards.ieee.org/ieee/11073-20701/6151/</li>
-    <li>Health Level Seven International. FHIR Release 4, Observation resource. https://hl7.org/fhir/R4/observation.html</li>
-    <li>Health Level Seven International. FHIR Release 4, Vital Signs profile. https://hl7.org/fhir/R4/observation-vitalsigns.html</li>
-    <li>Regenstrief Institute. LOINC. https://loinc.org/</li>
+    <li>Bluetooth SIG. Heart Rate Service 1.0 and GATT Specification Supplement (Heart Rate Measurement 0x2A37). Used by the Android app only.</li>
     <li>Regenstrief Institute. The Unified Code for Units of Measure (UCUM). https://ucum.org/</li>
-    <li>W3C Web Platform Incubator Community Group. Web Serial API draft. https://wicg.github.io/serial/</li>
-    <li>Electron. Device access: Web Serial API. https://www.electronjs.org/docs/latest/tutorial/devices#web-serial-api</li>
   </ol>
   <p class="hint">The full list, with what each reference supports, is in <code>REFERENCES.md</code>.</p>
 </section>
 
 <footer class="foot">
   PM-SIM is an original educational design. It does not reproduce the interface of any monitor manufacturer.
-  It runs fully offline. It makes no network requests. Measurements are not saved between sessions. Only the chosen device type and bed are kept in this browser's local storage.
+  It runs fully offline. It makes no network requests. Measurements are not saved between sessions. Nothing is kept in browser storage.
 </footer>
 
 <!-- logic modules (no DOM) -->
@@ -470,22 +367,12 @@
 <script src="src/data/csv.js"></script>
 <script src="src/data/importer.js"></script>
 <script src="src/devices/gatt.js"></script>
-<script src="src/devices/webBluetooth.js"></script>
-<script src="src/devices/replay.js"></script>
-<script src="src/devices/mdc.js"></script>
-<script src="src/devices/hl7v2.js"></script>
-<script src="src/devices/fhir.js"></script>
-<script src="src/devices/sdc.js"></script>
-<script src="src/devices/webSerial.js"></script>
-<script src="src/devices/samples.js"></script>
-<script src="src/devices/catalog.js"></script>
 <!-- UI -->
 <script src="src/ui/dom.js"></script>
 <script src="src/ui/waveforms.js"></script>
 <script src="src/ui/trends.js"></script>
 <script src="src/ui/panels.js"></script>
 <script src="src/ui/dataPanel.js"></script>
-<script src="src/ui/devicesPanel.js"></script>
 <script src="src/ui/selftest.js"></script>
 <script src="src/ui/app.js"></script>
 </body>

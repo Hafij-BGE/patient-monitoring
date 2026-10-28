@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PM-SIM</string>
+    <string name="privacy_title">PM-SIM privacy</string>
+    <string name="privacy_text">PM-SIM reads the health records you allow, only to show them on this device. Nothing is uploaded; the app has no internet permission. Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.</string>
+</resources>

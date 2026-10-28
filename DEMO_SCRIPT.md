@@ -1,13 +1,12 @@
 # Demo Script
 
-A demonstration of PM-SIM in about 9 minutes. Each step names what to click, what to say and what the audience should see. Times are cumulative.
+A demonstration of PM-SIM in about 8 minutes. Each step names what to click, what to say and what the audience should see. Times are cumulative.
 
 > **Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.**
 
 ## Before you start
 
-- Open `index.html` in Chrome or Edge. For the Bluetooth and serial parts, serve the folder instead (`python3 -m http.server 8000`) and open `http://localhost:8000/`.
-- To show the HL7 MLLP listener as available, use the desktop app (Linux `.deb` or Windows build) instead of the browser. The rest of the script is the same in both.
+- Open the website https://hafij-bge.github.io/patient-monitoring/ in any current browser. Alternatives: run `python3 -m http.server 8766` in the project folder and open `http://localhost:8766/`, or open `index.html` directly. All three show the same page.
 - Use a fresh page load, so the stored data is empty.
 - Keep `fixtures/vitals_units_fahrenheit_lb_kpa.csv` ready for the import step.
 - The demo runs at playback speed 1×. Press `Space` at any time to pause and explain a waveform.
@@ -89,41 +88,31 @@ Return to **Baseline adult**.
    - *Expected:* stored as 37.5 °C with source `user`.
 3. Open the **Trends** tab and choose temperature. Simulated, imported and user values are drawn as separate series. Nothing is merged, and gaps are breaks, not zeros.
 
-**Click:** the **Devices** tab. Set **Device type** to *Pulse oximeter*.
+## 7. Watch data on Android (6:45–7:15)
 
-1. Point at the route list: each route shows whether it is available in this browser. Select *Bluetooth LE standard health profile* and click **Start BLE replay** under *Packet replay (no hardware)*. Recorded Bluetooth packets for heart rate, pulse oximetry, blood pressure, temperature and weight run through the same parsers as a live device.
-   - *Expected:* readings appear in the extra-devices tile, labelled SYNTHETIC. One truncated packet is rejected and one "not a number" temperature is stored as missing.
-2. Mention **Connect a device…**: with a device that implements a standard Bluetooth health profile (for example a heart-rate strap or a Bluetooth thermometer) this connects through the browser's own device chooser. It needs Chrome or Edge and `localhost` or `https`, or the desktop app. Devices without a standard profile never appear in the chooser.
-
-## 7. Hospital device integration (6:45–8:15)
-
-Stay on the **Devices** tab.
-
-1. Open the **Device type** list and show the 12 generic classes, from bedside monitor and central station to capnograph, ventilator and EHR export. No brand names are used.
-2. Choose *Central station / device integration gateway*.
-   - *Expected (browser):* *HL7 v2 over MLLP (TCP listener)* is marked unavailable, with the reason that a web page cannot open a TCP port. The file routes and the synthetic feed are available. In the desktop app the listener is available, on port 2575 and `127.0.0.1` by default.
-   - **Say:** hospitals usually connect monitors through a central station or gateway that sends HL7 v2 ORU^R01 messages (IHE PCD-01) over MLLP. PM-SIM only receives; it never sends data out.
-3. Select the route *HL7 v2 message file*, then click **Load synthetic example**.
-   - *Expected:* 16 values imported, 1 missing. kPa and °F are converted. The respiratory rate that has no value is stored as missing, not 0. The patient identity segment is not stored.
-4. Tick **Accept HL7 messages for this bed only** (bed `ICU^01^01`). Select the route *Synthetic HL7 feed (no hardware)* and click **Start feed**. Open the **Message log** while it runs (one message every 2 s, about 40 s in total).
-   - *Expected:* each row shows the raw HL7 text and what was decoded. SpO₂ drops to 88 % for a few messages, one respiratory rate is missing and one temperature of 55 °C is flagged invalid. At the end: "Finished: 20 messages, 5 dropped by the bed filter."
-   - **Say:** the 5 dropped messages were for the neighbouring bed `ICU^01^02`. A central station sends data for many beds, so the bed filter matters.
-5. Change **Device type** to *Bedside multiparameter monitor*, select the route *SDC MDIB XML* and click **Load synthetic example**.
-   - *Expected:* 7 imported, 1 missing. The SpO₂ value of questionable validity is flagged low quality.
-6. **Say:** all of this was tested only with synthetic messages written from the published standards. No real monitor was connected, and some MDC codes are still unconfirmed. Details are in `DEVICE_INTEGRATION_REPORT.md`.
-
-## 8. Tests (8:15–8:45)
-
-**Click:** the **Tests** tab, then **Run browser self-test** (or open `index.html?selftest=1`).
-
-**Expected:** 13 pass, 0 fail, 2 not run. Each row shows the input, the expected result and the observed result.
-
-**Say:** the two hardware tests (a real BLE device and a live HL7 feed from a real monitor or gateway) are reported as "not run" because no device was connected. The app never marks a hardware test as passed without hardware. The same models and parsers are also checked by 71 Node unit tests (`node --test tests/unit/*.test.js`).
-
-## 9. Closing (8:45–9:00)
+This part is a short spoken note, or a planned demonstration on a phone. It is **not** part of the web page: real watch data enters PM-SIM only through the Android app, which wraps the same page. The Android app is still in development and has **not been tested with real hardware**, so do not present any result from it as verified.
 
 **Say:**
 
-- The model, its equations, assumptions and limitations are in `TECHNICAL_REPORT.md`, with sources in `REFERENCES.md`. Device interfaces are described in `DEVICE_INTEGRATION_REPORT.md`.
-- Limitations to name aloud: the waveforms come from simplified models, the SpO₂ calibration is a textbook example, NIBP fails under strong motion, and no real device was tested.
+- The Android app has three routes for watch data: reading Android Health Connect (with the user's permission), a native Bluetooth LE connection to the standard Heart Rate Service (0x180D), and import of a health-app export file.
+- The watch may be an HONOR watch or any other watch that writes to Health Connect or exposes the standard heart-rate service. HONOR's own protocol is proprietary and is not used.
+- Watch readings are consumer wearable values. In the app they are meant to be shown next to the simulation with their source, and they are never used to generate the ECG.
+- The app has no internet permission, and the data stays on the phone.
+
+**If the phone demonstration is done later:** install the APK (`release/PM-SIM-1.1.0-android.apk`), grant the Health Connect permissions, and show the values that arrive with the route recorded as their source. Until that has been done on a real device, report it as planned.
+
+## 8. Tests (7:15–7:45)
+
+**Click:** the **Tests** tab, then **Run browser self-test** (or open `index.html?selftest=1`).
+
+**Expected:** 10 pass, 0 fail, 1 not run. Each row shows the input, the expected result and the observed result.
+
+**Say:** the one hardware entry (watch data on Android through Health Connect, BLE or an export file) is reported as "not run" because no watch was connected. The app never marks a hardware test as passed without hardware. The same models and parsers are also checked by 47 Node unit tests (`node --test tests/unit/*.test.js`).
+
+## 9. Closing (7:45–8:00)
+
+**Say:**
+
+- The model, its equations, assumptions and limitations are in `TECHNICAL_REPORT.md`, with sources in `REFERENCES.md`. The Android-only watch routes and their status are in `DEVICE_INTEGRATION_REPORT.md`. The page is online at https://hafij-bge.github.io/patient-monitoring/.
+- Limitations to name aloud: the waveforms come from simplified models, the SpO₂ calibration is a textbook example, NIBP fails under strong motion, and no real watch or sensor was tested.
 - Educational simulation only.
