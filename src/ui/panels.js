@@ -7,16 +7,24 @@
   const { $, el, fmt } = PM.dom;
 
   // ------------------------------------------------------------- controls
+  // Simple view: the vital-sign set points and the two most used sensor faults.
+  // Any other control is still shown when it is not at its default value or is
+  // linked to an active alarm, so a scenario never hides what it changed.
+  const SIMPLE = new Set(['hr', 'arrhythmia', 'sbp', 'dbp', 'spo2', 'rr', 'etco2', 'temp',
+    'motion', 'spo2_sensor', 'nibp_interval']);
+  const VIEW_KEY = 'pmsim.controls.v1';
+
   /**
    * Build one control per SPEC entry, grouped. `apply(update)` must return the
    * engine's {params, errors, warnings}. Returns {sync(params, changedKeys)}.
    */
   function buildControls(container, msgs, apply) {
     const { SPEC, GROUPS } = PM.params;
-    const rows = {};
+    const rows = {}, boxes = [];
     container.textContent = '';
     for (const [g, title] of Object.entries(GROUPS)) {
       const box = el('div.cgroup', null, el('h3', { text: title }));
+      boxes.push(box);
       for (const [key, s] of Object.entries(SPEC)) {
         if (s.group !== g) continue;
         const id = 'ctl-' + key;
@@ -37,6 +45,7 @@
         }
         const issue = el('div.ctl-issue', { 'aria-live': 'polite' });
         row.append(issue, el('div.help', { text: s.help || '' }));
+        if (s.help) row.querySelector('label').title = s.help;
         rows[key] = { row, input, slider, issue, spec: s };
         box.append(row);
       }
@@ -66,7 +75,51 @@
         if (r.slider && document.activeElement !== r.slider) r.slider.value = String(v);
         r.row.classList.toggle('changed', String(v) !== String(PM.params.DEFAULTS[key]));
       }
+      applyView();
     }
+
+    // View options: simple/advanced and help text on/off, kept per browser.
+    const view = { mode: 'simple', help: false };
+    try { Object.assign(view, JSON.parse(localStorage.getItem(VIEW_KEY)) || {}); } catch (e) { /* no storage */ }
+    const radio = m => el('input', { type: 'radio', name: 'ctlView', value: m });
+    const rSimple = radio('simple'), rAdv = radio('advanced');
+    const cHelp = el('input', { type: 'checkbox', id: 'ctlHelp' });
+    const note = el('span.ctl-note', { 'aria-live': 'polite' });
+    const bar = el('div.ctl-view', { role: 'group', 'aria-label': 'Control view' },
+      el('label', null, rSimple, ' Simple'), el('label', null, rAdv, ' Advanced'),
+      el('label', null, cHelp, ' Show explanations'), note);
+    container.before(bar);
+    rSimple.addEventListener('change', () => setView({ mode: 'simple' }));
+    rAdv.addEventListener('change', () => setView({ mode: 'advanced' }));
+    cHelp.addEventListener('change', () => setView({ help: cHelp.checked }));
+    function setView(v) {
+      Object.assign(view, v);
+      if (view.mode !== 'advanced') view.mode = 'simple';
+      try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (e) { /* no storage */ }
+      rSimple.checked = view.mode === 'simple'; rAdv.checked = !rSimple.checked; cHelp.checked = !!view.help;
+      container.classList.toggle('show-help', !!view.help);
+      applyView();
+    }
+    function applyView() {
+      const simple = view.mode === 'simple';
+      let extra = 0;
+      for (const [key, r] of Object.entries(rows)) {
+        const cl = r.row.classList;
+        const flagged = cl.contains('changed') || cl.contains('sev-high') || cl.contains('sev-medium') || cl.contains('sev-low');
+        const hide = simple && !SIMPLE.has(key) && !flagged;
+        if (r.row.hidden !== hide) r.row.hidden = hide;
+        if (simple && !SIMPLE.has(key) && flagged) extra++;
+      }
+      for (const b of boxes) {
+        const hide = !b.querySelector('.ctl:not([hidden])');
+        if (b.hidden !== hide) b.hidden = hide;
+      }
+      const text = simple
+        ? SIMPLE.size + ' main controls' + (extra ? ' + ' + extra + ' changed by the scenario or linked to an alarm' : '') + '. Advanced shows all ' + Object.keys(rows).length + '.'
+        : 'All ' + Object.keys(rows).length + ' controls.';
+      if (note.textContent !== text) note.textContent = text;
+    }
+    setView({});
 
     /** graded: {key: {sev, messages}} from PM.severity.grade(...).controls. */
     function markSeverity(graded) {
@@ -76,8 +129,9 @@
         const text = g ? '⚠ ' + g.messages.join(' · ') : '';
         if (r.issue.textContent !== text) r.issue.textContent = text;
       }
+      applyView();
     }
-    return { sync, showMsgs, markSeverity };
+    return { sync, showMsgs, markSeverity, setView, get view() { return Object.assign({}, view); }, SIMPLE };
   }
 
   // ------------------------------------------------------------- alarms

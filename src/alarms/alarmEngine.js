@@ -16,7 +16,8 @@
  *    visual indication continues.
  *  - Priorities (illustrative, in the spirit of IEC 60601-2-27 lethal-arrhythmia
  *    alarms): apnea, asystole, V-Fib, V-Tach = high, delay 0; limit alarms,
- *    irregular rhythm and frequent PVCs = medium; technical = low. */
+ *    irregular rhythm and frequent PVCs = medium; technical = low. Extreme lows
+ *    (HR < 40, SpO2 < 80) and glucose level 2 add a high-priority alarm. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else (root.PM = root.PM || {}).alarms = factory();
@@ -42,12 +43,17 @@
   };
   /** Glucose below this is hypoglycaemia level 2 [51]: a separate high-priority alarm. */
   const GLUCOSE_LEVEL2 = 54;
+  /** Extreme lows: a second, high-priority alarm on top of the medium limit alarm,
+   * so a patient close to arrest is not shown with medium alarms only. The values
+   * are illustrative teaching values, not taken from a device or guideline. */
+  const EXTREME_LOW = { hr: { value: 40, message: 'EXTREME BRADY' }, spo2: { value: 80, message: 'SpO₂ < 80 (severe)' } };
 
   /** Rhythm alarm conditions keyed by the analyser's rhythm label. */
   const RHYTHM = {
     asystole: { priority: 'high', delay: 0, message: 'ASYSTOLE' },
     vfib:     { priority: 'high', delay: 0, message: 'V-FIB' },
     vtach:    { priority: 'high', delay: 0, message: 'V-TACH' },
+    svt:      { priority: 'medium', delay: 0, message: 'SVT' },
     irregular: { priority: 'medium', delay: 10, message: 'Irregular HR' },
   };
   const PVC_ALARM_PER_MIN = 10;
@@ -136,6 +142,11 @@
         cond['apnea'] = { kind: 'physiological', param: 'rr', priority: 'high', delay: 0, value: 0, limit: null, message: 'APNEA' };
       if (this.limits.glucose.enabled && Number.isFinite(vals.glucose) && vals.glucose < GLUCOSE_LEVEL2)
         cond['glucose:level2'] = { kind: 'physiological', param: 'glucose', priority: 'high', delay: 0, value: vals.glucose, limit: GLUCOSE_LEVEL2, message: 'GLUCOSE < ' + GLUCOSE_LEVEL2 + ' (level 2)' };
+      for (const [param, X] of Object.entries(EXTREME_LOW)) {
+        const v = vals[param];
+        if (this.limits[param].enabled && Number.isFinite(v) && v < X.value)
+          cond[param + ':extreme'] = { kind: 'physiological', param, priority: 'high', delay: this.limits[param].delay, value: v, limit: X.value, message: X.message };
+      }
       const rh = RHYTHM[frame.est.rhythm];
       if (rh) cond['rhythm:' + frame.est.rhythm] = { kind: 'physiological', param: 'rhythm', priority: rh.priority, delay: rh.delay, value: null, limit: null, message: rh.message };
       if (frame.est.rhythm === 'pvc' && frame.est.pvcPerMin > PVC_ALARM_PER_MIN)
@@ -198,6 +209,6 @@
     return [head].concat(history.map(a => [a.id, a.kind, a.priority, a.message, num(a.value), a.limit, num(a.tCond), num(a.tOn), num(a.tOff), num(a.ackAt)].map(cell).join(','))).join('\n') + '\n';
   }
 
-  return { AlarmEngine, DEFAULT_LIMITS, GLUCOSE_LEVEL2, TECHNICAL, RHYTHM, PVC_ALARM_PER_MIN, TECH_DELAY, PRIORITY, validateLimit, frameValues, historyCSV,
+  return { AlarmEngine, DEFAULT_LIMITS, GLUCOSE_LEVEL2, EXTREME_LOW, TECHNICAL, RHYTHM, PVC_ALARM_PER_MIN, TECH_DELAY, PRIORITY, validateLimit, frameValues, historyCSV,
     NOTICE: 'Educational alarm logic — not a certified clinical alarm system.' };
 });

@@ -3,6 +3,8 @@
  * analyser that looks at the acquired ECG.
  *
  * Patient side (used by ecg.js):
+ *   SVT                  narrow beats at a fast, very regular rate with no visible P wave
+ *                        (hidden in the QRS); handled in ecg.js like a normal beat without P
  *   ventricularParams()  wide ventricular complex (no P, broad R, S, inverted T),
  *                        defined in seconds and converted to the model's phase units
  *   Fibrillation         sum of slowly drifting sinusoids: AF f-waves (6–9 Hz, small)
@@ -20,7 +22,7 @@
   'use strict';
 
   const TWO_PI = 2 * Math.PI;
-  const MODES = ['none', 'af', 'pvc', 'vt', 'vf', 'asystole'];
+  const MODES = ['none', 'af', 'svt', 'pvc', 'vt', 'vf', 'asystole'];
 
   /** Pulse amplitude (relative stroke volume) of each beat kind; illustrative. */
   const PULSE_AMP = { normal: 1, pvc: 0.4, vt: 0.5 };
@@ -74,7 +76,7 @@
 
   const LABELS = {
     learning: 'Learning', unavailable: 'Not analysed', regular: 'Regular', irregular: 'Irregular',
-    pvc: 'PVCs', vtach: 'V-Tach', vfib: 'V-Fib', asystole: 'Asystole',
+    svt: 'SVT', pvc: 'PVCs', vtach: 'V-Tach', vfib: 'V-Fib', asystole: 'Asystole',
   };
 
   function median(a) { const s = a.slice().sort((x, y) => x - y); const n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : NaN; }
@@ -89,6 +91,9 @@
    *  - V-Fib: no QRS for 4 s on a busy trace (no isoelectric baseline), or the
    *    detected "complexes" are wide and chaotic (RR coefficient of variation > 0.3).
    *  - V-Tach: the last 4 complexes are wide at a rate > 100 bpm.
+   *  - SVT: the last 8 complexes are narrow, very regular (RR coefficient of variation
+   *    < 0.06) and faster than 150 bpm. Rate, width and regularity only: P waves are not
+   *    looked for, so a sinus rhythm above 150 bpm gets the same label.
    *  - irregular: coefficient of variation of narrow-to-narrow RR > 0.12.
    *  - PVCs: wide complexes counted over the last 60 s.
    */
@@ -161,6 +166,12 @@
         const hr = 60 / median(rr.slice(-3));
         if (hr > 100) return set('vtach', extra);
       }
+      const run = recent.slice(-RhythmAnalyzer.SVT_BEATS);
+      if (run.length === RhythmAnalyzer.SVT_BEATS && run.every(q => !q.wide)) {
+        const rrRun = [];
+        for (let i = 1; i < run.length; i++) rrRun.push(run[i].t - run[i - 1].t);
+        if (60 / median(rrRun) > RhythmAnalyzer.SVT_HR && dsp.std(rrRun) / dsp.mean(rrRun) < RhythmAnalyzer.SVT_CV) return set('svt', extra);
+      }
       const nn = [];
       for (let i = 1; i < recent.length; i++) if (!recent[i].wide && !recent[i - 1].wide) nn.push(recent[i].t - recent[i - 1].t);
       if (nn.length >= 6 && dsp.std(nn) / dsp.mean(nn) > 0.12) return set('irregular', extra);
@@ -174,6 +185,10 @@
   // ventricular (≈ 95–140 ms) complexes.
   RhythmAnalyzer.WIDE_S = 0.075;
   RhythmAnalyzer.LEARN_S = 8;
+  // SVT rule: illustrative teaching thresholds (not taken from a product or a standard).
+  RhythmAnalyzer.SVT_BEATS = 8;
+  RhythmAnalyzer.SVT_HR = 150;
+  RhythmAnalyzer.SVT_CV = 0.06;
 
   return { MODES, PULSE_AMP, LABELS, ventricularParams, Fibrillation, RhythmAnalyzer, median };
 });

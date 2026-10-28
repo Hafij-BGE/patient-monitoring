@@ -7,6 +7,7 @@
  * (PhysioNet ECGSYN). The waveform is synthetic, single-lead and not diagnostic.
  * Arrhythmia teaching patterns (arrhythmia.js) change the beat kind per cycle:
  *   af   no P wave, f-waves added, irregular intervals
+ *   svt  normal narrow beat without a P wave (hidden in the QRS); timing as set
  *   pvc  occasional early wide beat (R at 0.6 × mean interval) + compensatory pause
  *   vt   every beat wide at the set rate      vf  fibrillatory signal, no beats
  *   asystole  flat line, no beats */
@@ -98,7 +99,7 @@
     setParams(p, immediate) {
       this.p = Object.assign({}, p);
       const mode = p.arrhythmia || 'none', mean = 60 / p.hr;
-      const w = waveParams(mode === 'af' ? Object.assign({}, p, { p_scale: 0 }) : p);
+      const w = waveParams(mode === 'af' || mode === 'svt' ? Object.assign({}, p, { p_scale: 0 }) : p);
       const vw = arr.ventricularParams(mean, 0);
       this.pending = { mode, w, gain: calibrate(w, p.hr, p.ecg_amp_mv), vw, pw: arr.ventricularParams(mean, PVC_THETA_R),
         vgain: calibrate(vw, p.hr, 1.3 * p.ecg_amp_mv) };

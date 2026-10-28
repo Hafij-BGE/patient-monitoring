@@ -8,11 +8,11 @@ PM-SIM, Patient Monitor Simulator. Updated 2026-10-28 after the device integrati
 
 | Test level | Result |
 |---|---|
-| Node unit tests (`node --test tests/unit/*.test.js`) | **79 tests in 10 files, 79 pass, 0 fail** (run 2026-10-28 after the NIBP set-point fix; 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
+| Node unit tests (`node --test tests/unit/*.test.js`) | **86 tests in 11 files, 86 pass, 0 fail** (run 2026-10-28 after the critical-illness, stroke, heart-failure and post-operative scenarios and the extreme-low alarms; 80 after the SVT scenario and the QRS beat-time fix, 79 after the NIBP set-point fix, 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
 | Browser self-test (`index.html?selftest=1`) | **16 entries: 15 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-28: **15 pass, 0 fail, 1 not run** (section 3). |
 | Manual interaction checks in a browser | 9 earlier checks (section 4.1) and 5 checks of the new features made on 2026-10-28 (section 4.2), all as expected. |
 | Hardware tests (watch data on Android through Health Connect, native BLE Heart Rate Service, export file) | **Not run.** No watch, heart-rate sensor or Health Connect store was used. |
-| Android app | Not tested on a device. An APK file (`release/PM-SIM-1.2.1-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
+| Android app | Not tested on a device. An APK file (`release/PM-SIM-1.3.0-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
 | Website | Published from `.github/workflows/pages.yml`, which runs the unit tests before deploying. The deployed site was not checked as part of this report. |
 | Opening from `file://` | Checked statically only (section 5) |
 
@@ -93,7 +93,7 @@ When served over `http://localhost`, the app made no network requests other than
 
 ## 6. Node unit and integration tests
 
-79 tests in 10 files (18 + 10 + 4 + 13 + 3 + 10 + 3 + 4 + 6 + 8). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
+86 tests in 11 files (18 + 10 + 4 + 13 + 3 + 11 + 3 + 4 + 6 + 8 + 6). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
 
 The first five files were already described before the new features were added. Their counts did not change.
 
@@ -162,9 +162,10 @@ The first five files were already described before the new features were added. 
 
 These tests check the parser against packets built from the specification. They do not test a radio link or a real sensor.
 
-### `tests/unit/arrhythmia.test.js` (10 tests)
+### `tests/unit/arrhythmia.test.js` (11 tests)
 
-- Each teaching rhythm gets its label in at least 90 % of the frames after the first 10 s of a 60 s run: baseline, tachycardia and bradycardia → regular; AF → irregular; PVC → pvc; VT → vtach; VF → vfib; asystole → asystole.
+- Each teaching rhythm gets its label in at least 90 % of the frames after the first 10 s of a 60 s run: baseline, tachycardia and bradycardia → regular; AF → irregular; SVT → svt; PVC → pvc; VT → vtach; VF → vfib; asystole → asystole.
+- SVT pattern: measured QRS width < 75 ms, HR within ±6 of 180, no wide beats, P-wave amplitude 0, and the medium-priority `rhythm:svt` alarm active. The documented limitation is tested too: sinus rhythm at 180 bpm (P wave kept) is also labelled SVT in ≥ 90 % of frames; sinus at 140 bpm and AF at 180 bpm are never labelled SVT.
 - The analyser reports "learning" at the start, and "unavailable" (shown as "Not analysed") with the leads off.
 - PVC pattern over 90 s: each PVC is premature (< 0.8 × the mean interval) and followed by a compensatory pause (coupling + pause > 1.7 × the mean); at least 5 PVCs are checked; a PVC has a smaller pulse than a normal beat; the reported PVC rate is 6–25/min.
 - VT: measured QRS width > 100 ms and HR within ±10 bpm of 170. VF and asystole: HR missing, perfusion < 0.05, ART MAP < 15 mmHg and EtCO₂ < 10 mmHg after 40 s.
@@ -212,6 +213,19 @@ These tests use records and packets written in the test. They do not involve a p
 
 These tests check the model against its own design targets and the published parameter values. They are not a validation against measured patient data.
 
+### `tests/unit/critical.test.js` (6 tests)
+
+Each test runs the full simulation of a scenario (40–60 s) and passes every frame after 5 s to the alarm engine with default limits.
+
+- Pre-arrest deterioration: RR > 30, HR > 120, SpO₂ < 90 %; RR-high, SpO₂-low, HR-high and ART-SYS-low are active together, and none is high priority.
+- Peri-arrest: HR < 40 and SpO₂ < 80 % give exactly two high-priority alarms (`hr:extreme`, `spo2:extreme`) on top of six medium alarms; EtCO₂ < 25. With the HR limit switched off, `hr:extreme` is not raised. The asystole scenario raises the high-priority asystole alarm.
+- The extreme alarms are not raised in the bradycardia, desaturation, hypothermia and Cushing scenarios.
+- Stroke: arterial systolic > 185 mmHg, regular rhythm, and only the two arterial-pressure-high alarms.
+- Heart failure: warm-wet raises ART-SYS-high, SpO₂-low and RR-high; cold-wet has a proportional pulse pressure < 25 % and raises **no** alarm; cardiogenic shock raises ART-SYS-low, ART-MAP-low and SpO₂-low with MAP < 65 mmHg.
+- Post-operative: opioid depression raises RR-low, EtCO₂-high and SpO₂-low with EtCO₂ > 55; shivering raises TEMP-low and shows SpO₂ < 90 % (set point 97 %) **without** the low-SQI flag; the pulmonary complication raises only SpO₂-low with RR > 24 and HR > 100.
+
+The cold-wet and shivering checks record limitations on purpose: the monitor misses the first, and the quality index misses the artefact in the second.
+
 ## 7. Defects found and fixed during testing
 
 Defects found in the removed device code are not listed here.
@@ -229,7 +243,7 @@ Defects found in the removed device code are not listed here.
 - **Website:** the GitHub Pages workflow runs the unit tests before deploying. The live site at https://hafij-bge.github.io/patient-monitoring/ was not part of the testing described here.
 - **`file://`** was checked statically only (section 5).
 - Browsers other than Chromium were not tested.
-- Model limitations observed during testing are listed in `TECHNICAL_REPORT.md` section 9: NIBP fails at motion ≥ 20 %, SpO₂ is biased toward about 85 % under motion, the DIA-low alarm can be missed in the low-blood-pressure preset, and the QRS detector has no search-back.
+- Model limitations observed during testing are listed in `TECHNICAL_REPORT.md` section 9: NIBP fails at motion ≥ 20 %, SpO₂ is biased toward about 85 % under motion, the DIA-low alarm can be missed in the low-blood-pressure preset, and the QRS detector has no search-back. Found while adding the new scenarios and not fixed: in the atrial-fibrillation scenario (set HR 110) the displayed HR is about 75–85 bpm, because short beats have a smaller QRS that the detector misses; and the low-SQI flag does not catch strong motion (0 flagged frames in 90 s for the motion and shivering scenarios).
 
 ## 9. How to repeat
 

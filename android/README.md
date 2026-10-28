@@ -5,7 +5,7 @@ folder: at build time the Gradle task `syncWebAssets` copies `index.html`, `css/
 and `fixtures/` from the project root into `app/build/generated/www-assets/www`. That folder
 is registered as an assets source dir.
 
-- Package `edu.deu.pmsim`, version 1.2.1 (versionCode 4), minSdk 26, target/compile SDK 35
+- Package `edu.deu.pmsim`, version 1.3.0 (versionCode 5), minSdk 26, target/compile SDK 35
 - Kotlin 2.0.21, AGP 8.7.3, Gradle 8.11.1, JDK 17
 - Dependencies: androidx core-ktx, activity-ktx, lifecycle-runtime-ktx, webkit 1.12.1,
   kotlinx-coroutines-android, `androidx.health.connect:connect-client:1.1.0-beta01`
@@ -78,7 +78,7 @@ window.addEventListener('pmandroid', e => { const ev = e.detail; /* ev.type ... 
 
 | Method | Returns / emits |
 | --- | --- |
-| `info()` | returns a JSON **string** `{"platform":"android","appVersion":"1.2.1","sdk":35,"healthConnect":"available"\|"not-installed"\|"update-required"\|"unsupported","ble":"available"\|"off"\|"unsupported"\|"no-permission"}` |
+| `info()` | returns a JSON **string** `{"platform":"android","appVersion":"1.3.0","sdk":35,"healthConnect":"available"\|"not-installed"\|"update-required"\|"unsupported","ble":"available"\|"off"\|"unsupported"\|"no-permission"}` |
 | `hcRequestPermissions()` | opens the Health Connect read-permission screen, then emits `{"type":"hc-permissions","granted":[...],"denied":[...]}` (record simple names). If Health Connect is unavailable, emits `{"type":"hc-status","status":"not-installed"\|"update-required"\|"unsupported"}` instead |
 | `hcRead(days)` | `days` is clamped to 1..30. Emits ONE event `{"type":"hc-records","days":d,"records":[...],"errors":[...]}` |
 | `hcOpenInstall()` | *extra.* Opens the Play Store Health Connect page. Call it only from a user tap |

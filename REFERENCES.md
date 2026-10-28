@@ -139,3 +139,46 @@ Used by `src/sim/glucose.js` (TECHNICAL_REPORT.md section 3.13). The model is a 
     Supports: the coupled minimal model may have no equilibrium and unbounded insulin action, the reason the model clamps glucose uptake at zero and glucose to 1–1000 mg/dL.
 54. **Saad MF, Anderson RL, Laws A, et al.** A comparison between the minimal model and the glucose clamp in the assessment of insulin sensitivity across the spectrum of glucose tolerance. *Diabetes.* 1994;43(9):1114–1121. doi:10.2337/diab.43.9.1114. PMID 8070611.
     Supports: limitation statement — minimal-model SI is about 66 % lower than clamp SI and is not distinguishable from 0 in about half of type 2 patients.
+
+## SVT scenario sources
+
+55. **Page RL, Joglar JA, Caldwell MA, et al.** 2015 ACC/AHA/HRS Guideline for the Management of Adult Patients With Supraventricular Tachycardia. *Circulation.* 2016;133(14):e506–e574. doi:10.1161/CIR.0000000000000311. PMID 26399663.
+    Supports: SVT as a regular narrow-QRS tachycardia from tissue at or above the His bundle; P waves hidden in or just after the QRS in AV-nodal re-entry (`svt`).
+56. **Brugada J, Katritsis DG, Arbelo E, et al.** 2019 ESC Guidelines for the management of patients with supraventricular tachycardia. *Eur Heart J.* 2020;41(5):655–720. doi:10.1093/eurheartj/ehz467. PMID 31504425.
+    Supports: same ECG features; telling SVT from sinus tachycardia needs P-wave analysis, onset and the response to vagal manoeuvres (`svt`).
+
+## Peri-arrest scenario sources
+
+57. **Schein RM, Hazday N, Pena M, Ruben BH, Sprung CL.** Clinical antecedents to in-hospital cardiopulmonary arrest. *Chest.* 1990;98(6):1388–1392. doi:10.1378/chest.98.6.1388. PMID 2245680.
+    Supports: 84 % of 64 patients had documented deterioration within 8 h before arrest, mostly respiratory or mental; mean respiratory rate 29 ± 1 /min (`deteriorating`).
+58. **Kause J, Smith G, Prytherch D, et al.** A comparison of antecedents to cardiac arrests, deaths and emergency intensive care admissions in Australia and New Zealand, and the United Kingdom—the ACADEMIA study. *Resuscitation.* 2004;62(3):275–282. doi:10.1016/j.resuscitation.2004.05.016. PMID 15325446.
+    Supports: hypotension and a fall in consciousness as the most common antecedents in the 8 h before arrest (`deteriorating`).
+59. **Andersen LW, Holmberg MJ, Berg KM, Donnino MW, Granfeldt A.** In-hospital cardiac arrest: a review. *JAMA.* 2019;321(12):1200–1210. doi:10.1001/jama.2019.1696. PMID 30912843.
+    Supports: about 81 % of in-hospital arrests start in a non-shockable rhythm (asystole or PEA); respiratory insufficiency is a common cause (`deteriorating`, `periarrest`).
+60. **Soar J, Böttiger BW, Carli P, et al.** European Resuscitation Council Guidelines 2021: Adult advanced life support. *Resuscitation.* 2021;161:115–151. doi:10.1016/j.resuscitation.2021.02.010. PMID 33773825.
+    Supports: recognising deterioration to prevent in-hospital arrest; hypoxia as a reversible cause; low EtCO₂ with low cardiac output (`periarrest`).
+
+## Stroke scenario sources
+
+61. **Powers WJ, Rabinstein AA, Ackerson T, et al.** Guidelines for the early management of patients with acute ischemic stroke: 2019 update to the 2018 guidelines. *Stroke.* 2019;50(12):e344–e418. doi:10.1161/STR.0000000000000211. PMID 31662037.
+    Supports: blood pressure must be below 185/110 mmHg before intravenous thrombolysis; imaging is needed to exclude haemorrhage; cardiac monitoring to detect atrial fibrillation (`stroke`).
+62. **Qureshi AI, Ezzeddine MA, Nasar A, et al.** Prevalence of elevated blood pressure in 563,704 adult patients with stroke presenting to the ED in the United States. *Am J Emerg Med.* 2007;25(1):32–38. doi:10.1016/j.ajem.2006.07.008. PMID 17157679.
+    Supports: initial SBP ≥ 140 mmHg in 69 % of stroke patients and 185–219 mmHg in 13 % (`stroke`).
+
+## Heart-failure scenario sources
+
+63. **McDonagh TA, Metra M, Adamo M, et al.** 2021 ESC Guidelines for the diagnosis and treatment of acute and chronic heart failure. *Eur Heart J.* 2021;42(36):3599–3726. doi:10.1093/eurheartj/ehab368. PMID 34447992.
+    Supports: the clinical presentations of acute heart failure (acute decompensated, acute pulmonary oedema, isolated right-ventricular failure, cardiogenic shock) and the congestion / hypoperfusion assessment (`hf-oedema`, `hf-cold-wet`, `cardiogenic-shock`).
+64. **Nohria A, Tsang SW, Fang JC, et al.** Clinical assessment identifies hemodynamic profiles that predict outcomes in patients admitted with heart failure. *J Am Coll Cardiol.* 2003;41(10):1797–1804. doi:10.1016/s0735-1097(03)00309-7. PMID 12767667.
+    Supports: the warm/cold (perfusion) and dry/wet (congestion) profiles, with narrow pulse pressure as a sign of hypoperfusion; wet-cold has the highest risk (`hf-oedema`, `hf-cold-wet`).
+65. **Baran DA, Grines CL, Bailey S, et al.** SCAI clinical expert consensus statement on the classification of cardiogenic shock. *Catheter Cardiovasc Interv.* 2019;94(1):29–37. doi:10.1002/ccd.28329. PMID 31104355.
+    Supports: shock stages A–E; stage C ("classic") is hypotension with hypoperfusion (`cardiogenic-shock`).
+
+## Post-operative scenario sources
+
+66. **Lee LA, Caplan RA, Stephens LS, et al.** Postoperative opioid-induced respiratory depression: a closed claims analysis. *Anesthesiology.* 2015;122(3):659–665. doi:10.1097/ALN.0000000000000564. PMID 25536092.
+    Supports: 88 % of respiratory-depression events within 24 h of surgery; somnolence noted before the event in 62 %; 97 % judged preventable with better monitoring of oxygenation and ventilation (`postop-opioid`).
+67. **Sessler DI.** Perioperative thermoregulation and heat balance. *Lancet.* 2016;387(10038):2655–2664. doi:10.1016/S0140-6736(15)00981-2. PMID 26775126.
+    Supports: unwarmed anaesthetised patients become hypothermic by 1–2 °C; vasoconstriction and shivering as thermoregulatory defences; shivering as a complication (`postop-hypothermia`).
+68. **Miskovic A, Lumb AB.** Postoperative pulmonary complications. *Br J Anaesth.* 2017;118(3):317–334. doi:10.1093/bja/aex002. PMID 28186222.
+    Supports: atelectasis develops in > 75 % of patients given a neuromuscular blocking drug; pulmonary complications are common after surgery and raise mortality (`postop-ppc`).

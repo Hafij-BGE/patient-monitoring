@@ -12,13 +12,17 @@
    * Simplified Pan–Tompkins QRS detector (Pan & Tompkins, IEEE TBME 1985;32(3):230–6):
    * band-pass 5–15 Hz → 5-point derivative → squaring → 150 ms moving-window
    * integration → adaptive thresholds (SPKI/NPKI) with 200 ms refractory period and
-   * a T-wave slope check within 360 ms. Search-back for missed beats is not implemented.
+   * a T-wave slope check within 360 ms (largest slope over the 150 ms integration window,
+   * compared with the previous QRS). The beat time is the largest band-passed sample in
+   * that window (the R peak), not the integrator peak, whose small ripples would move the
+   * mark by up to ±60 ms. Search-back for missed beats is not implemented.
    */
   class PanTompkins {
     constructor(fs) {
       this.fs = fs;
       this.bp = dsp.bandpass(5, 15, fs);
       this.mwi = new dsp.MovingAverage(Math.round(0.15 * fs));
+      this.slopeN = Math.round(0.15 * fs);
       this.reset();
     }
     reset() {
@@ -27,7 +31,7 @@
       this.n = 0; this.learnN = Math.round(2 * this.fs);
       this.learnMax = 0; this.learnSum = 0;
       this.spki = 0; this.npki = 0; this.thr = Infinity;
-      this.m1 = 0; this.m2 = 0; this.slopeAcc = 0; this.peakSlope = 0;
+      this.m1 = 0; this.m2 = 0; this.slopes = new Float64Array(this.slopeN); this.ys = new Float64Array(this.slopeN); this.si = 0;
       this.lastQRS = null; this.lastSlope = 0;
       this.rrs = []; this.beats = [];
     }
@@ -39,7 +43,7 @@
       this.x = [y, this.x[0], this.x[1], this.x[2]];
       const m = this.mwi.process(d * d);
       this.n++;
-      this.slopeAcc = Math.max(this.slopeAcc, Math.abs(d));
+      this.slopes[this.si] = Math.abs(d); this.ys[this.si] = Math.abs(y); this.si = (this.si + 1) % this.slopeN;
       let out = null;
       if (this.n <= this.learnN) {
         this.learnMax = Math.max(this.learnMax, m); this.learnSum += m;
@@ -49,7 +53,11 @@
         }
       } else if (this.m1 > this.m2 && this.m1 >= m) {
         // local maximum of the integrated signal at the previous sample
-        const pk = this.m1, tp = t - 1 / this.fs, slope = this.peakSlope;
+        const pk = this.m1;
+        let slope = 0, k = 0;
+        for (const v of this.slopes) if (v > slope) slope = v;
+        for (let j = 1; j < this.slopeN; j++) if (this.ys[(this.si - 1 - j + this.slopeN) % this.slopeN] > this.ys[(this.si - 1 - k + this.slopeN) % this.slopeN]) k = j;
+        const tp = t - k / this.fs;
         const since = this.lastQRS === null ? Infinity : tp - this.lastQRS;
         if (pk > this.thr && since > 0.2) {
           if (since < 0.36 && slope < 0.5 * this.lastSlope) {
@@ -62,9 +70,7 @@
           }
         } else this.npki = 0.125 * pk + 0.875 * this.npki;
         this.thr = this.npki + 0.25 * (this.spki - this.npki);
-        this.slopeAcc = 0;
       }
-      if (m > this.m1) this.peakSlope = this.slopeAcc;
       this.m2 = this.m1; this.m1 = m;
       return out;
     }

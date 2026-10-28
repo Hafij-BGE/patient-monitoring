@@ -123,13 +123,20 @@ code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 12.5
 .tabs button[aria-selected="true"] { background: var(--panel); border-color: var(--line); font-weight: 600; margin-bottom: -1px; }
 .panel { background: var(--panel); margin: 0 16px; padding: 10px 16px 16px; border: 1px solid var(--line); border-top: none; border-radius: 0 0 8px 8px; }
 .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
-.control-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-.cgroup h3 { margin-top: 4px; }
-.ctl { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 2px 8px; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+.control-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 18px; align-items: start; }
+.cgroup h3 { margin: 4px 0 2px; font-size: 14px; }
+.ctl-view { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 4px 0 8px; }
+.ctl-view label { cursor: pointer; }
+.ctl-note { color: var(--muted); font-size: 12px; }
+.control-groups:not(.show-help) .ctl .help { display: none; }
+.ctl label[title] { cursor: help; }
+.ctl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 2px 0; border-bottom: 1px dashed var(--line); }
+.ctl[hidden], .cgroup[hidden] { display: none; }
 .ctl label { font-weight: 500; }
 .ctl .u { color: var(--muted); font-size: 12px; }
 .ctl input[type=range] { grid-column: 1 / -1; width: 100%; }
-.ctl input[type=number], .ctl select { width: 92px; }
+.ctl input[type=number] { width: 84px; }
+.ctl select { min-width: 84px; max-width: 150px; justify-self: end; }
 .ctl .help { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; }
 .ctl.changed { background: var(--warn-bg); border-radius: 4px; padding-left: 4px; }
 .ctl.changed label::after { content: " • not default"; color: var(--warn-text); font-size: 11px; }
@@ -222,7 +229,6 @@ p.warn { color: var(--warn-text); background: var(--warn-bg); padding: 4px 8px; 
 @media (max-width: 1100px) {
   .monitor { grid-template-columns: 1fr; }
   .tiles { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  .control-groups { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 720px) {
   .monitor, .alarmbar, .panel, .tabs, .legend { margin-left: 8px; margin-right: 8px; }

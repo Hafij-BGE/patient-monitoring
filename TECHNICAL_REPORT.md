@@ -34,7 +34,7 @@ The set point of every parameter is known, so the app shows each estimate next t
 
 The simulation, alarm, data and parser modules never touch the DOM. Each uses a UMD wrapper, so the same file runs in the browser (`window.PM.*`) and in Node for the unit tests. There is no build step and no ES-module import, so `index.html` also works from `file://`.
 
-**Website and Android app.** The page is published as a static website at https://hafij-bge.github.io/patient-monitoring/ by the GitHub Actions workflow `.github/workflows/pages.yml`, which runs the unit tests and then deploys `index.html`, `css/`, `src/` and `fixtures/`. It can also be served locally (`python3 -m http.server 8766`) or opened from `file://`. The Content Security Policy (`connect-src 'none'`) means the page makes no network requests. The Android app (`android/`, package `edu.deu.pmsim`, version 1.2.1) wraps the same page in a WebView. It is the only place where real watch data enters (section 7.2) and it has not been tested with real hardware. The earlier Electron desktop app (with the hospital routes and the Windows build) was removed on 2026-10-28. For v1.1.0 a new, minimal Linux desktop app was added in `desktop/`: an Electron shell that shows the same page from inside a `.deb` package, with no preload script, no Node access in the page and no device access, so the page's CSP applies unchanged. It was smoke-tested under a virtual X display (Xvfb): the page loaded and the browser self-test of v1.1.0 gave 14 passed, 0 failed, 1 not run. After the glucose model was added the self-test has 16 entries; the browser run gave 15 passed, 0 failed, 1 not run.
+**Website and Android app.** The page is published as a static website at https://hafij-bge.github.io/patient-monitoring/ by the GitHub Actions workflow `.github/workflows/pages.yml`, which runs the unit tests and then deploys `index.html`, `css/`, `src/` and `fixtures/`. It can also be served locally (`python3 -m http.server 8766`) or opened from `file://`. The Content Security Policy (`connect-src 'none'`) means the page makes no network requests. The Android app (`android/`, package `edu.deu.pmsim`, version 1.3.0) wraps the same page in a WebView. It is the only place where real watch data enters (section 7.2) and it has not been tested with real hardware. The earlier Electron desktop app (with the hospital routes and the Windows build) was removed on 2026-10-28. For v1.1.0 a new, minimal Linux desktop app was added in `desktop/`: an Electron shell that shows the same page from inside a `.deb` package, with no preload script, no Node access in the page and no device access, so the page's CSP applies unchanged. It was smoke-tested under a virtual X display (Xvfb): the page loaded and the browser self-test of v1.1.0 gave 14 passed, 0 failed, 1 not run. After the glucose model was added the self-test has 16 entries; the browser run gave 15 passed, 0 failed, 1 not run.
 
 ### 2.1 Time base
 
@@ -212,8 +212,9 @@ Following Pan & Tompkins (1985), simplified:
 4. Moving-window integration over 150 ms.
 5. A 2 s learning phase initialises the signal and noise peak levels (SPKI, NPKI).
 6. Adaptive threshold: thr = NPKI + 0.25 (SPKI − NPKI).
-7. 200 ms refractory period. A candidate within 360 ms of the last QRS whose maximum slope is below half of the previous slope is classified as a T wave.
-8. HR = 60 / mean of the last 8 RR intervals.
+7. 200 ms refractory period. A candidate within 360 ms of the last QRS whose maximum slope (largest derivative over the 150 ms integration window) is below half of the previous QRS slope is classified as a T wave.
+8. The beat time is the largest band-passed sample in the same 150 ms window (the R peak). Using the integrator peak itself moved the mark by up to ±60 ms, because small ripples on the integrator plateau create several local maxima. This jitter did not change the averaged HR, but it made regular rhythms look irregular to the SVT rule (RR coefficient of variation > 0.06 at 180 bpm).
+9. HR = 60 / mean of the last 8 RR intervals.
 
 **Omitted:** the search-back for missed beats and the second (filtered-signal) threshold set of the original algorithm.
 
@@ -272,16 +273,17 @@ Presets: *Under-damped arterial line* and *Transducer too high* (20 cm).
 
 ### 3.10 Arrhythmia patterns and rhythm analysis
 
-**Patient side** (`src/sim/arrhythmia.js`, `ecg.js`). The `arrhythmia` control selects one teaching pattern: none, AF, PVC, VT, VF or asystole. The patterns are simplified shapes for teaching. They are not models of the electrophysiology.
+**Patient side** (`src/sim/arrhythmia.js`, `ecg.js`). The `arrhythmia` control selects one teaching pattern: none, AF, SVT, PVC, VT, VF or asystole. The patterns are simplified shapes for teaching. They are not models of the electrophysiology.
 
 - **Ventricular (wide) beats** reuse the McSharry ODE of section 3.1 with a different event set: no P wave, Q at −35 ms (SD 30 ms, −0.08), R at 0 (SD 40 ms, 1), S at +75 ms (SD 40 ms, −0.45) and a discordant T wave at min(0.3 s, 0.42 · RR) (SD 75 ms, −0.35). Times and widths are converted to angles, and amplitudes to aᵢ = Aᵢ · ω / bᵢ². The wide beat is scaled to 1.3 × `ecg_amp_mv`. These values are teaching choices.
 - **AF:** no P waves. RRᵢ = mean · (0.55 + 0.9 U), U ~ uniform(0, 1). A fibrillatory baseline of 6–9 Hz (sum of 4 sines with a random-walk frequency and a slow amplitude envelope) with amplitude 0.07 × `ecg_amp_mv` is added.
+- **SVT:** a normal narrow beat without the P wave (hidden in the QRS, as in typical AV-nodal re-entry [55, 56]), at the set heart rate and beat-to-beat variability. Fast, regular timing comes from the scenario (HR 180, variability SD 3 ms).
 - **PVC:** each normal cycle is followed by an early wide beat with probability min(0.5, `pvc_per_min`/HR), never two in a row. The early beat comes at about 0.6 × the mean interval and is followed by a compensatory pause.
 - **VT:** every beat is wide, at the set heart rate.
 - **VF:** no beats. The ECG is a fibrillatory signal of 3–7 Hz with amplitude 0.5 × `ecg_amp_mv`.
 - **Asystole:** no beats and a flat ECG (noise and wander are still added at acquisition).
 
-Without beats, perf falls (section 3.2), so ART, pleth and the CO₂ plateau fall as well. Presets: *AF pattern*, *Frequent PVCs* (14/min), *V-Tach pattern* (HR 170, 85/55 mmHg), *V-Fib pattern (no output)* and *Asystole pattern*.
+Without beats, perf falls (section 3.2), so ART, pleth and the CO₂ plateau fall as well. Presets: *AF pattern*, *SVT pattern* (HR 180, 106/72 mmHg), *Frequent PVCs* (14/min), *V-Tach pattern* (HR 170, 85/55 mmHg), *V-Fib pattern (no output)* and *Asystole pattern*.
 
 **Monitor side** (`RhythmAnalyzer` in `src/sim/detectors.js`). The analyser works on a 0.5–40 Hz band-passed copy of the ECG, keeps 6 s of it and uses the QRS times of section 3.7.
 
@@ -293,9 +295,11 @@ Without beats, perf falls (section 3.2), so ART, pleth and the CO₂ plateau fal
   4. no QRS for 4 s → *V-Fib* if the signal is mostly not flat, else *Asystole*,
   5. median width wide and RR coefficient of variation > 0.3 (at least 3 widths) → *V-Fib*,
   6. last 4 complexes wide and rate > 100 bpm → *V-Tach*,
-  7. coefficient of variation of narrow-to-narrow intervals > 0.12 (at least 6 intervals) → *Irregular*,
-  8. any wide complex in the last 60 s → *PVCs*,
-  9. otherwise → *Regular*.
+  7. last 8 complexes narrow, rate > 150 bpm and their RR coefficient of variation < 0.06 → *SVT*,
+  8. coefficient of variation of narrow-to-narrow intervals > 0.12 (at least 6 intervals) → *Irregular*,
+  9. any wide complex in the last 60 s → *PVCs*,
+  10. otherwise → *Regular*.
+- The SVT rule uses rate, width and regularity only. It does not look for P waves, so a sinus rhythm above 150 bpm also reads *SVT*. Telling the two apart needs the P waves, the onset and the response to vagal manoeuvres [56]. The thresholds are illustrative.
 - PVC rate = wide complexes × 60 / max(10 s, time span covered).
 - For V-Fib and asystole the HR value is reported as missing.
 
@@ -315,7 +319,9 @@ These rules are **not a validated arrhythmia algorithm**. A clinical arrhythmia 
 
 The last stage can be saved as a PNG image.
 
-**Lessons tab** (`src/lessons/lessons.js`, `src/ui/lessonsPanel.js`). Seven guided lessons: ECG signal chain, pulse oximetry, NIBP, rhythms, capnography, arterial line and alarms (8–10 min each). Each lesson has objectives, a button that loads its scenario (preset), steps that can set controls or open a tab, and a quiz of 3 multiple-choice questions with an explanation for each answer. A unit test checks that the quiz answers about the model (for example the ratio R of the desaturation preset) agree with the simulator. The best score per lesson is kept in the browser's `localStorage` only; it is not measurement data.
+**Controls tab** (`buildControls` in `src/ui/panels.js`). One row per parameter, built from `SPEC`. *Simple* view shows 11 main controls (HR, arrhythmia pattern, SYS, DIA, SpO₂, RR, EtCO₂, temperature, motion, SpO₂ probe state, NIBP interval). Any other control is shown as well when it is not at its default value or an active alarm points to it, so a scenario never hides what it changed. *Advanced* shows all 62. The explanation text is hidden unless *Show explanations* is ticked; it is also the tooltip of the control name.
+
+**Lessons tab** (`src/lessons/lessons.js`, `src/ui/lessonsPanel.js`). Eight guided lessons: ECG signal chain, pulse oximetry, NIBP, rhythms, capnography, arterial line, alarms and deterioration before cardiac arrest (8–10 min each). Each lesson has objectives, a button that loads its scenario (preset), steps that can set controls or open a tab, and a quiz of 3 multiple-choice questions with an explanation for each answer. A unit test checks that the quiz answers about the model (for example the ratio R of the desaturation preset) agree with the simulator. The best score per lesson is kept in the browser's `localStorage` only; it is not measurement data.
 
 **Monitor screen.** Six sweeping waveforms: ECG, pleth (auto scale), ART (0–200 mmHg), respiration (auto scale), CO₂ (0–60 mmHg) and cuff pressure (0–300 mmHg). Respiration, CO₂ and cuff sweep at 6.25 mm/s. The HR tile also shows the rhythm label and the PVC rate. The ART tile shows SYS/DIA (MAP) with the set point and the SYS limits. The EtCO₂ tile shows FiCO₂ and awRR. The page layout adapts to narrow screens (one column at 1100 px and below, a phone layout at 720 px and below).
 
@@ -323,7 +329,7 @@ The last stage can be saved as a PNG image.
 
 A scenario sets **every** patient-profile, physiological and sensor control: it starts from the defaults and applies its own changes, so nothing from the previous scenario remains. Processing and display settings (filters, sweep, averaging, NIBP interval, speed, seed) are kept. When any patient or sensor control is changed by hand, in Controls or in the Profile tab, the selector shows **Custom (edited)**. If the values are changed back to those of a scenario, the selector shows that scenario again (`matchPreset` in `src/sim/params.js`).
 
-There are 40 scenarios. The first 25 change one or two signs, or one sensor setting. The other 15 are **combined-sign patterns taken from the literature**. Each lists its sources (field `refs`, entries 28–44 and 51 of `REFERENCES.md`) and a teaching note, which the app shows when the scenario is loaded.
+There are 50 scenarios. The first 25 change one or two signs, or one sensor setting. The other 25 are **combined-sign patterns taken from the literature**. Each lists its sources (field `refs`, entries 28–44, 51 and 55–68 of `REFERENCES.md`) and a teaching note, which the app shows when the scenario is loaded.
 
 | Scenario | Values (others at default) | Sources |
 |---|---|---|
@@ -341,9 +347,19 @@ There are 40 scenarios. The first 25 change one or two signs, or one sensor sett
 | Raised-potassium ECG, early | T-wave size 1.9× | 43 |
 | Raised-potassium ECG, late | T 1.9×, P 0.3×, QRS width 1.7× | 43 |
 | Raised-ICP reflex (Cushing) | 200/90 mmHg, HR 46, RR 8 | 44 |
+| SVT pattern | SVT rhythm (no P wave), HR 180, variability SD 3 ms, 106/72 mmHg | 55, 56 |
 | Hyperglycaemic-crisis pattern (DKA-type) | type 1 diabetes, fasting glucose 320 mg/dL, no basal insulin, RR 28, EtCO₂ 24, HR 115, 102/64 mmHg | 35, 36, 51 |
+| Pre-arrest deterioration (hours before) | RR 31, SpO₂ 88 %, HR 122, 86/52 mmHg, EtCO₂ 30 | 57–59 |
+| Peri-arrest (minutes before arrest) | RR 4, SpO₂ 68 %, HR 36, 60/32 mmHg, EtCO₂ 18, PI 0.15 % | 59, 60 |
+| Acute stroke pattern (high blood pressure) | 192/104 mmHg, HR 84, SpO₂ 96 % | 61, 62 |
+| Heart failure, acute pulmonary oedema (warm-wet) | 178/102 mmHg, HR 118, RR 32, SpO₂ 86 %, EtCO₂ 32 | 63, 64 |
+| Heart failure, low output with congestion (cold-wet) | 92/74 mmHg, HR 112, RR 26, SpO₂ 90 %, PI 0.5 % | 63, 64 |
+| Heart failure, cardiogenic shock (SCAI stage C) | 78/54 mmHg, HR 118, RR 28, SpO₂ 88 %, EtCO₂ 28, PI 0.3 % | 63, 65 |
+| Post-operative opioid respiratory depression (ward, room air) | RR 6, SpO₂ 86 %, EtCO₂ 62, HR 58, 104/62 mmHg | 66, 34, 35 |
+| Post-operative hypothermia with shivering | 35.2 °C, HR 96, motion 35 %, PI 0.8 % | 67 |
+| Post-operative pulmonary complication (atelectasis type) | SpO₂ 89 %, RR 26, HR 104, EtCO₂ 34 | 68 |
 
-Where a source gives a range (for example ATLS class III: HR 120–140, RR 30–40) the value lies inside it. Where a source gives only a direction (for example "pulse pressure decreased", "bradycardia"), the number is an **illustrative choice** in that direction. The ECG scale factors for raised potassium are illustrative; the source gives only the order of the changes, and the patterns carry no potassium values. The DKA-type pattern shows only glucose above 250 mg/dL together with the compensatory breathing of [35, 36]; ketones, pH and potassium are not modelled. Every scenario is an illustrative pattern for education only. Real presentations vary and the values are not diagnostic. A unit test checks that every sourced scenario passes validation without clamping, that its references exist in `REFERENCES.md` and that no two scenarios have the same settings.
+Where a source gives a range (for example ATLS class III: HR 120–140, RR 30–40) the value lies inside it. Where a source gives only a direction (for example "pulse pressure decreased", "bradycardia"), the number is an **illustrative choice** in that direction. The ECG scale factors for raised potassium are illustrative; the source gives only the order of the changes, and the patterns carry no potassium values. The DKA-type pattern shows only glucose above 250 mg/dL together with the compensatory breathing of [35, 36]; ketones, pH and potassium are not modelled. The critical-illness and post-operative scenarios also show what the monitor **cannot** see, and their notes say so. In the peri-arrest pattern the low EtCO₂ comes from low pulmonary blood flow; pulseless electrical activity (PEA) is not modelled, because the model always couples a QRS complex to a pulse. The stroke pattern shows only the blood pressure (above the 185/110 mmHg limit for thrombolysis [61]); the neurological deficit is not visible on a monitor. The cold-wet heart-failure pattern has a proportional pulse pressure of (92 − 74)/92 < 25 % [64] but raises no default alarm, although it is the profile with the highest risk. Cardiogenic shock raises the same alarms as the blood-loss pattern; venous pressure and right-ventricular failure are not modelled. In the shivering pattern the SpO₂ of about 85 % is a motion artefact (set point 97 %) that the signal quality index does not flag (section 9). The monitor cannot tell atelectasis from pneumonia or pulmonary embolism. A unit test (`tests/unit/critical.test.js`) checks the alarms each of these scenarios raises. Every scenario is an illustrative pattern for education only. Real presentations vary and the values are not diagnostic. A unit test checks that every sourced scenario passes validation without clamping, that its references exist in `REFERENCES.md` and that no two scenarios have the same settings.
 
 ### 3.13 Glucose–insulin model and projection
 
@@ -449,6 +465,7 @@ These defaults are illustrative and editable. They are not clinical recommendati
 - Physiological alarms are medium priority. **Apnea** is high priority and replaces the RR-low alarm.
 - Missing values never raise a physiological alarm. They raise a technical alarm instead.
 - **Glucose level 2:** below 54 mg/dL a separate high-priority alarm "GLUCOSE < 54 (level 2)" is raised as well. The 70, 180 and 54 mg/dL values follow [51, 52].
+- **Extreme lows:** below HR 40 bpm ("EXTREME BRADY") and below SpO₂ 80 % ("SpO₂ < 80 (severe)") a separate high-priority alarm is raised on top of the medium limit alarm, with the same delay. It is switched off together with its limit. Without it a patient close to arrest showed only medium-priority alarms. The two values are illustrative teaching values, not taken from a device or guideline (`EXTREME_LOW` in `src/alarms/alarmEngine.js`).
 
 **Rhythm alarms** come from the rhythm label of section 3.10. The priorities follow the spirit of IEC 60601-2-27; they do not claim compliance.
 
@@ -457,6 +474,7 @@ These defaults are illustrative and editable. They are not clinical recommendati
 | Asystole | ASYSTOLE | high | 0 s |
 | V-Fib | V-FIB | high | 0 s |
 | V-Tach | V-TACH | high | 0 s |
+| SVT | SVT | medium | 0 s |
 | Irregular | Irregular HR | medium | 10 s |
 | PVCs, rate > 10/min | PVCs > 10/min | medium | 0 s |
 
@@ -518,7 +536,7 @@ The WebView page is served from the app's own assets and has no network access; 
 
 ## 8. Assumptions
 
-1. A single ECG lead with a fixed morphology, scaled by heart rate. The arrhythmia patterns (AF, PVC, VT, VF, asystole) are simplified teaching shapes. No other conduction disorders are modelled.
+1. A single ECG lead with a fixed morphology, scaled by heart rate. The arrhythmia patterns (AF, SVT, PVC, VT, VF, asystole) are simplified teaching shapes. No other conduction disorders are modelled.
 2. The arterial pulse has a fixed shape and a fixed 0.20 s arrival time. Pressure, PPG, capnogram and respiration share the same beat and breath times. Circulation is reduced to one perfusion state (section 3.2).
 3. The PPG is two-wavelength transmission with a linear R-to-SpO₂ calibration. No venous pulsation, no ambient light, no dyshaemoglobins.
 4. Respiration is a regular oscillator with I:E = 1:2. No sighs. Expiratory obstruction is shown only in the capnogram shape, not in the impedance signal.
@@ -536,9 +554,10 @@ These were observed or are known from the model design:
 
 - **NIBP under motion.** At motion ≥ 20 % the oscillometric measurement usually fails with a motion-artifact message. This is intended behaviour, but the threshold is a teaching choice.
 - **NIBP set-point change.** A measurement is aborted when the simulated SBP or DBP changes by more than 5 mmHg while it runs (section 3.6). The simulator can do this because it knows the set point. A real monitor has to detect an unstable patient from the oscillations themselves, and the oscillogram analysis here does not test for a two-level envelope. Gradual changes of up to 5 mmHg are accepted and can bias the reading by a similar amount.
-- **SpO₂ under motion** is biased toward about 85 % (R → 1), and SQI drops. The low-SQI quality flag and technical alarm show this. The value itself is not corrected.
+- **SpO₂ under motion** is biased toward about 85 % (R → 1). The value is not corrected. SQI (consistency of R across four 1-s windows) drops for mild motion (mean 43 at motion 15, 60 s run) but rises again under strong motion (mean 75 at motion 70), because then the artefact itself sets a steady R ≈ 1. The low-SQI flag (SQI < 40) therefore catches only some mild-motion windows and misses strong motion (`motion` and `postop-hypothermia` scenarios: 0 flagged frames in 90 s).
 - **Hypotension preset.** At 82/48 mmHg the oscillometric DBP estimate can land just above the 50 mmHg limit, so the DIA-low alarm may not fire. This is a real-world limitation of fixed-ratio estimation and is left visible as a teaching example.
 - **QRS detector** has no search-back, so dropouts and very noisy ECG can cause missed beats and HR errors.
+- **HR in the AF pattern reads low.** With a set HR of 110 the displayed HR is about 75–85 bpm. The ECG model scales the QRS amplitude with the beat interval, so the short beats of AF have a small QRS that does not cross the detection threshold. The irregular-rhythm alarm still fires. Not fixed.
 - **RR estimate** is null for the first breaths after a start or reset.
 - **SpO₂ calibration** is the linear example line, not a device calibration.
 - **Imported timestamps without a time zone** are read in the zone chosen in the import panel. Device clocks that carry no zone information cannot be corrected automatically.
@@ -547,7 +566,7 @@ These were observed or are known from the model design:
 - **Capnography and arterial line** parameters (wave shape constants, f_n, ζ, the perfusion time constants) are illustrative. They show the effects qualitatively and are not fitted to measured data.
 - **Watch data** (Android app only) has not been tested with any real watch, heart-rate sensor or Health Connect store. Consumer wearable readings are not clinical measurements (see `TEST_REPORT.md`).
 - **Glucose model.** Population parameters only; no person is fitted. Renal glucose excretion, glucagon, counter-regulation, exercise and the change of endogenous glucose output with insulin are not modelled. Without insulin action, glucose still returns towards fasting through SG (glucose effectiveness), so untreated type 1 hyperglycaemia resolves slowly in the model, unlike in reality. Minimal-model SI is lower than clamp-derived sensitivity (about 66 % lower in [54]), so a bolus has a modest effect. Secretion gain σ, the type 2 factor 0.5 and fasting insulin are illustrative. There is no CGM or glucose meter model (no sensor lag, no noise). Ketones and pH are not modelled.
-- Measurements are not persisted between sessions. Only the best lesson quiz scores are kept, in the browser's `localStorage`.
+- Measurements are not persisted between sessions. Only the best lesson quiz scores and the Controls view choice are kept, in the browser's `localStorage`.
 
 ## 10. References
 

@@ -84,10 +84,12 @@
     },
     {
       id: 'rhythms', title: 'Rhythm patterns and the analyser', minutes: 10, preset: 'pvc',
-      objectives: ['Recognise the teaching patterns: PVCs, AF, V-Tach', 'Describe which features the rule-based analyser uses', 'Explain the learning period'],
+      objectives: ['Recognise the teaching patterns: PVCs, AF, SVT, V-Tach', 'Describe which features the rule-based analyser uses', 'Explain the learning period'],
       steps: [
         { text: 'Frequent PVCs: look for early, wide complexes followed by a pause. The HR tile shows PVCs per minute.' },
         { text: 'Switch to atrial fibrillation. The R–R intervals become irregular and there are no P waves.', set: { arrhythmia: 'af', hr: 110 } },
+        { text: 'Switch to SVT. Narrow complexes at 180 bpm, very regular, with no visible P wave. The label reads SVT with a medium-priority alarm.', set: { arrhythmia: 'svt', hr: 180, hrv_ms: 3 } },
+        { text: 'Now set the pattern back to none and keep 180 bpm (a fast sinus rhythm with P waves). The label still reads SVT: the analyser uses only rate, width and regularity.', set: { arrhythmia: 'none', hr: 180, hrv_ms: 3 } },
         { text: 'Switch to V-Tach. Wide complexes at a high rate; the alarm has high priority and no delay.', set: { arrhythmia: 'vt', hr: 170 } },
         { text: 'Open the signal chain for the ECG: QRS width and rhythm label are listed under the plots.', tab: 'chain' },
       ],
@@ -101,6 +103,9 @@
         { q: 'Why does the rhythm label read "Learning" after a reset?',
           options: ['The analyser needs about 8 s of signal before its rules apply', 'The ECG is switched off for 8 s', 'The alarm system is being tested', 'The patient model is not running'],
           answer: 0, why: 'Rules based on R–R statistics need a few beats first. The analyser here is illustrative and not a validated algorithm.' },
+        { q: 'The analyser labels a regular narrow rhythm at 180 bpm as SVT. What can it not tell from its rules?',
+          options: ['Whether P waves are present, so a fast sinus rhythm gets the same label', 'Whether the QRS is narrow', 'Whether the rate is above 150 bpm', 'Whether the R–R intervals are regular'],
+          answer: 0, why: 'The SVT rule uses rate, QRS width and R–R regularity only. Telling SVT from sinus tachycardia needs the P waves, onset and response to manoeuvres, which this analyser does not check.' },
       ],
     },
     {
@@ -167,6 +172,27 @@
         { q: 'In this simulator, which alarms are high priority with no delay?',
           options: ['Apnea, asystole, V-Fib and V-Tach', 'All limit alarms', 'Only temperature alarms', 'Technical alarms'],
           answer: 0, why: 'These are configured as high priority with zero delay in the alarm engine.' },
+      ],
+    },
+    {
+      id: 'deterioration', title: 'Deterioration before cardiac arrest', minutes: 8, preset: 'deteriorating',
+      objectives: ['Recognise the vital-sign pattern that comes before most in-hospital arrests', 'Explain why EtCO₂ falls when the circulation fails'],
+      steps: [
+        { text: 'Hours before arrest: fast breathing, SpO₂ 88 %, heart rate over 120 and low blood pressure. Each alarm is medium priority; together they match the antecedents most often recorded before in-hospital arrest.' },
+        { text: 'Open Trends and keep it open while the next steps change the patient.', tab: 'trends' },
+        { text: 'Minutes before arrest: exhausted breathing, SpO₂ 68 %, heart rate 36 and pressure 60/32. EXTREME BRADY and SpO₂ < 80 are now high-priority alarms.', set: { rr: 4, spo2: 68, hr: 36, sbp: 60, dbp: 32, etco2: 18, pi: 0.15 } },
+        { text: 'Arrest. Most in-hospital arrests start in a non-shockable rhythm. The ASYSTOLE alarm is high priority with no delay.', set: { arrhythmia: 'asystole' } },
+      ],
+      quiz: [
+        { q: 'What did studies of in-hospital cardiac arrest find in the hours before the arrest?',
+          options: ['Most patients had documented deterioration, often respiratory', 'Vital signs were usually normal until the arrest', 'Only temperature changed', 'Deterioration was seen only in children'],
+          answer: 0, why: 'In Schein et al. 84 % had documented deterioration within 8 h, mostly respiratory or mental; mean respiratory rate was 29 /min.' },
+        { q: 'In the peri-arrest step breathing is slow, yet EtCO₂ is low. Why?',
+          options: ['Little blood flows through the lungs, so little CO₂ reaches the alveoli', 'The patient is hyperventilating', 'The capnograph is disconnected', 'Arterial CO₂ is low'],
+          answer: 0, why: 'With low cardiac output, CO₂ delivery to the lungs falls, so EtCO₂ falls even though arterial CO₂ rises.' },
+        { q: 'Which arrest rhythm can this simulator not show?',
+          options: ['Pulseless electrical activity (PEA)', 'Asystole', 'Ventricular fibrillation', 'Ventricular tachycardia'],
+          answer: 0, why: 'PEA needs an organised ECG with no output; the model always couples a QRS to a pulse.' },
       ],
     },
   ];

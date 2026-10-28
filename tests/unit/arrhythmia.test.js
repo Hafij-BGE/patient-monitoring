@@ -21,12 +21,33 @@ const after = (frames, t0) => frames.filter(f => f.t >= t0);
 const share = (frames, rhythm) => frames.filter(f => f.est.rhythm === rhythm).length / frames.length;
 
 test('rhythm analyser labels each teaching rhythm (≥ 90 % of frames after learning)', () => {
-  const expect = { baseline: 'regular', tachy: 'regular', brady: 'regular', af: 'irregular', pvc: 'pvc',
+  const expect = { baseline: 'regular', tachy: 'regular', brady: 'regular', af: 'irregular', svt: 'svt', pvc: 'pvc',
     vt: 'vtach', vf: 'vfib', asystole: 'asystole' };
   for (const [id, rhythm] of Object.entries(expect)) {
     const { frames } = run(id, 60);
     assert.ok(share(after(frames, 10), rhythm) >= 0.9, id + ' → ' + rhythm);
   }
+});
+
+test('SVT: narrow, regular, no P wave, medium alarm; the rule cannot tell it from fast sinus rhythm', () => {
+  const { e, frames, last } = run('svt', 40);
+  assert.ok(last.est.qrsWidthMs < 75, 'narrow: ' + last.est.qrsWidthMs);
+  assert.ok(Math.abs(last.est.hr - 180) < 6, 'rate ' + last.est.hr);
+  assert.ok(e.trueKinds.slice(-20).every(k => k === 'normal'), 'no wide beats');
+  assert.equal(e.ecg.pending.w.a[0], 0, 'P-wave amplitude 0');
+  const alarms = new AlarmEngine();
+  let st;
+  for (const f of after(frames, 10)) st = alarms.evaluate(f);
+  const a = st.active.find(x => x.id === 'rhythm:svt');
+  assert.ok(a, 'rhythm:svt active');
+  assert.equal(a.priority, 'medium');
+  // Same rate as sinus rhythm (P waves present): the rule gives the same label.
+  const sinus = run('baseline', 40, { hr: 180, hrv_ms: 3 });
+  assert.ok(sinus.e.ecg.pending.w.a[0] !== 0, 'sinus keeps its P wave');
+  assert.ok(share(after(sinus.frames, 10), 'svt') >= 0.9, 'fast sinus also labelled SVT');
+  // Below the 150 bpm threshold, or irregular, it is not SVT.
+  assert.equal(share(after(run('baseline', 40, { hr: 140, hrv_ms: 3 }).frames, 10), 'svt'), 0);
+  assert.equal(share(after(run('af', 40, { hr: 180 }).frames, 10), 'svt'), 0);
 });
 
 test('rhythm analysis is "learning" at first and "Not analysed" with leads off', () => {

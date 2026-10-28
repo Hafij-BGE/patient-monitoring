@@ -152,8 +152,8 @@
 </nav>
 
 <section class="panel" data-panel="controls">
-  <p class="hint">Each control lists its unit, its range and what it does. Values outside the range are clamped, and a warning is shown.
-    A scenario preset resets the patient and sensor settings, keeps the display settings, and highlights what it changed.</p>
+  <p class="hint">Each control shows its unit and range; hover a name, or tick <em>Show explanations</em>, for what it does. Values outside the range are clamped with a warning.
+    A scenario resets the patient and sensor settings, keeps the display settings, and highlights what it changed.</p>
   <div class="sev-legend" aria-label="Colour key"><span class="h">high-priority alarm</span><span class="m">medium-priority alarm</span><span class="l">technical alarm</span><span class="d">not the default value</span></div>
   <div id="controlMsgs" class="msgs" aria-live="polite"></div>
   <div id="controls" class="control-groups"></div>
@@ -374,7 +374,7 @@
     The mean pressure is almost unchanged in each case. h is the transducer height above the heart in cm; 1 cm of water ≈ 0.7356 mmHg. A line open to air reads 0.</p>
   <h3>Rhythm analysis: rule-based teaching analyser</h3>
   <p>The monitor band-passes the acquired ECG (0.5–40 Hz) and measures each detected QRS width. It then applies simple rules every second:
-    almost flat trace → asystole; no QRS for 4 s on a busy trace, or wide chaotic complexes → V-Fib; the last 4 complexes wide above 100 bpm → V-Tach;
+    almost flat trace → asystole; no QRS for 4 s on a busy trace, or wide chaotic complexes → V-Fib; the last 4 complexes wide above 100 bpm → V-Tach; the last 8 narrow, very regular and above 150 bpm → SVT (P waves are not checked, so a fast sinus rhythm gets the same label);
     narrow-to-narrow RR coefficient of variation above 0.12 → irregular; any wide complex in the last 60 s → PVCs. The first 8 s are "learning".
     The thresholds were tuned on this simulator's own waveforms. This is not a validated arrhythmia algorithm (IEC 60601-2-27 requires testing against annotated databases) and it gives no diagnosis.</p>
   <h3>Main components of a bedside monitor</h3>
@@ -391,7 +391,7 @@
 
   <h3>Simplifying assumptions</h3>
   <ul>
-    <li>One ECG lead with a fixed morphology. The arrhythmias are five teaching patterns (AF, PVCs, V-Tach, V-Fib, asystole). Blocks, flutter and paced rhythms are not modelled.</li>
+    <li>One ECG lead with a fixed morphology. The arrhythmias are six teaching patterns (AF, SVT, PVCs, V-Tach, V-Fib, asystole). Blocks, flutter and paced rhythms are not modelled.</li>
     <li>Perfusion is one number between 0 and 1. It falls when no effective beat occurs and drives the arterial pressure, the pulse and the EtCO₂.</li>
     <li>The pulse has a fixed shape and arrives 0.20 s after the R wave. ECG, PPG, pressure and respiration share the same beat times.</li>
     <li>The PPG uses two wavelengths and a linear calibration. Venous pulsation, ambient light and dyshaemoglobins (COHb, MetHb) are not modelled.</li>
@@ -458,7 +458,7 @@
 
 <footer class="foot">
   PM-SIM is an original educational design. It does not reproduce the interface of any monitor manufacturer.
-  It runs fully offline. It makes no network requests. Measurements are not saved between sessions. Nothing is kept in browser storage.
+  It runs fully offline. It makes no network requests. Measurements are not saved between sessions. Browser storage keeps only the best lesson scores and the Controls view choice.
 </footer>
 
 <!-- logic modules (no DOM) -->
