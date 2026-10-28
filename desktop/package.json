@@ -30,6 +30,24 @@
       "artifactName": "PM-SIM-${version}-${arch}.${ext}",
       "syncDesktopName": true
     },
-    "deb": { "packageCategory": "education" }
+    "deb": { "packageCategory": "education" },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "zip", "arch": ["x64"] }
+      ],
+      "icon": "icon.png",
+      "artifactName": "PM-SIM-${version}-win-${arch}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "PM-SIM-${version}-setup-${arch}.${ext}",
+      "shortcutName": "PM-SIM"
+    },
+    "portable": { "artifactName": "PM-SIM-${version}-portable-${arch}.${ext}" }
   }
 }

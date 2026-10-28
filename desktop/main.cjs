@@ -1,6 +1,6 @@
 'use strict';
 
-// Linux desktop shell for PM-SIM (.deb). It only shows the same web page as the
+// Desktop shell for PM-SIM (Linux .deb, Windows .exe). It only shows the same web page as the
 // website, served from app://pm-sim/ inside the package. No preload, no Node in
 // the page, no device access; the page's CSP (connect-src 'none') applies unchanged.
 

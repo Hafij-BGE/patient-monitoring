@@ -1,0 +1,49 @@
+# Builds the Windows x64 desktop app (NSIS installer, portable .exe, .zip) on a
+# Windows runner, because the Linux development machine has no Wine/NSIS.
+# Run it by hand with a release tag; the files are added to that GitHub release.
+name: windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to add the Windows files to (for example v1.2.0)
+        required: true
+
+permissions:
+  contents: write  # needed to upload files to the release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/unit/*.test.js
+      - name: Stage the web app next to the Electron shell (as desktop/build-deb.sh does)
+        run: |
+          mkdir -p stage/web
+          cp desktop/main.cjs desktop/package.json desktop/icon.png stage/
+          cp -r index.html css src fixtures stage/web/
+      - run: npm install --no-audit --no-fund
+        working-directory: stage
+      - run: npx electron-builder --win --publish never
+        working-directory: stage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pm-sim-windows
+          path: |
+            stage/dist/PM-SIM-*.exe
+            stage/dist/PM-SIM-*.zip
+          if-no-files-found: error
+      - name: Add the files to the release
+        working-directory: stage/dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" PM-SIM-*.exe PM-SIM-*.zip --repo "$GITHUB_REPOSITORY" --clobber
