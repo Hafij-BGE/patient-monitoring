@@ -191,3 +191,24 @@ Used by `src/sim/glucose.js` (TECHNICAL_REPORT.md section 3.13). The model is a 
     Supports: the Dower matrix coefficients used for leads I, II and V1–V6 (`DOWER` in `src/sim/ecg12.js`).
 71. **Kligfield P, Gettes LS, Bailey JJ, et al.** Recommendations for the standardization and interpretation of the electrocardiogram, part I: the electrocardiogram and its technology. *Circulation.* 2007;115(10):1306–1324. doi:10.1161/CIRCULATIONAHA.106.180200. PMID 17322457.
     Supports: the derived limb leads (III = II − I and the augmented leads), the standard 3 × 4 layout with a rhythm strip, 25 mm/s, 10 mm/mV, the 1 mV calibration pulse and the 0.05–150 Hz diagnostic bandwidth (12-lead view).
+
+## Profile use-case sources
+
+72. **Acute Respiratory Distress Syndrome Network; Brower RG, Matthay MA, Morris A, Schoenfeld D, Thompson BT, Wheeler A.** Ventilation with lower tidal volumes as compared with traditional tidal volumes for acute lung injury and the acute respiratory distress syndrome. *N Engl J Med.* 2000;342(18):1301–1308. doi:10.1056/NEJM200005043421801. PMID 10793162.
+    Supports: tidal volume of 6 mL/kg of predicted body weight (lower mortality than 12 mL/kg) and the predicted-body-weight formula of the trial, male 50 + 0.91 × (height cm − 152.4), female 45.5 + 0.91 × (height cm − 152.4) (`predictedBodyWeight` in `src/core/profile.js`).
+73. **Evans L, Rhodes A, Alhazzani W, et al.** Surviving sepsis campaign: international guidelines for management of sepsis and septic shock 2021. *Intensive Care Med.* 2021;47(11):1181–1247. doi:10.1007/s00134-021-06506-y. PMID 34599691. PMC8486643.
+    Supports: at least 30 mL/kg IV crystalloid within the first 3 h for sepsis-induced hypoperfusion or septic shock (recommendation 5, weak, low-quality evidence; the 2016 text used ideal body weight); low tidal volume of 6 mL/kg PBW in sepsis-induced ARDS (recommendation 49), earlier versions 4–8 mL/kg PBW (Profile calculators).
+74. **Kellum JA, Lameire N; KDIGO AKI Guideline Work Group.** Diagnosis, evaluation, and management of acute kidney injury: a KDIGO summary (Part 1). *Crit Care.* 2013;17(1):204. doi:10.1186/cc11454. PMID 23394211. PMC4057151.
+    Supports: urine volume < 0.5 mL/kg/h for 6 h as an AKI criterion and stage 1 (6–12 h) (urine output threshold card).
+75. **Tanaka H, Monahan KD, Seals DR.** Age-predicted maximal heart rate revisited. *J Am Coll Cardiol.* 2001;37(1):153–156. doi:10.1016/s0735-1097(00)01054-8. PMID 11153730.
+    Supports: HRmax = 208 − 0.7 × age, independent of sex (`hrMaxTanaka`).
+76. **Caputo N, Reilly J, Kanter M, West J.** A retrospective analysis of the respiratory adjusted shock index to determine the presence of occult shock in trauma patients. *J Trauma Acute Care Surg.* 2018;84(4):674–678. doi:10.1097/TA.0000000000001761. PMID 29251715.
+    Supports: shock index = HR / SBP, healthy adult range 0.5–0.7; SI alone had AUC 0.58 for occult hypoperfusion (`SI_NORMAL`, NIBP tile).
+77. **Zarzaur BL, Croce MA, Fischer PE, Magnotti LJ, Fabian TC.** New vitals after injury: shock index for the young and age x shock index for the old. *J Surg Res.* 2008;147(2):229–236. doi:10.1016/j.jss.2008.03.025. PMID 18498875.
+    Supports: age × SI predicted 48-h mortality better than HR, SBP or SI in injured patients older than 55 (AUC 0.828). The abstract gives no cut-off, so PM-SIM shows the value without a threshold (`ageShockIndex`).
+78. **Wright JD, Hughes JP, Ostchega Y, Yoon SS, Nwankwo T.** Mean systolic and diastolic blood pressure in adults aged 18 and over in the United States, 2001–2008. *Natl Health Stat Report.* 2011;(35):1–22, 24. PMID 21485611.
+    Supports: mean SBP/DBP by age group (18–39, 40–59, 60+) and sex, "Total" columns of Tables 2–7 (`BP_NORMS`, `bpForAge`). The group centres 28.5, 49.5 and 70 years and the linear interpolation between them are PM-SIM's own choice.
+79. **Franklin SS, Gustin W, Wong ND, et al.** Hemodynamic patterns of age-related changes in blood pressure. The Framingham Heart Study. *Circulation.* 1997;96(1):308–315. doi:10.1161/01.cir.96.1.308. PMID 9236450.
+    Supports: SBP rises with age, DBP falls after age 50–60 and pulse pressure widens (unit test of `bpForAge`).
+80. **Ostchega Y, Porter KS, Hughes J, Dillon CF, Nwankwo T.** Resting pulse rate reference data for children, adolescents, and adults: United States, 1999–2008. *Natl Health Stat Report.* 2011;(41). PMID 21905522.
+    Supports: adult resting pulse stays about 72 beats/min across age groups, so "age sets blood pressure" does not change HR.

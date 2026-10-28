@@ -1,4 +1,7 @@
-/* Patient profile calculations: BMI, BSA (Mosteller), weight history. */
+/* Patient profile calculations: BMI, BSA (Mosteller), weight history, bedside
+ * calculators (predicted body weight, weight-based volumes, age-predicted maximal
+ * heart rate), shock index and age-typical blood pressure. Sources are listed in
+ * REFERENCES.md (entries 72-80). */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else (root.PM = root.PM || {}).profile = factory();
@@ -69,5 +72,82 @@
              days: Math.round((last.t - first.t) / 86400000) };
   }
 
-  return { DEFAULT_PROFILE, ADULT_MIN_AGE, bmi, bsaMosteller, bmiCategory, normaliseHistory, weightChange };
+  // ------------------------------------------------------------- bedside calculators
+  /**
+   * Predicted body weight (kg), ARDS Network 2000 trial formula:
+   * male 50 + 0.91 (height cm - 152.4), female 45.5 + 0.91 (height cm - 152.4).
+   * Returns null when sex is not 'male' or 'female' (the formula needs it).
+   */
+  function predictedBodyWeight(heightCm, sex) {
+    if (!validNum(heightCm, 100, 260)) return null;
+    const base = sex === 'male' ? 50 : sex === 'female' ? 45.5 : null;
+    return base === null ? null : base + 0.91 * (heightCm - 152.4);
+  }
+
+  /** Tidal volume (mL) for a dose in mL/kg of predicted body weight. */
+  function tidalVolume(pbwKg, mlPerKg) {
+    return Number.isFinite(pbwKg) && pbwKg > 0 ? pbwKg * mlPerKg : null;
+  }
+
+  /** Volume (mL) for a weight-based dose in mL/kg, e.g. 30 mL/kg crystalloid. */
+  function weightDose(weightKg, mlPerKg) {
+    return validNum(weightKg, 0.3, 500) ? weightKg * mlPerKg : null;
+  }
+
+  /** Age-predicted maximal heart rate (beats/min), Tanaka et al. 2001: 208 - 0.7 x age. */
+  function hrMaxTanaka(ageYears) {
+    return validNum(ageYears, 0, 120) ? 208 - 0.7 * ageYears : null;
+  }
+
+  // ------------------------------------------------------------- shock index
+  const SI_NORMAL = Object.freeze({ lo: 0.5, hi: 0.7 }); // healthy adult range (Caputo et al. 2018)
+
+  /** Shock index = HR / SBP. Null unless both are finite and SBP > 0. */
+  function shockIndex(hr, sbp) {
+    return Number.isFinite(hr) && Number.isFinite(sbp) && sbp > 0 ? hr / sbp : null;
+  }
+
+  /** Age x shock index (Zarzaur et al. 2008). No validated cut-off is used here. */
+  function ageShockIndex(ageYears, hr, sbp) {
+    const si = shockIndex(hr, sbp);
+    return si === null || !Number.isFinite(ageYears) ? null : ageYears * si;
+  }
+
+  // ------------------------------------------------------------- age-typical blood pressure
+  /**
+   * Mean SBP/DBP (mmHg) of US adults by age group and sex, NHANES 2001-2008,
+   * "Total" columns (all participants, treated hypertensives included).
+   * Wright et al. 2011, Natl Health Stat Report 35, Tables 2-7.
+   * The report gives only the groups 18-39, 40-59 and 60+; the centres below
+   * (28.5, 49.5, 70 years) are this simulator's choice for interpolation.
+   */
+  const BP_NORMS = Object.freeze({
+    centres: [28.5, 49.5, 70],
+    all:    { sbp: [115, 123, 136], dbp: [69, 75, 68] },
+    male:   { sbp: [119, 124, 133], dbp: [70, 77, 69] },
+    female: { sbp: [110, 122, 139], dbp: [68, 74, 68] },
+  });
+
+  function interp(xs, ys, x) {
+    if (x <= xs[0]) return ys[0];
+    for (let i = 1; i < xs.length; i++) {
+      if (x <= xs[i]) return ys[i - 1] + (ys[i] - ys[i - 1]) * (x - xs[i - 1]) / (xs[i] - xs[i - 1]);
+    }
+    return ys[ys.length - 1];
+  }
+
+  /**
+   * Age-typical resting SBP/DBP (whole mmHg), linearly interpolated between the
+   * NHANES group centres and held flat outside them. Sex other than male/female
+   * uses the all-adults row. Returns null for an invalid age.
+   */
+  function bpForAge(ageYears, sex) {
+    if (!validNum(ageYears, 18, 120)) return null;
+    const row = BP_NORMS[sex === 'male' || sex === 'female' ? sex : 'all'];
+    return { sbp: Math.round(interp(BP_NORMS.centres, row.sbp, ageYears)),
+             dbp: Math.round(interp(BP_NORMS.centres, row.dbp, ageYears)) };
+  }
+
+  return { DEFAULT_PROFILE, ADULT_MIN_AGE, bmi, bsaMosteller, bmiCategory, normaliseHistory, weightChange,
+    predictedBodyWeight, tidalVolume, weightDose, hrMaxTanaka, SI_NORMAL, shockIndex, ageShockIndex, BP_NORMS, bpForAge };
 });

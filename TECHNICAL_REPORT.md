@@ -23,7 +23,7 @@ The set point of every parameter is known, so the app shows each estimate next t
 
 | Layer | Files | Role |
 |---|---|---|
-| Core data | `src/core/observation.js`, `units.js`, `profile.js`, `store.js` | Observation model, unit conversion, BMI/BSA, per-source time series |
+| Core data | `src/core/observation.js`, `units.js`, `profile.js`, `store.js` | Observation model, unit conversion, BMI/BSA and profile calculators, per-source time series |
 | Simulation | `src/sim/params.js`, `rng.js`, `dsp.js`, `ecg.js`, `arrhythmia.js`, `pulse.js`, `sensors.js`, `nibp.js`, `detectors.js`, `glucose.js`, `engine.js` | Parameters, presets, signal models, arrhythmia patterns, glucose–insulin model and projection, estimators, the time-stepping engine |
 | Alarms | `src/alarms/alarmEngine.js`, `severity.js` | Limit checks, rhythm alarms, delays, priorities, acknowledge, audio pause, history |
 | Data I/O | `src/data/csv.js`, `importer.js` | CSV/JSON parsing, column mapping, units, time zones, validation |
@@ -319,7 +319,7 @@ These rules are **not a validated arrhythmia algorithm**. A clinical arrhythmia 
 
 The last stage can be saved as a PNG image.
 
-**Controls tab** (`buildControls` in `src/ui/panels.js`). One row per parameter, built from `SPEC`. *Simple* view shows 11 main controls (HR, arrhythmia pattern, SYS, DIA, SpO₂, RR, EtCO₂, temperature, motion, SpO₂ probe state, NIBP interval). Any other control is shown as well when it is not at its default value or an active alarm points to it, so a scenario never hides what it changed. *Advanced* shows all 62. The explanation text is hidden unless *Show explanations* is ticked; it is also the tooltip of the control name.
+**Controls tab** (`buildControls` in `src/ui/panels.js`). One row per parameter, built from `SPEC`. *Simple* view shows 16 main controls (the 5 patient profile fields: age, sex, height, weight, diabetes status; then HR, arrhythmia pattern, SYS, DIA, SpO₂, RR, EtCO₂, temperature, motion, SpO₂ probe state, NIBP interval). Any other control is shown as well when it is not at its default value or an active alarm points to it, so a scenario never hides what it changed. *Advanced* shows all 62. The explanation text is hidden unless *Show explanations* is ticked; it is also the tooltip of the control name.
 
 **Lessons tab** (`src/lessons/lessons.js`, `src/ui/lessonsPanel.js`). Eight guided lessons: ECG signal chain, pulse oximetry, NIBP, rhythms, capnography, arterial line, alarms and deterioration before cardiac arrest (8–10 min each). Each lesson has objectives, a button that loads its scenario (preset), steps that can set controls or open a tab, and a quiz of 3 multiple-choice questions with an explanation for each answer. A unit test checks that the quiz answers about the model (for example the ratio R of the desaturation preset) agree with the simulator. The best score per lesson is kept in the browser's `localStorage` only; it is not measurement data.
 
@@ -462,6 +462,24 @@ Age, sex, height, weight and diabetes status are simulation parameters (group *P
 
 BMI and BSA are stored as `derived`. Age, sex, height, BMI and BSA do not change any simulated signal. Weight and diabetes status are inputs of the glucose model only (section 3.13).
 
+### 5.1 Using the profile
+
+The box *Use the profile* in the Profile tab has three switches. Their state is kept in `localStorage` (`pmsim.usecases.v1`); defaults are calculators on, shock index on, age-typical blood pressure off. The functions are in `src/core/profile.js` and are tested in `tests/unit/usecases.test.js`.
+
+**Bedside calculators.** Cards below BMI and BSA, recalculated whenever the profile or the set heart rate changes:
+
+- Predicted body weight (PBW), ARDS Network formula [72]: male 50 + 0.91 × (height cm − 152.4), female 45.5 + 0.91 × (height cm − 152.4). The formula needs sex; with sex unspecified the card shows both values and asks for sex.
+- Low tidal volume 6 mL/kg PBW, with the 4–8 mL/kg range [72].
+- Sepsis crystalloid bolus 30 mL/kg on actual weight [73]; the PBW value is shown as well.
+- Urine output threshold 0.5 mL/kg/h and its 6-hour total (KDIGO oliguria criterion) [74].
+- Age-predicted maximal heart rate 208 − 0.7 × age [75], and the set heart rate as a percentage of it.
+
+**Shock index.** When the switch is on, the NIBP tile shows SI = displayed heart rate / systolic pressure of the last successful NIBP measurement, and Age × SI. The healthy adult SI range is 0.5–0.7 [76]; values above 0.7 are coloured. Age × SI has been studied in older trauma patients [77]; this simulator applies no cut-off to it. When the ECG leads are off or no NIBP has been measured the row shows `--`. Example (tested): the hypotension scenario (HR 72, BP 82/48, age 40) gives NIBP 82/51, SI 0.88 (highlighted) and Age × SI 35.
+
+**Age-typical blood pressure.** When the switch is on and age or sex is changed by hand (Controls or Profile tab), SYS and DIA are set to the mean for that age and sex from NHANES 2001–2008 [78]: age groups 18–39, 40–59 and ≥ 60 years, placed at 28.5, 49.5 and 70 years, linearly interpolated between them and held constant outside them. With sex unspecified the all-adult values are used. The curve reproduces the known pattern that systolic pressure rises with age while diastolic pressure falls after about 50, so pulse pressure widens [79, 80]. A message names the values set. Blood pressure can still be changed by hand afterwards, and loading a scenario never applies this rule. Examples (tested): age 40 male 122/74, age 75 male 133/69, age 30 male 119/71.
+
+These calculations are for teaching. They are not prescriptions and not dosing advice.
+
 ## 6. Alarm system
 
 The alarm engine uses the vocabulary of IEC 60601-1-8 (alarm condition, delay, priority, acknowledge, audio paused). It is a teaching model and does **not** claim compliance with that standard.
@@ -591,7 +609,7 @@ These were observed or are known from the model design:
 - **Capnography and arterial line** parameters (wave shape constants, f_n, ζ, the perfusion time constants) are illustrative. They show the effects qualitatively and are not fitted to measured data.
 - **Watch data** (Android app only) has not been tested with any real watch, heart-rate sensor or Health Connect store. Consumer wearable readings are not clinical measurements (see `TEST_REPORT.md`).
 - **Glucose model.** Population parameters only; no person is fitted. Renal glucose excretion, glucagon, counter-regulation, exercise and the change of endogenous glucose output with insulin are not modelled. Without insulin action, glucose still returns towards fasting through SG (glucose effectiveness), so untreated type 1 hyperglycaemia resolves slowly in the model, unlike in reality. Minimal-model SI is lower than clamp-derived sensitivity (about 66 % lower in [54]), so a bolus has a modest effect. Secretion gain σ, the type 2 factor 0.5 and fasting insulin are illustrative. There is no CGM or glucose meter model (no sensor lag, no noise). Ketones and pH are not modelled.
-- Measurements are not persisted between sessions. Only the best lesson quiz scores, the Controls view choice and the Bedside view on/off state are kept, in the browser's `localStorage` (keys `pmsim.lessons.v1`, `pmsim.controls.v1`, `pmsim.bedside`).
+- Measurements are not persisted between sessions. Only the best lesson quiz scores, the Controls view choice, the Bedside view on/off state and the profile use-case switches are kept, in the browser's `localStorage` (keys `pmsim.lessons.v1`, `pmsim.controls.v1`, `pmsim.bedside`, `pmsim.usecases.v1`).
 
 ## 10. References
 

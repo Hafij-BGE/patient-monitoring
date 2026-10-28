@@ -10,7 +10,7 @@ Every number on the screen sits next to the value that generated it, so measurem
 [![Live demo](https://img.shields.io/badge/live%20demo-GitHub%20Pages-2ea44f?logo=github)](https://hafij-bge.github.io/patient-monitoring/)
 [![Release](https://img.shields.io/github/v/release/Hafij-BGE/patient-monitoring?label=release)](https://github.com/Hafij-BGE/patient-monitoring/releases/latest)
 [![Pages](https://github.com/Hafij-BGE/patient-monitoring/actions/workflows/pages.yml/badge.svg)](https://github.com/Hafij-BGE/patient-monitoring/actions/workflows/pages.yml)
-![Unit tests](https://img.shields.io/badge/unit%20tests-93%20pass-brightgreen)
+![Unit tests](https://img.shields.io/badge/unit%20tests-98%20pass-brightgreen)
 ![Dependencies](https://img.shields.io/badge/runtime%20dependencies-none-blue)
 ![Platforms](https://img.shields.io/badge/runs%20on-web%20%7C%20Linux%20%7C%20Windows%20%7C%20Android-informational)
 
@@ -105,7 +105,7 @@ These are illustrative patterns for education only. They are not diagnostic.
 <details>
 <summary><b>62 validated controls, Simple and Advanced views</b></summary>
 
-Five groups: patient profile, physiology, glucose and insulin, sensor, processing. Each control has a label, a unit, a range and a short explanation. **Simple** shows 11 main controls (HR, arrhythmia, SYS, DIA, SpO₂, RR, EtCO₂, temperature, motion, SpO₂ probe state, NIBP interval) plus any control the scenario changed or an alarm points to. **Advanced** shows all 62. Invalid input is rejected with a message, for example DIA ≥ SYS.
+Five groups: patient profile, physiology, glucose and insulin, sensor, processing. Each control has a label, a unit, a range and a short explanation. **Simple** shows 16 main controls (the 5 patient profile fields: age, sex, height, weight, diabetes status; then HR, arrhythmia, SYS, DIA, SpO₂, RR, EtCO₂, temperature, motion, SpO₂ probe state, NIBP interval) plus any control the scenario changed or an alarm points to. **Advanced** shows all 62. Invalid input is rejected with a message, for example DIA ≥ SYS.
 </details>
 
 <details>
@@ -128,6 +128,11 @@ Limits and delays for the physiological parameters, rhythm alarms (for example V
 
 - **Glucose and insulin:** meal or bolus now, or a 2–4 h **model projection** with a planned meal and bolus: the curve, time to cross 70 / 54 / 180 / 250 mg/dL and time in 70–180 mg/dL. It is a model projection, not a clinical prediction, and not dosing advice.
 - **Patient profile:** age, sex, height, weight and diabetes status, BMI and BSA (Mosteller). Adult BMI categories only from age 20.
+- **Use the profile** (three switches in the Profile tab, kept in this browser):
+  - *Bedside calculators* (on by default): predicted body weight (ARDS Network formula, needs sex), low tidal volume 6 mL/kg PBW, sepsis fluid bolus 30 mL/kg, urine output threshold 0.5 mL/kg/h and age-predicted maximal heart rate (Tanaka 208 − 0.7 × age).
+  - *Shock index on the NIBP tile* (on by default): live SI = displayed HR / last NIBP systolic (healthy adults 0.5–0.7, values above 0.7 are highlighted) and Age × SI.
+  - *Age and sex set typical blood pressure* (off by default): changing age or sex by hand sets SYS/DIA to the US adult mean for that age and sex (NHANES 2001–2008, interpolated between age groups). Scenarios are never changed.
+  - These are teaching calculations, not prescriptions. Sources: `REFERENCES.md` entries 72–80.
 - **Data import / export:** CSV and JSON tables (wide or long, unit conversion, time zones, missing tokens, duplicates and conflicts), manual entry, CSV / JSON export by source and a waveform CSV export.
 - **Android only:** readings from a watch or other wearable through Android Health Connect, a Bluetooth LE heart-rate sensor (Heart Rate Service 0x180D) or a health-app export file. Real data is shown next to the simulation and never drives it.
 </details>
@@ -191,7 +196,7 @@ node --test tests/unit/*.test.js
 
 | Suite | Result |
 |---|---|
-| Node unit tests | **93 tests in 12 files, 93 pass** |
+| Node unit tests | **98 tests in 13 files, 98 pass** |
 | Browser self-test (`?selftest=1`, or the Tests tab) | 17 entries: **16 pass, 0 fail, 1 not run** |
 
 The entry that is not run is the Android watch-hardware check (Health Connect, BLE, export file). It is always reported as "not run" when no hardware is present, never as passed. Scenarios, expected and observed results, and what was not tested are in [`TEST_REPORT.md`](TEST_REPORT.md).
@@ -266,7 +271,7 @@ The full list is in section 9 of [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) an
 
 - The page makes **no network requests**. Its Content Security Policy sets `connect-src 'none'` and loads scripts and styles only from its own folder. The website, the Android app and the desktop apps all use the same page.
 - Imported files are read in the browser tab and are not uploaded anywhere.
-- No measurement data is saved between sessions; reloading the page clears it. Only three settings are kept in this browser's `localStorage`: the best quiz score per lesson (`pmsim.lessons.v1`), the Controls view choice (`pmsim.controls.v1`) and the Bedside view on/off state (`pmsim.bedside`).
+- No measurement data is saved between sessions; reloading the page clears it. Only four settings are kept in this browser's `localStorage`: the best quiz score per lesson (`pmsim.lessons.v1`), the Controls view choice (`pmsim.controls.v1`), the Bedside view on/off state (`pmsim.bedside`) and the three profile use-case switches (`pmsim.usecases.v1`).
 - The Android app has no `INTERNET` permission and disables cloud backup. Health Connect permissions are read-only and requested from the user. This is the intended design; it has not yet been verified with real devices.
 - Only documented, vendor-neutral interfaces are used (Android Health Connect, the Bluetooth SIG Heart Rate Service, the user's own export files). No proprietary protocol is reverse-engineered.
 - PM-SIM is an original educational design. It does not reproduce the interface of any monitor manufacturer.

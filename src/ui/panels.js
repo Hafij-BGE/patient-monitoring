@@ -7,12 +7,22 @@
   const { $, el, fmt } = PM.dom;
 
   // ------------------------------------------------------------- controls
-  // Simple view: the vital-sign set points and the two most used sensor faults.
+  // Simple view: the patient profile, the vital-sign set points and the two most
+  // used sensor faults.
   // Any other control is still shown when it is not at its default value or is
   // linked to an active alarm, so a scenario never hides what it changed.
-  const SIMPLE = new Set(['hr', 'arrhythmia', 'sbp', 'dbp', 'spo2', 'rr', 'etco2', 'temp',
+  const SIMPLE = new Set(['age_years', 'sex', 'height_cm', 'weight_kg', 'diabetes',
+    'hr', 'arrhythmia', 'sbp', 'dbp', 'spo2', 'rr', 'etco2', 'temp',
     'motion', 'spo2_sensor', 'nibp_interval']);
   const VIEW_KEY = 'pmsim.controls.v1';
+
+  // Profile use-case switches (Profile tab), kept per browser. calc: bedside
+  // calculators; si: shock index on the NIBP tile; ageBp: a hand edit of age or
+  // sex also sets SBP/DBP to the age-typical values (applied in app.js).
+  const USECASE_KEY = 'pmsim.usecases.v1';
+  const useCases = { calc: true, si: true, ageBp: false };
+  try { Object.assign(useCases, JSON.parse(localStorage.getItem(USECASE_KEY)) || {}); } catch (e) { /* no storage */ }
+  function saveUseCases() { try { localStorage.setItem(USECASE_KEY, JSON.stringify(useCases)); } catch (e) { /* no storage */ } }
 
   /**
    * Build one control per SPEC entry, grouped. `apply(update)` must return the
@@ -65,6 +75,7 @@
       const name = k => (SPEC[k] ? SPEC[k].label : k);
       for (const e of r.errors) msgs.append(el('div.err', { text: name(e.key) + ': ' + e.msg + ' (value not applied)' }));
       for (const w of r.warnings) msgs.append(el('div', null, el('span.warn', { text: name(w.key) + ': ' + w.msg })));
+      if (r.note) msgs.append(el('div.ok', { text: r.note }));
     }
 
     // Every row whose value differs from the default is marked, whatever changed it.
@@ -224,6 +235,22 @@
     $('#pHeightUnit').addEventListener('change', e => { hUnit = e.target.value; fill(true); });
     $('#pWeightUnit').addEventListener('change', e => { wUnit = e.target.value; fill(true); });
 
+    // Use-case switches. Turning "age sets blood pressure" on applies it at once.
+    const ucBox = { calc: $('#ucCalc'), si: $('#ucSi'), ageBp: $('#ucAgeBp') };
+    for (const [k, box] of Object.entries(ucBox)) {
+      box.checked = useCases[k];
+      box.addEventListener('change', () => {
+        useCases[k] = box.checked; saveUseCases();
+        const msg = $('#ucMsg'); msg.textContent = '';
+        if (k === 'ageBp' && box.checked) {
+          const r = opts.apply({ age_years: cur.age_years });
+          if (r.note) msg.append(el('span.ok', { text: r.note }));
+          cur = r.params;
+        }
+        render(false);
+      });
+    }
+
     function num(id) { const s = $(id).value.trim().replace(',', '.'); return s === '' ? null : Number(s); }
     const range = k => S[k].min + '–' + S[k].max + ' ' + S[k].unit;
 
@@ -251,7 +278,7 @@
       const r = opts.apply({ age_years: Math.round(age), sex: $('#pSex').value,
         height_cm: Math.round(hCm), weight_kg: Math.round(wKg * 2) / 2 });
       if (r.errors.length) { msg.append(el('span.err', { text: r.errors.map(x => x.key + ': ' + x.msg).join('; ') })); return; }
-      msg.append(el('span.ok', { text: 'Profile updated. The same values are in Controls → Patient profile.' }));
+      msg.append(el('span.ok', { text: 'Profile updated. The same values are in Controls → Patient profile.' + (r.note ? ' ' + r.note : '') }));
       cur = r.params; fill(true); render(true);
     });
 
@@ -279,6 +306,7 @@
         card('Height', hCm.toFixed(1) + ' cm', ft.ft + ' ft ' + ft.in + ' in'),
         card('Weight', wKg.toFixed(1) + ' kg', U.kgToLb(wKg).toFixed(1) + ' lb'),
         card('Diabetes status', cur.diabetes, 'Selects the glucose model parameters'));
+      renderCalc(card);
       const hist = P.normaliseHistory(local.weightHistory), ch = P.weightChange(local.weightHistory);
       const list = $('#whList'); list.textContent = '';
       if (hist.length) {
@@ -296,8 +324,31 @@
       }
     }
 
+    // Bedside calculators from the profile (sources in REFERENCES.md 72-75).
+    function renderCalc(card) {
+      const box = $('#pCalc'); box.textContent = '';
+      box.hidden = !useCases.calc;
+      if (!useCases.calc) return;
+      const hCm = cur.height_cm, wKg = cur.weight_kg, ml = v => v === null ? '--' : Math.round(v) + ' mL';
+      const pbw = P.predictedBodyWeight(hCm, cur.sex);
+      if (pbw === null) {
+        const m = P.predictedBodyWeight(hCm, 'male'), f = P.predictedBodyWeight(hCm, 'female');
+        box.append(card('Predicted body weight', 'set sex', 'The ARDS Network formula differs by sex: ' + f.toFixed(1) + ' kg if female, ' + m.toFixed(1) + ' kg if male at ' + hCm + ' cm.'));
+      } else {
+        box.append(card('Predicted body weight', pbw.toFixed(1) + ' kg', (cur.sex === 'male' ? '50' : '45.5') + ' + 0.91 × (' + hCm + ' − 152.4). From height and sex only; actual weight ' + wKg + ' kg.'),
+          card('Low tidal volume (6 mL/kg PBW)', ml(P.tidalVolume(pbw, 6)), 'Lung-protective ventilation target in ARDS; 4–8 mL/kg PBW = ' + ml(P.tidalVolume(pbw, 4)) + '–' + ml(P.tidalVolume(pbw, 8)) + '.'));
+      }
+      const pbwTxt = pbw === null ? '' : ' With predicted body weight: ' + ml(P.weightDose(pbw, 30)) + '.';
+      const uo = P.weightDose(wKg, 0.5);
+      const hrMax = P.hrMaxTanaka(cur.age_years);
+      box.append(
+        card('Sepsis fluid, 30 mL/kg', ml(P.weightDose(wKg, 30)), 'At least this much IV crystalloid within the first 3 h for sepsis-induced hypoperfusion (weak recommendation, low-quality evidence), using actual weight.' + pbwTxt),
+        card('Urine output threshold', uo === null ? '--' : uo.toFixed(0) + ' mL/h', '0.5 mL/kg/h. Below this for 6 h (under ' + (uo * 6).toFixed(0) + ' mL in 6 h) meets the KDIGO stage 1 AKI urine criterion.'),
+        card('Age-predicted max HR', hrMax === null ? '--' : Math.round(hrMax) + ' /min', '208 − 0.7 × ' + cur.age_years + ' y. Set HR ' + cur.hr + ' /min = ' + (hrMax ? Math.round(cur.hr / hrMax * 100) : '--') + ' % of it. Population mean; individuals vary.'));
+    }
+
     function refresh(params) {
-      const same = ['age_years', 'sex', 'height_cm', 'weight_kg', 'diabetes'].every(k => params[k] === cur[k]);
+      const same = ['age_years', 'sex', 'height_cm', 'weight_kg', 'diabetes', 'hr'].every(k => params[k] === cur[k]);
       cur = params;
       if (!same) { fill(false); render(false); }
     }
@@ -305,5 +356,5 @@
     return { refresh };
   }
 
-  PM.panels = { buildControls, renderAlarmBar, buildLimits, renderAlarmHistory, renderNibpTable, buildProfile };
+  PM.panels = { buildControls, renderAlarmBar, buildLimits, renderAlarmHistory, renderNibpTable, buildProfile, useCases };
 })(this);

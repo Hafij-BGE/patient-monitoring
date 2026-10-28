@@ -114,6 +114,15 @@
       $('#tNibp .t-val').classList.toggle('stale', age > engine.p.nibp_interval * 60 + 60 || engine.p.nibp_interval === 0 && age > 900);
     }
     setTxt('#sNibp', 'set ' + tr.sbp + '/' + tr.dbp);
+    // Shock index from the displayed HR and the last good NIBP systolic.
+    const siRow = $('#siRow');
+    siRow.hidden = !PM.panels.useCases.si;
+    if (!siRow.hidden) {
+      const hr = f.technical.ecgLeadsOff ? null : est.hr, sbp = lastOk ? lastOk.res.sbp : null;
+      const si = PM.profile.shockIndex(hr, sbp), asi = PM.profile.ageShockIndex(engine.p.age_years, hr, sbp);
+      setTxt('#vSi', si === null ? '--' : si.toFixed(2)); setTxt('#vAgeSi', asi === null ? '--' : asi.toFixed(0));
+      $('#vSi').classList.toggle('si-high', si !== null && si > PM.profile.SI_NORMAL.hi);
+    }
 
     const a = est.art;
     setTxt('#vArt', a ? fmt(a.sys) + '/' + fmt(a.dia) : '--/--'); setTxt('#vArtMap', a ? fmt(a.map) : '--');
@@ -197,8 +206,25 @@
   let dataPanel = null; // set once the Data tab is built (below)
   let profile = null;   // set once the Profile tab is built (below)
   let glucose = { draw() {} }; // replaced once the Glucose tab is built (below)
+  // "Age and sex set typical blood pressure" (Profile tab switch): a hand edit of
+  // age or sex also sets SBP/DBP to the NHANES mean for that age and sex. Scenarios
+  // never pass through here, so their pressures stay as published.
+  function setParamsByHand(update) {
+    let note = null;
+    if (PM.panels.useCases.ageBp && ('age_years' in update || 'sex' in update)) {
+      const age = 'age_years' in update ? Number(update.age_years) : engine.p.age_years;
+      const sex = 'sex' in update ? update.sex : engine.p.sex;
+      const bp = PM.profile.bpForAge(age, sex);
+      if (bp) {
+        update = Object.assign({}, update, bp);
+        note = 'Age ' + age + ' y, sex ' + sex + ': SBP/DBP set to ' + bp.sbp + '/' + bp.dbp +
+          ' mmHg (US adult mean for this age, NHANES 2001–2008, interpolated; REFERENCES.md [78]).';
+      }
+    }
+    return Object.assign(engine.setParams(update), { note });
+  }
   const controls = PM.panels.buildControls($('#controls'), $('#controlMsgs'), update => {
-    const r = engine.setParams(update);
+    const r = setParamsByHand(update);
     afterParams();
     return r;
   });
@@ -370,7 +396,7 @@
 
   // ------------------------------------------------------------- other panels
   profile = PM.panels.buildProfile({
-    apply: update => { const r = engine.setParams(update); controls.sync(engine.p); afterParams(); return r; },
+    apply: update => { const r = setParamsByHand(update); controls.sync(engine.p); afterParams(); return r; },
     onDerived: list => { store.addMany(list); refreshExt(); },
   });
   profile.refresh(engine.p);

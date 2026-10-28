@@ -8,7 +8,7 @@ PM-SIM, Patient Monitor Simulator. Updated 2026-10-28 after the device integrati
 
 | Test level | Result |
 |---|---|
-| Node unit tests (`node --test tests/unit/*.test.js`) | **93 tests in 12 files, 93 pass, 0 fail** (run 2026-10-28 after the derived 12-lead ECG; 86 after the critical-illness, stroke, heart-failure and post-operative scenarios and the extreme-low alarms; 80 after the SVT scenario and the QRS beat-time fix, 79 after the NIBP set-point fix, 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
+| Node unit tests (`node --test tests/unit/*.test.js`) | **98 tests in 13 files, 98 pass, 0 fail** (run 2026-10-28 after the profile use cases; 93 after the derived 12-lead ECG; 86 after the critical-illness, stroke, heart-failure and post-operative scenarios and the extreme-low alarms; 80 after the SVT scenario and the QRS beat-time fix, 79 after the NIBP set-point fix, 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
 | Browser self-test (`index.html?selftest=1`) | **17 entries: 16 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-28: **16 pass, 0 fail, 1 not run** (section 3). |
 | Manual interaction checks in a browser | 9 earlier checks (section 4.1) and 5 checks of the new features made on 2026-10-28 (section 4.2), all as expected. |
 | Hardware tests (watch data on Android through Health Connect, native BLE Heart Rate Service, export file) | **Not run.** No watch, heart-rate sensor or Health Connect store was used. |
@@ -111,7 +111,7 @@ When served over `http://localhost`, the app made no network requests other than
 
 ## 6. Node unit and integration tests
 
-93 tests in 12 files (18 + 10 + 4 + 13 + 3 + 11 + 3 + 4 + 6 + 8 + 6 + 7). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
+98 tests in 13 files (18 + 10 + 4 + 13 + 3 + 11 + 3 + 4 + 6 + 8 + 6 + 7 + 5). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
 
 The first five files were already described before the new features were added. Their counts did not change.
 
@@ -253,6 +253,16 @@ The cold-wet and shivering checks record limitations on purpose: the monitor mis
 - Ventricular beat (VT, 70 bpm): V1 negative, V6 positive, axis +60…+100°, T opposite the QRS in II.
 - The axis stays within 5° of its reference at 40–200 bpm and QRS width 0.8–1.5×; it is undefined (NaN) in VF and asystole.
 - Engine: 12 rings filled; the 12-lead lead II ring equals the monitor ECG ring sample for sample; all 12 are NaN while the electrode contact is 5 %.
+
+### `tests/unit/usecases.test.js` (5 tests)
+
+- Predicted body weight: 180 cm male 75.12 kg, 165 cm female 56.97 kg, 152.4 cm male exactly 50 kg; null when sex is unspecified or height is invalid.
+- Tidal volume 6 mL/kg × 75.12 kg = 451 mL; 30 mL/kg × 70 kg = 2100 mL; 0.5 mL/kg/h × 70 kg = 35 mL/h; null for invalid weight.
+- Tanaka maximal heart rate: 180 bpm at 40 years, 159 bpm at 70 years.
+- Shock index 72/120 = 0.6, Age × SI at 40 years = 24; null when SBP is 0 or HR is missing.
+- Age-typical BP: male 20 y 119/70 (held flat), unspecified 28.5 y 115/69, female 49.5 y 122/74, male 60 y 129/73 (interpolated), female 90 y 139/68 (held flat), null below 18 y. For every sex SBP rises from 30 to 50 to 75 y, DBP falls from 50 to 75 y and pulse pressure widens.
+
+Browser checks of the use cases (2026-10-28, local preview): switches default to calculators on, shock index on, age BP off; switching each off hides its cards or row and is kept after reload. Male 180 cm shows PBW 75.1 kg and tidal volume 451 mL; sex unspecified at 172 cm shows both values (63.3 and 67.8 kg). With age BP on, age 40 male gives 122/74, age 75 gives 133/69, age 30 via the Controls tab 119/71, and a later manual SYS of 150 is kept. With the switch off, changing age leaves the blood pressure unchanged. The hypotension scenario loads 82/48 unchanged; after an NIBP the tile shows SI 0.88 (highlighted) and Age × SI 35.
 
 ## 7. Defects found and fixed during testing
 

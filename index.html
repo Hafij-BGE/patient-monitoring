@@ -94,6 +94,7 @@
       <div class="t-val"><span id="vNibp">--/--</span> <small>(<span id="vMap">--</span>)</small></div>
       <div class="t-foot"><span id="sNibp"></span><span class="lim" id="nibpAge"></span></div>
       <div class="t-sub">MAP osc. <b id="vMapOsc">--</b> · MAP formula <b id="vMapF">--</b> · PP <b id="vPp">--</b></div>
+      <div class="t-sub" id="siRow" hidden title="Shock index = displayed HR / last NIBP systolic. Healthy adult range 0.5–0.7. Age × SI has no validated cut-off in this simulator.">SI <b id="vSi">--</b> · Age×SI <b id="vAgeSi">--</b></div>
       <div class="row">
         <button id="btnNibp">Start NIBP</button>
         <button id="btnNibpStop">Stop</button>
@@ -300,6 +301,14 @@
     </form>
     <div>
       <div class="derived" id="pDerived"></div>
+      <fieldset class="usecases">
+        <legend>Use the profile</legend>
+        <label><input type="checkbox" id="ucCalc"> Bedside calculators</label>
+        <label><input type="checkbox" id="ucSi"> Shock index on the NIBP tile</label>
+        <label><input type="checkbox" id="ucAgeBp"> Age and sex set typical blood pressure</label>
+        <span id="ucMsg" class="msgs"></span>
+      </fieldset>
+      <div class="derived" id="pCalc"></div>
       <h3>Weight history</h3>
       <form id="whForm" class="row wrap">
         <input id="whDate" type="date" aria-label="Date">
@@ -313,7 +322,16 @@
   <p class="hint">BMI = weight / height². BSA (Mosteller) = √(height[cm] × weight[kg] / 3600).
     Adult BMI categories are shown only for ages 20 and over. Younger people need age- and sex-specific growth references.
     Age, sex, height, weight and diabetes status are the same values as Controls → Patient profile; changing them here or there sets the scenario to Custom.
-    Weight sets the glucose model's distribution volumes and diabetes status selects its parameter set; no other signal uses the profile. The label and the weight history stay in this tab.</p>
+    Weight sets the glucose model's distribution volumes and diabetes status selects its parameter set. The label and the weight history stay in this tab.</p>
+  <p class="hint"><b>Use the profile</b> (each switch is kept in this browser):
+    <b>Bedside calculators</b> turn height, sex, weight and age into the numbers used at the bedside: predicted body weight (ARDS Network formula) and the low tidal volume of 6 mL/kg PBW [72, 73];
+    the at-least-30 mL/kg crystalloid volume suggested for sepsis-induced hypoperfusion within 3 h (weak recommendation, low-quality evidence) [73];
+    the 0.5 mL/kg/h urine output below which, for 6 h, KDIGO stage 1 acute kidney injury is met [74]; and the age-predicted maximal heart rate, 208 − 0.7 × age [75].
+    <b>Shock index</b> (SI = HR / systolic pressure) uses the displayed HR and the last NIBP systolic; the healthy adult range is 0.5–0.7 [76], and SI alone discriminates poorly (AUC 0.58 in that study).
+    Age × SI predicted 48-h mortality better than SI in injured patients over 55 [77]; that study gives no cut-off, so none is shown.
+    <b>Age and sex set typical blood pressure</b>: when you change age or sex by hand, SBP and DBP are set to the mean of US adults of that age and sex (NHANES 2001–2008, all participants) [78], interpolated between the published age groups 18–39, 40–59 and 60+.
+    Systolic pressure rises with age while diastolic falls after about 50 [79]. Scenarios never trigger it, and you can still change SBP and DBP afterwards. Resting heart rate is not changed: it stays near 72 beats/min at all adult ages [80].
+    These are teaching calculations, not prescriptions.</p>
 </section>
 
 <section class="panel" data-panel="chain" hidden>
