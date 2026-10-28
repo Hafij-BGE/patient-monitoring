@@ -12,7 +12,7 @@ PM-SIM, Patient Monitor Simulator. Updated 2026-10-28 after the device integrati
 | Browser self-test (`index.html?selftest=1`) | **17 entries: 16 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-28: **16 pass, 0 fail, 1 not run** (section 3). |
 | Manual interaction checks in a browser | 9 earlier checks (section 4.1) and 5 checks of the new features made on 2026-10-28 (section 4.2), all as expected. |
 | Hardware tests (watch data on Android through Health Connect, native BLE Heart Rate Service, export file) | **Not run.** No watch, heart-rate sensor or Health Connect store was used. |
-| Android app | Not tested on a device. An APK file (`release/PM-SIM-1.3.1-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
+| Android app | Not tested on a device. An APK file (`release/PM-SIM-1.4.0-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
 | Website | Published from `.github/workflows/pages.yml`, which runs the unit tests before deploying. The deployed site was not checked as part of this report. |
 | Opening from `file://` | Checked statically only (section 5) |
 

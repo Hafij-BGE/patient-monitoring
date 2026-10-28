@@ -7,8 +7,8 @@ Assignment: homework-2, Interactive Medical Device Simulator. Assigned device: m
 By the owner's decision the project is a **simulator first**. On 2026-10-28 the Devices tab and all hospital and Web Bluetooth device integration (HL7 v2, FHIR, SDC, MDC mapping, Web Serial, packet replay) were removed, together with the Electron desktop app, its builds and its workflow. Delivered forms:
 
 - **Website:** https://hafij-bge.github.io/patient-monitoring/, a static site published by `.github/workflows/pages.yml` (unit tests, then deploy). Browser-only, no backend, Content Security Policy `connect-src 'none'`. Also runs locally (`python3 -m http.server 8766`) or from `index.html`.
-- **Android app (in development):** `android/`, package `edu.deu.pmsim` 1.3.1, wraps the same page in a WebView. It is the only place where real watch data enters (Health Connect read, native BLE Heart Rate Service 0x180D, health-app export file). Nothing is hardware-tested yet.
-- **Linux desktop app (.deb):** `desktop/` (added for v1.1.0 at the owner's request), a minimal Electron shell that only shows the same page; `desktop/build-deb.sh` builds `release/PM-SIM-1.3.1-amd64.deb`.
+- **Android app (in development):** `android/`, package `edu.deu.pmsim` 1.4.0, wraps the same page in a WebView. It is the only place where real watch data enters (Health Connect read, native BLE Heart Rate Service 0x180D, health-app export file). Nothing is hardware-tested yet.
+- **Linux desktop app (.deb):** `desktop/` (added for v1.1.0 at the owner's request), a minimal Electron shell that only shows the same page; `desktop/build-deb.sh` builds `release/PM-SIM-1.4.0-amd64.deb`.
 
 ## Environment (inspected 2026-10-27)
 

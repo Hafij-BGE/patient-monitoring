@@ -149,7 +149,7 @@ This part is a short spoken note, or an optional demonstration if a phone is ava
 - Watch readings are consumer wearable values. In the app they are meant to be shown next to the simulation with their source, and they are never used to generate the ECG.
 - The app has no internet permission, and the data stays on the phone.
 
-**Optional, only if a phone is available:** install the APK (`release/PM-SIM-1.3.1-android.apk`) and open the **Data import/export** tab. The "On this phone" panel appears there.
+**Optional, only if a phone is available:** install the APK (`release/PM-SIM-1.4.0-android.apk`) and open the **Data import/export** tab. The "On this phone" panel appears there.
 
 1. Under **Health Connect**, tap **Allow reading…**, choose a period and tap **Read records**. The message lists the stored and rejected values. The values appear in **Trends** as a separate `device` series.
 2. Under **Bluetooth heart-rate sensor**, tap **Scan**, then **Connect** on a heart-rate device. The last heart rate is shown.
