@@ -1,0 +1,9 @@
+{
+  "description": "Example wearable-style export (synthetic, made up for testing the importer)",
+  "records": [
+    { "time": "2026-10-20T08:00:00+03:00", "heartRate": 72, "spo2": 97, "steps": 120 },
+    { "time": "2026-10-20T08:05:00+03:00", "heartRate": 75, "spo2": null, "steps": 340 },
+    { "time": "2026-10-20T08:10:00+03:00", "heartRate": 78, "temperature": { "value": 98.9, "unit": "°F" } },
+    { "time": "2026-10-20T08:15:00+03:00", "weight": { "value": 70.2, "unit": "kg" } }
+  ]
+}

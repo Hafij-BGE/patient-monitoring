@@ -1,0 +1,181 @@
+/* Monitor-side estimators. They see only the sampled signals, never the
+ * simulator's "true" settings, so their outputs carry real measurement error. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./dsp.js'));
+  else (root.PM = root.PM || {}).detectors = factory(root.PM.dsp);
+})(this, function (dsp) {
+  'use strict';
+
+  function meanOfLast(arr, n) { const a = arr.slice(-n); return a.reduce((s, x) => s + x, 0) / a.length; }
+
+  /**
+   * Simplified Pan–Tompkins QRS detector (Pan & Tompkins, IEEE TBME 1985;32(3):230–6):
+   * band-pass 5–15 Hz → 5-point derivative → squaring → 150 ms moving-window
+   * integration → adaptive thresholds (SPKI/NPKI) with 200 ms refractory period and
+   * a T-wave slope check within 360 ms. Search-back for missed beats is not implemented.
+   */
+  class PanTompkins {
+    constructor(fs) {
+      this.fs = fs;
+      this.bp = dsp.bandpass(5, 15, fs);
+      this.mwi = new dsp.MovingAverage(Math.round(0.15 * fs));
+      this.reset();
+    }
+    reset() {
+      this.bp.reset(); this.mwi.reset();
+      this.x = [0, 0, 0, 0];
+      this.n = 0; this.learnN = Math.round(2 * this.fs);
+      this.learnMax = 0; this.learnSum = 0;
+      this.spki = 0; this.npki = 0; this.thr = Infinity;
+      this.m1 = 0; this.m2 = 0; this.slopeAcc = 0; this.peakSlope = 0;
+      this.lastQRS = null; this.lastSlope = 0;
+      this.rrs = []; this.beats = [];
+    }
+    /** Feed one sample; returns QRS time (s) when a beat is detected, else null. */
+    process(x, t) {
+      if (!Number.isFinite(x)) { if (this.n) this.reset(); return null; }
+      const y = this.bp.process(x);
+      const d = (2 * y + this.x[0] - this.x[2] - 2 * this.x[3]) * this.fs / 8;
+      this.x = [y, this.x[0], this.x[1], this.x[2]];
+      const m = this.mwi.process(d * d);
+      this.n++;
+      this.slopeAcc = Math.max(this.slopeAcc, Math.abs(d));
+      let out = null;
+      if (this.n <= this.learnN) {
+        this.learnMax = Math.max(this.learnMax, m); this.learnSum += m;
+        if (this.n === this.learnN) {
+          this.spki = 0.25 * this.learnMax; this.npki = 0.5 * this.learnSum / this.learnN;
+          this.thr = this.npki + 0.25 * (this.spki - this.npki);
+        }
+      } else if (this.m1 > this.m2 && this.m1 >= m) {
+        // local maximum of the integrated signal at the previous sample
+        const pk = this.m1, tp = t - 1 / this.fs, slope = this.peakSlope;
+        const since = this.lastQRS === null ? Infinity : tp - this.lastQRS;
+        if (pk > this.thr && since > 0.2) {
+          if (since < 0.36 && slope < 0.5 * this.lastSlope) {
+            this.npki = 0.125 * pk + 0.875 * this.npki; // T wave: treat as noise
+          } else {
+            this.spki = 0.125 * pk + 0.875 * this.spki;
+            if (this.lastQRS !== null) { const rr = since; if (rr > 0.2 && rr < 3) { this.rrs.push(rr); if (this.rrs.length > 16) this.rrs.shift(); } }
+            this.lastQRS = tp; this.lastSlope = slope; out = tp;
+            this.beats.push(tp); if (this.beats.length > 32) this.beats.shift();
+          }
+        } else this.npki = 0.125 * pk + 0.875 * this.npki;
+        this.thr = this.npki + 0.25 * (this.spki - this.npki);
+        this.slopeAcc = 0;
+      }
+      if (m > this.m1) this.peakSlope = this.slopeAcc;
+      this.m2 = this.m1; this.m1 = m;
+      return out;
+    }
+    /** Heart rate = 60 / mean of the last 8 RR intervals; null if no recent beats. */
+    heartRate(tNow) {
+      if (this.rrs.length < 2 || this.lastQRS === null) return null;
+      const rrMean = meanOfLast(this.rrs, 8);
+      if (tNow - this.lastQRS > Math.max(3, 2.5 * rrMean)) return null;
+      return 60 / rrMean;
+    }
+  }
+
+  /** Breath detector for impedance pneumography: band-pass 0.1–1 Hz, hysteresis
+   *  threshold h (Ω), RR = 60 / mean of last 4 breath intervals, apnea after delay. */
+  class BreathDetector {
+    constructor(fs) { this.fs = fs; this.bp = dsp.bandpass(0.1, 1.0, fs); this.reset(0); }
+    reset(t) { this.bp.reset(); this.state = 0; this.lastBreath = null; this.startT = t || 0; this.intervals = []; this.breaths = []; }
+    process(x, t, h) {
+      if (!Number.isFinite(x)) return null;
+      const y = this.bp.process(x);
+      let out = null;
+      if (this.state <= 0 && y > h) {
+        if (this.state === -1) {
+          if (this.lastBreath !== null) { this.intervals.push(t - this.lastBreath); if (this.intervals.length > 8) this.intervals.shift(); }
+          this.lastBreath = t; out = t;
+          this.breaths.push(t); if (this.breaths.length > 32) this.breaths.shift();
+        }
+        this.state = 1;
+      } else if (this.state >= 0 && y < -h) this.state = -1;
+      this.y = y;
+      return out;
+    }
+    apnea(t, delay) { const ref = this.lastBreath === null ? this.startT : this.lastBreath; return t - ref > delay; }
+    rate(t, delay) {
+      if (this.apnea(t, delay)) return 0;
+      if (this.intervals.length < 2) return null;
+      return 60 / meanOfLast(this.intervals, 4);
+    }
+  }
+
+  /**
+   * Ratio-of-ratios SpO2 estimator. ln(I) of each wavelength is band-passed
+   * 0.5–5 Hz; R = RMS(red AC)/RMS(IR AC) over a 4 s window, updated every 1 s.
+   * SpO2 = 110 − 25·R: an empirical straight-line calibration given as an example in
+   * TI application report SLAA655 (real devices use device-specific calibration
+   * curves from desaturation studies). SQI = consistency of R across four 1-s
+   * sub-windows. Pulse rate from peaks of the inverted, filtered IR signal.
+   */
+  class SpO2Estimator {
+    constructor(fs) {
+      this.fs = fs;
+      this.bpR = dsp.bandpass(0.5, 5, fs); this.bpI = dsp.bandpass(0.5, 5, fs);
+      this.lpDC = dsp.rbj('lowpass', 0.3, fs);
+      const n = 4 * fs;
+      this.acR = new dsp.Ring(n); this.acI = new dsp.Ring(n);
+      this.reset();
+    }
+    reset() {
+      this.bpR.reset(); this.bpI.reset(); this.lpDC.reset(); this.acR.clear(); this.acI.clear();
+      this.k = 0; this.inst = []; this.dc = null; this.warm = 0;
+      this.pk = { y1: 0, y2: 0, last: null, intervals: [], max: 0 };
+      this.out = { spo2: null, sqi: null, pi: null, pr: null, status: 'searching' };
+    }
+    /** Feed one sample pair (normalised intensities). Returns the pleth display value (or NaN). */
+    process(red, ir, t, avgN) {
+      if (!Number.isFinite(red) || !Number.isFinite(ir)) {
+        this.bpR.reset(); this.bpI.reset(); this.acR.clear(); this.acI.clear(); this.warm = 0;
+        this.pk.last = null; this.pk.max = 0; // do not measure a pulse interval across a gap
+        this.out = { spo2: null, sqi: null, pi: null, pr: null, status: 'no-signal' };
+        return NaN;
+      }
+      this.dc = this.lpDC.process(ir);
+      const r = this.bpR.process(Math.log(Math.max(red, 1e-6)));
+      const i = this.bpI.process(Math.log(Math.max(ir, 1e-6)));
+      this.warm++;
+      const pleth = -i; // absorbance rises with blood volume
+      if (this.warm > this.fs) { this.acR.push(r); this.acI.push(i); this.detectPulse(pleth, t); }
+      if (++this.k >= this.fs) { this.k = 0; this.update(t, avgN); }
+      return pleth;
+    }
+    detectPulse(y, t) {
+      const p = this.pk;
+      p.max = Math.max(p.max * Math.exp(-1 / (2 * this.fs)), y); // decaying peak tracker (~2 s)
+      if (p.y1 > p.y2 && p.y1 >= y && p.y1 > 0.6 * p.max && (p.last === null || t - p.last > 0.25)) {
+        if (p.last !== null) { const iv = t - p.last; if (iv < 3) { p.intervals.push(iv); if (p.intervals.length > 8) p.intervals.shift(); } }
+        p.last = t;
+      }
+      p.y2 = p.y1; p.y1 = y;
+    }
+    update(t, avgN) {
+      if (this.dc !== null && this.dc > 1.5) { this.out = { spo2: null, sqi: null, pi: null, pr: null, status: 'probe-off' }; this.inst = []; return; }
+      if (this.acI.total < 4 * this.fs) { this.out = { spo2: null, sqi: null, pi: null, pr: null, status: 'searching' }; return; }
+      const R = this.acR.last(4 * this.fs), I = this.acI.last(4 * this.fs);
+      const rmsI = dsp.rms(I);
+      const ratio = dsp.rms(R) / Math.max(rmsI, 1e-12);
+      const subs = [];
+      for (let j = 0; j < 4; j++) {
+        const a = R.slice(j * this.fs, (j + 1) * this.fs), b = I.slice(j * this.fs, (j + 1) * this.fs);
+        subs.push(dsp.rms(a) / Math.max(dsp.rms(b), 1e-12));
+      }
+      const cv = dsp.std(subs) / Math.max(dsp.mean(subs), 1e-9);
+      const sqi = dsp.clamp(1 - cv / 0.2, 0, 1) * 100;
+      const inst = dsp.clamp(110 - 25 * ratio, 0, 100);
+      this.inst.push(inst); while (this.inst.length > (avgN || 8)) this.inst.shift();
+      const pi = (Math.max(...I) - Math.min(...I)) * 100;
+      const p = this.pk;
+      const pr = (p.intervals.length >= 2 && p.last !== null && t - p.last < 3) ? 60 / meanOfLast(p.intervals, 8) : null;
+      this.out = { spo2: dsp.mean(this.inst), spo2Inst: inst, ratio, sqi, pi, pr, status: rmsI < 1e-5 ? 'no-pulse' : 'ok' };
+      if (this.out.status === 'no-pulse') Object.assign(this.out, { spo2: null, pr: null, sqi: 0 });
+    }
+  }
+
+  return { PanTompkins, BreathDetector, SpO2Estimator };
+});

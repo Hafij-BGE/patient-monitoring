@@ -1,0 +1,93 @@
+{
+  "name": "pm-sim",
+  "version": "1.0.0",
+  "description": "PM-SIM: educational patient monitor simulator (ECG, SpO2, NIBP, respiration, temperature)",
+  "private": true,
+  "packageManager": "pnpm@10.33.4",
+  "license": "MIT",
+  "author": {
+    "name": "Hafij-BGE",
+    "email": "mdhafijur.rahman@ogr.deu.edu.tr"
+  },
+  "homepage": "https://github.com/Hafij-BGE",
+  "main": "electron/main.cjs",
+  "desktopName": "pm-sim.desktop",
+  "scripts": {
+    "test": "node --test tests/unit/*.test.js",
+    "start": "electron .",
+    "build:deb": "electron-builder --linux deb --publish never",
+    "build:win": "electron-builder --win zip --x64 --publish never",
+    "build:all": "electron-builder --linux deb --win zip --x64 --publish never",
+    "build:win-installer": "electron-builder --win nsis portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "42.1.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "io.github.hafijbge.pmsim",
+    "productName": "PM-SIM",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**",
+      "index.html",
+      "css/**",
+      "src/**",
+      "fixtures/**",
+      "build/icon.png"
+    ],
+    "linux": {
+      "target": [
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Education",
+      "maintainer": "Hafij-BGE <mdhafijur.rahman@ogr.deu.edu.tr>",
+      "synopsis": "Educational patient monitor simulator",
+      "description": "Simulates a multiparameter bedside monitor (ECG, pulse oximetry, NIBP, respiration, temperature) for teaching. Not a medical device.",
+      "artifactName": "PM-SIM-${version}-${arch}.${ext}",
+      "syncDesktopName": true
+    },
+    "deb": {
+      "packageCategory": "education"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "PM-SIM-${version}-win-${arch}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "PM-SIM-${version}-setup-${arch}.${ext}",
+      "shortcutName": "PM-SIM"
+    },
+    "portable": {
+      "artifactName": "PM-SIM-${version}-portable-${arch}.${ext}"
+    }
+  }
+}

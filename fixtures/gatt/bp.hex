@@ -1,0 +1,7 @@
+# Synthetic bp payloads from src/devices/replay.js (no hardware, no real person). One hex payload per line.
+# t=19 s
+1c 7c 00 4f 00 5d 00 49 00 01 00 00
+# t=45 s
+10 83 00 54 00 63 00 01 00
+# t=47 s
+1e 7c

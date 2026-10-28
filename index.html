@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; connect-src 'none'; media-src 'self' blob:">
+<title>PM-SIM Patient Monitor Simulator</title>
+<link rel="stylesheet" href="css/monitor.css">
+</head>
+<body>
+<div class="notice" id="notice" role="note">
+  <strong>Educational simulation only.</strong> Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"></span>
+    <div>
+      <h1>PM-SIM</h1>
+      <p class="sub">Interactive multiparameter patient monitor simulator, homework 2 (BME, DEU)</p>
+    </div>
+  </div>
+  <div class="toolbar" role="toolbar" aria-label="Simulation controls">
+    <button id="btnRun" class="primary" title="Pause or resume the simulation (space)">Pause</button>
+    <button id="btnReset" title="Reset the simulation, alarms and stored simulated data to defaults">Reset</button>
+    <label class="inline">Speed
+      <select id="selSpeed" aria-label="Playback speed"></select>
+    </label>
+    <label class="inline">Scenario
+      <select id="selPreset" aria-label="Scenario preset"></select>
+    </label>
+    <button id="btnFreeze" title="Freeze the waveform display; the simulation keeps running">Freeze display</button>
+    <button id="btnPng" title="Save a PNG snapshot of the monitor screen">PNG</button>
+    <span class="clock" id="clock" title="Simulation time">t = 0 s</span>
+  </div>
+</header>
+
+<section class="alarmbar" id="alarmbar" aria-live="polite">
+  <div class="alarm-list" id="alarmList"><span class="muted">No active alarms</span></div>
+  <div class="alarm-actions">
+    <button id="btnAckAll" title="Acknowledge all active alarms (each stays visible until its condition ends)">Acknowledge</button>
+    <button id="btnMute" title="Pause alarm audio for 2 minutes of simulation time">Audio pause 2 min</button>
+    <label class="inline" title="Play illustrative tones with Web Audio. Off by default.">
+      <input type="checkbox" id="chkSound"> Sound
+    </label>
+  </div>
+</section>
+
+<main class="monitor" id="monitor">
+  <div class="waves" id="waves">
+    <div class="wave" data-ch="ecg">
+      <div class="wave-label"><span>ECG</span><span class="wave-scale" id="ecgScale"></span></div>
+      <canvas id="cvEcg" aria-label="Simulated ECG waveform"></canvas>
+    </div>
+    <div class="wave" data-ch="pleth">
+      <div class="wave-label"><span>PLETH (IR)</span><span class="wave-scale">auto scale</span></div>
+      <canvas id="cvPleth" aria-label="Simulated plethysmogram"></canvas>
+    </div>
+    <div class="wave" data-ch="resp">
+      <div class="wave-label"><span>RESP (impedance)</span><span class="wave-scale">auto scale</span></div>
+      <canvas id="cvResp" aria-label="Simulated impedance respiration waveform"></canvas>
+    </div>
+    <div class="wave" data-ch="cuff">
+      <div class="wave-label"><span>CUFF</span><span class="wave-scale">0–300 mmHg</span></div>
+      <canvas id="cvCuff" aria-label="Simulated NIBP cuff pressure"></canvas>
+    </div>
+  </div>
+
+  <div class="tiles" id="tiles">
+    <div class="tile" data-ch="ecg" id="tHr">
+      <div class="t-head"><span>HR</span><span class="unit">bpm</span></div>
+      <div class="t-val" id="vHr">--</div>
+      <div class="t-foot"><span id="sHr"></span><span class="lim" id="lHr"></span></div>
+    </div>
+    <div class="tile" data-ch="pleth" id="tSpo2">
+      <div class="t-head"><span>SpO₂</span><span class="unit">%</span></div>
+      <div class="t-val" id="vSpo2">--</div>
+      <div class="t-foot"><span id="sSpo2"></span><span class="lim" id="lSpo2"></span></div>
+      <div class="t-sub">PR <b id="vPr">--</b> bpm · PI <b id="vPi">--</b> % · SQI <b id="vSqi">--</b></div>
+      <div class="sqi"><div class="sqi-fill" id="sqiBar"></div></div>
+    </div>
+    <div class="tile wide" data-ch="cuff" id="tNibp">
+      <div class="t-head"><span>NIBP</span><span class="unit">mmHg</span><span class="nibp-state" id="nibpState">idle</span></div>
+      <div class="t-val"><span id="vNibp">--/--</span> <small>(<span id="vMap">--</span>)</small></div>
+      <div class="t-foot"><span id="sNibp"></span><span class="lim" id="nibpAge"></span></div>
+      <div class="t-sub">MAP osc. <b id="vMapOsc">--</b> · MAP formula <b id="vMapF">--</b> · PP <b id="vPp">--</b></div>
+      <div class="row">
+        <button id="btnNibp">Start NIBP</button>
+        <button id="btnNibpStop">Stop</button>
+      </div>
+    </div>
+    <div class="tile" data-ch="resp" id="tRr">
+      <div class="t-head"><span>RR</span><span class="unit">br/min</span></div>
+      <div class="t-val" id="vRr">--</div>
+      <div class="t-foot"><span id="sRr"></span><span class="lim" id="lRr"></span></div>
+    </div>
+    <div class="tile" data-ch="temp" id="tTemp">
+      <div class="t-head"><span>TEMP</span><span class="unit">°C</span></div>
+      <div class="t-val" id="vTemp">--</div>
+      <div class="t-foot"><span id="sTemp"></span><span class="lim" id="lTemp"></span></div>
+    </div>
+    <div class="tile external" id="tExt">
+      <div class="t-head"><span>OTHER SOURCES</span><span class="unit">latest</span></div>
+      <div id="extList" class="ext-list"><span class="muted">No device, imported or manual data yet</span></div>
+    </div>
+  </div>
+</main>
+<p class="legend">Large numbers are the <b>monitor's estimates</b> computed from the simulated signals.
+  "set" is the simulated patient's true input. The difference between them is the simulated measurement error.
+  Grey hatching means no signal (missing data). Nothing is filled in.</p>
+
+<nav class="tabs" role="tablist" id="tabs">
+  <button role="tab" data-tab="controls" aria-selected="true">Controls</button>
+  <button role="tab" data-tab="nibp">NIBP</button>
+  <button role="tab" data-tab="alarms">Alarms</button>
+  <button role="tab" data-tab="trends">Trends</button>
+  <button role="tab" data-tab="data">Data import/export</button>
+  <button role="tab" data-tab="devices">Devices</button>
+  <button role="tab" data-tab="profile">Profile</button>
+  <button role="tab" data-tab="science">Science</button>
+  <button role="tab" data-tab="tests">Tests</button>
+  <button role="tab" data-tab="refs">References</button>
+</nav>
+
+<section class="panel" data-panel="controls">
+  <p class="hint">Each control lists its unit, its range and what it does. Values outside the range are clamped, and a warning is shown.
+    A scenario preset resets the patient and sensor settings, keeps the display settings, and highlights what it changed.</p>
+  <div id="controlMsgs" class="msgs" aria-live="polite"></div>
+  <div id="controls" class="control-groups"></div>
+</section>
+
+<section class="panel" data-panel="nibp" hidden>
+  <div class="split">
+    <div>
+      <h3>Oscillogram of the last measurement</h3>
+      <canvas id="cvOsc" class="plot" aria-label="Oscillation amplitude envelope versus cuff pressure"></canvas>
+      <p class="hint">Dots show the oscillation amplitude of each beat against cuff pressure. Red dots are beats rejected as artifact.
+        The line is the smoothed envelope. SBP and DBP are read where the envelope falls to K<sub>s</sub> and K<sub>d</sub> times its maximum (fixed-ratio method).</p>
+    </div>
+    <div>
+      <h3>Measurement history</h3>
+      <div class="table-wrap"><table id="nibpTable"><thead><tr><th>t (s)</th><th>SYS</th><th>DIA</th><th>MAP osc.</th><th>MAP formula</th><th>set SYS/DIA</th><th>result</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+</section>
+
+<section class="panel" data-panel="alarms" hidden>
+  <p class="hint" id="alarmNotice"></p>
+  <div class="split">
+    <div>
+      <h3>Limits</h3>
+      <div class="table-wrap"><table id="limitTable"><thead><tr><th>Parameter</th><th>Low</th><th>High</th><th>Delay (s)</th><th>On</th></tr></thead><tbody></tbody></table></div>
+      <div class="row"><button id="btnLimitsDefault">Restore default limits</button></div>
+      <div id="limitMsg" class="msgs"></div>
+      <p class="hint">Defaults are illustrative teaching values for an adult. They do not come from a device or a guideline.
+        A missing value never raises a physiological alarm. A technical alarm reports the lost signal instead.</p>
+    </div>
+    <div>
+      <h3>History</h3>
+      <div class="row"><button id="btnAlarmCsv">Export history CSV</button><button id="btnAlarmClear">Clear history</button></div>
+      <div class="table-wrap tall"><table id="alarmHistory"><thead><tr><th>Alarm</th><th>Kind</th><th>Priority</th><th>On (s)</th><th>Off (s)</th><th>Ack (s)</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+</section>
+
+<section class="panel" data-panel="trends" hidden>
+  <div class="row wrap">
+    <label class="inline">Parameter <select id="trParam"></select></label>
+    <label class="inline">Window <select id="trWindow">
+      <option value="300">last 5 min</option><option value="1800">last 30 min</option><option value="7200">last 2 h</option><option value="fit">fit all data</option>
+    </select></label>
+    <span class="inline" id="trSources"></span>
+    <button id="trPause">Pause trend</button>
+    <button id="trPng">PNG</button>
+    <button id="trCsv">CSV</button>
+  </div>
+  <canvas id="cvTrend" class="plot tall" aria-label="Trend plot"></canvas>
+  <div id="trStats" class="stats"></div>
+  <p class="hint">Each source has its own colour and marker. Sources are never merged into one line.
+    Hatched bands are intervals with missing values, or with no data for longer than 3 × the usual sample interval.</p>
+</section>
+
+<section class="panel" data-panel="data" hidden>
+  <div class="split">
+    <div>
+      <h3>Import files (CSV, JSON, HL7 v2, FHIR, SDC XML)</h3>
+      <div class="drop" id="drop">Drop files here, or <label class="filebtn">choose files<input type="file" id="fileIn" accept=".csv,.tsv,.txt,.json,.hl7,.xml" multiple></label></div>
+      <div class="row wrap">
+        <label class="inline">Time zone for timestamps without one
+          <input id="impTz" value="local" size="8" aria-label="Time zone for naive timestamps (local, UTC or ±HH:MM)"></label>
+        <label class="inline">Date order <select id="impOrder"><option value="auto">auto</option><option value="DMY">DD/MM/YYYY</option><option value="MDY">MM/DD/YYYY</option></select></label>
+        <label class="inline">Duplicates <select id="impDup"><option value="keep-first">keep first</option><option value="keep-last">keep last</option></select></label>
+      </div>
+      <p class="hint">Files are read in this browser tab only. Nothing is uploaded. Units are converted (°F→°C, lb→kg, kPa→mmHg, in→cm).
+        Out-of-range values are rejected with their line number. Missing cells stay missing.</p>
+      <div id="impReport"></div>
+      <div class="row"><button id="btnClearImported">Remove imported data</button></div>
+    </div>
+    <div>
+      <h3>Manual entry</h3>
+      <form id="manualForm" class="form-grid">
+        <label>Parameter <select id="mParam"></select></label>
+        <label>Value <input id="mValue" inputmode="decimal" autocomplete="off"></label>
+        <label>Unit <select id="mUnit"></select></label>
+        <label>Time <input id="mTime" type="datetime-local" step="1"></label>
+        <label>Device / method <input id="mDevice" placeholder="e.g. home BP cuff" autocomplete="off"></label>
+        <label>Note <input id="mNote" autocomplete="off"></label>
+        <div class="row"><button type="submit" class="primary">Add value</button><span id="mMsg" class="msgs"></span></div>
+      </form>
+      <h3>Export</h3>
+      <div class="row wrap" id="expSources"></div>
+      <div class="row wrap">
+        <button id="btnExpCsv">Observations CSV</button>
+        <button id="btnExpJson">Observations JSON</button>
+        <button id="btnExpWave">Waveforms CSV (last 10 s)</button>
+      </div>
+      <p class="hint">Every exported row keeps its source, quality and provenance. A JSON export can be imported again; its values then count as <i>imported</i>.</p>
+      <h3>Stored observations</h3>
+      <div id="storeSummary" class="table-wrap"></div>
+    </div>
+  </div>
+</section>
+
+<section class="panel" data-panel="devices" hidden>
+  <div class="devhead">
+    <label>Device type <select id="devClass" aria-label="Device type"></select></label>
+    <label>Bed / location <input id="devBed" placeholder="e.g. ICU^01^01" size="14" aria-label="Bed or location, HL7 PV1-3 point of care, room, bed"></label>
+    <label class="inline"><input type="checkbox" id="devBedOnly"> Accept HL7 messages for this bed only</label>
+  </div>
+  <p id="devClassInfo" class="hint"></p>
+  <div id="devRoutes" class="routes" role="radiogroup" aria-label="Connection route"></div>
+
+  <div class="split">
+    <div id="routePanels">
+      <div class="rpanel" data-route="ble" hidden>
+        <h3>Bluetooth LE standard health profile</h3>
+        <div id="bleAvail" class="msgs"></div>
+        <p class="hint">Works with devices that use the Bluetooth SIG standard health profiles. You choose the device in the browser's own dialog.
+          The page cannot see devices you do not choose. Readings are stored with source <i>device</i>.</p>
+        <div id="bleKinds" class="checks"></div>
+        <div class="row"><button id="btnBle" class="primary">Connect a device…</button></div>
+        <div id="bleList"></div>
+        <h3>Packet replay (no hardware)</h3>
+        <p class="hint">Plays 60 s of synthetic, byte-exact BLE packets through the same parser a real device uses, including a probe-off period,
+          lost skin contact, a movement-flagged BP reading, a truncated packet and a NaN value.</p>
+        <div class="row"><button id="btnReplay">Start BLE replay</button><span id="replayState" class="muted"></span></div>
+      </div>
+
+      <div class="rpanel" data-route="hl7-mllp" hidden>
+        <h3>HL7 v2 over MLLP</h3>
+        <div id="mllpAvail" class="msgs"></div>
+        <p class="hint">Starts a TCP listener in the desktop app. Point the monitor, central station or interface engine at this computer's address and port.
+          Each ORU^R01 message is answered with an HL7 ACK (MSA AA, or AE when the message cannot be read).</p>
+        <div class="row wrap">
+          <label class="inline">Port <input id="mllpPort" value="2575" size="6" inputmode="numeric"></label>
+          <label class="inline">Listen on <select id="mllpHost"><option value="127.0.0.1">this computer only (127.0.0.1)</option><option value="0.0.0.0">all network interfaces (0.0.0.0)</option></select></label>
+          <button id="btnMllp" class="primary">Start listener</button>
+        </div>
+        <p id="mllpWarn" class="warn" hidden>Listening on all interfaces lets any computer on the network send messages to this app. MLLP has no encryption or login.
+          Use it only on an isolated test network.</p>
+        <div id="mllpState" class="muted"></div>
+      </div>
+
+      <div class="rpanel" data-route="hl7-serial" hidden>
+        <h3>HL7 v2 over serial port</h3>
+        <div id="serialAvail" class="msgs"></div>
+        <p class="hint">For devices with an RS-232 or USB-serial HL7 output. Choose the port in the browser's dialog. MLLP framing and plain CR-separated messages are both read.
+          This route only listens; it never writes to the port.</p>
+        <div class="row wrap">
+          <label class="inline">Baud <select id="serialBaud"><option>9600</option><option>19200</option><option>38400</option><option>57600</option><option selected>115200</option></select></label>
+          <label class="inline">Format <select id="serialFmt"><option value="8N1">8N1</option><option value="7E1">7E1</option></select></label>
+          <button id="btnSerial" class="primary">Connect a port…</button>
+        </div>
+        <div id="serialState" class="muted"></div>
+      </div>
+
+      <div class="rpanel" data-route="file" hidden>
+        <h3 id="fileTitle">File import</h3>
+        <p id="fileHint" class="hint"></p>
+        <div class="row wrap">
+          <label class="filebtn">Choose a file<input type="file" id="devFile" accept=".hl7,.txt,.json,.xml"></label>
+          <button id="btnExample">Load synthetic example</button>
+        </div>
+        <textarea id="devPaste" rows="6" spellcheck="false" placeholder="…or paste the message text here" aria-label="Paste message text"></textarea>
+        <div class="row"><button id="btnPaste">Import pasted text</button></div>
+        <div id="devReport"></div>
+      </div>
+
+      <div class="rpanel" data-route="table" hidden>
+        <h3 id="tableTitle">Table import or manual entry</h3>
+        <p class="hint">CSV/JSON tables and manual entry use the <i>Data import</i> tab, which converts units, checks ranges and reports every rejected row.</p>
+        <div class="row"><button id="btnGoData" class="primary">Open Data import</button></div>
+      </div>
+
+      <div class="rpanel" data-route="demo" hidden>
+        <h3>Synthetic HL7 feed (no hardware)</h3>
+        <p class="hint">Plays 20 ORU^R01 messages, one every 2 s, from a synthetic central station that serves two beds (your bed and ICU^01^02).
+          It includes an SpO₂ drop, a missing respiratory rate and an implausible temperature. Turn on the bed filter to see the other bed's messages rejected.
+          Values carry a <span class="badge replay">SYNTHETIC</span> badge.</p>
+        <div class="row"><button id="btnFeed" class="primary">Start feed</button><span id="feedState" class="muted"></span></div>
+      </div>
+    </div>
+
+    <div>
+      <h3>Message log</h3>
+      <div class="table-wrap tall"><table id="pktTable"><thead><tr><th>t</th><th>From</th><th>Channel</th><th>Raw</th><th>Decoded</th></tr></thead><tbody></tbody></table></div>
+      <p class="hint">Patient identity segments and resources (HL7 PID/PD1/NK1, FHIR Patient) are counted and ignored. No patient identifiers are stored.
+        This app uses only published standards. It does not reverse-engineer vendor protocols and it does not write to devices.</p>
+    </div>
+  </div>
+</section>
+
+<section class="panel" data-panel="profile" hidden>
+  <div class="split">
+    <form id="profileForm" class="form-grid" autocomplete="off">
+      <label>Label (fictional) <input id="pLabel"></label>
+      <label>Age (years) <input id="pAge" inputmode="decimal"></label>
+      <label>Height <span class="pair"><input id="pHeight" inputmode="decimal"><select id="pHeightUnit"><option value="cm">cm</option><option value="in">in</option></select></span></label>
+      <label>Weight <span class="pair"><input id="pWeight" inputmode="decimal"><select id="pWeightUnit"><option value="kg">kg</option><option value="lb">lb</option></select></span></label>
+      <div class="row"><button type="submit" class="primary">Update</button><span id="pMsg" class="msgs"></span></div>
+    </form>
+    <div>
+      <div class="derived" id="pDerived"></div>
+      <h3>Weight history</h3>
+      <form id="whForm" class="row wrap">
+        <input id="whDate" type="date" aria-label="Date">
+        <input id="whKg" inputmode="decimal" placeholder="kg" size="6" aria-label="Weight in kg">
+        <button type="submit">Add</button>
+        <span id="whMsg" class="msgs"></span>
+      </form>
+      <div id="whList" class="table-wrap"></div>
+    </div>
+  </div>
+  <p class="hint">BMI = weight / height². BSA (Mosteller) = √(height[cm] × weight[kg] / 3600).
+    Adult BMI categories are shown only for ages 20 and over. Younger people need age- and sex-specific growth references.
+    The profile does not change the simulated signals. It stays in this tab.</p>
+</section>
+
+<section class="panel prose" data-panel="science" hidden>
+  <h2>Models used (summary)</h2>
+  <p>The full derivation, parameters and assumptions are in <code>TECHNICAL_REPORT.md</code>. All models are simplified teaching models.
+    None of them is a validated physiological or device model.</p>
+  <h3>ECG: McSharry dynamical model</h3>
+  <p>A point moves on a limit cycle in the (x, y) plane with angular speed ω = 2π/RR<sub>i</sub>. Its height z is pushed by five Gaussian events, P, Q, R, S and T:</p>
+  <p class="eq">ż = − Σ<sub>i∈{P,Q,R,S,T}</sub> a<sub>i</sub> Δθ<sub>i</sub> exp(−Δθ<sub>i</sub>² / 2b<sub>i</sub>²) − (z − z<sub>0</sub>),   Δθ<sub>i</sub> = (θ − θ<sub>i</sub>) mod 2π</p>
+  <p>Each beat interval RR<sub>i</sub> is 60/HR plus Gaussian jitter (SD set by the variability control). Irregular mode draws it uniformly within ±35 %.
+    Noise, baseline wander and mains interference are added. Then the display filter (band-pass, notch) is applied.
+    A simplified Pan–Tompkins detector (derivative, square, moving-window integral, adaptive threshold) finds the R peaks for the HR estimate.
+    The ECG is never generated from a measured heart rate.</p>
+  <h3>Pulse oximetry: ratio of ratios</h3>
+  <p class="eq">I<sub>λ</sub>(t) = I<sub>0</sub> exp(−k<sub>λ</sub> · PI · s(t))  →  R = (AC<sub>red</sub>/DC<sub>red</sub>) / (AC<sub>IR</sub>/DC<sub>IR</sub>)  →  SpO₂ ≈ 110 − 25 R</p>
+  <p>The linear calibration line is a textbook approximation. Real oximeters use empirical calibration curves.
+    The signal quality index (SQI) measures how consistent R stays over 4 one-second windows. Motion adds a common-mode artifact that pulls R toward 1 (SpO₂ ≈ 85 %).</p>
+  <h3>NIBP: oscillometric method</h3>
+  <p>The cuff inflates above the expected systolic pressure, then deflates linearly. The oscillation amplitude of each beat follows the slope of an arctangent pressure–volume curve of the artery at transmural pressure P<sub>art</sub> − P<sub>cuff</sub>.
+    MAP<sub>osc</sub> is the cuff pressure at the maximum amplitude A<sub>m</sub>. SBP is where the amplitude falls to K<sub>s</sub>·A<sub>m</sub> above the maximum. DBP is where it falls to K<sub>d</sub>·A<sub>m</sub> below the maximum.</p>
+  <p class="eq">MAP<sub>formula</sub> = (SBP + 2·DBP) / 3     PP = SBP − DBP   (derived values, not measured)</p>
+  <h3>Respiration: impedance pneumography</h3>
+  <p>The transthoracic impedance changes with lung volume. A phase oscillator at RR/60 Hz drives the breath waveform, and a cardiogenic component and noise are added.
+    A band-pass filter and hysteresis threshold detect breaths. If no breath is detected for the apnea delay, apnea is declared.</p>
+  <h3>Temperature: first-order probe</h3>
+  <p class="eq">dT<sub>probe</sub>/dt = (T<sub>true</sub> − T<sub>probe</sub>) / τ</p>
+  <h3>Main components of a bedside monitor</h3>
+  <p>This is a generic block diagram from the textbook literature (Webster, <i>Medical Instrumentation</i>; Webster, <i>Design of Pulse Oximeters</i>; Allen 2007; Forouzanfar et al. 2015). It describes no specific product and claims no device specifications.</p>
+  <ul>
+    <li><b>ECG channel:</b> skin electrodes and lead wires → protected, isolated input → instrumentation (differential) amplifier with high common-mode rejection → band-pass and optional mains notch filter → analogue-to-digital converter (ADC) → QRS detector → heart rate.</li>
+    <li><b>Impedance respiration:</b> a small high-frequency carrier current passes through the ECG electrodes. The impedance change caused by breathing is demodulated, filtered and counted as breaths.</li>
+    <li><b>SpO₂ channel:</b> a probe with a red LED, an infrared LED and one photodiode → transimpedance amplifier → red and IR signals separated by time multiplexing → AC/DC extraction → ratio of ratios R → calibration curve → SpO₂ and pulse rate.</li>
+    <li><b>NIBP channel:</b> cuff, air pump, deflation valve and pressure transducer → the controller inflates, then deflates → the oscillations on the cuff pressure are extracted → envelope → MAP, then SBP and DBP by ratio rules. An over-pressure limit stops inflation.</li>
+    <li><b>Temperature channel:</b> thermistor probe in a bridge or divider → ADC → linearisation to °C. The probe responds with a time lag.</li>
+    <li><b>Processing and output:</b> processor; display of waveforms and numerics; alarm system with limits, priorities, delays and audio/visual signals (IEC 60601-1-8); trend storage; network or serial interface (HL7) to a central station.</li>
+  </ul>
+  <p>In this app each channel is a module in <code>src/sim/</code>. Each sensor control (noise, mains, contact, motion, probe state, time constant) acts on the stage of the chain that it names.</p>
+
+  <h3>Simplifying assumptions</h3>
+  <ul>
+    <li>One ECG lead with a fixed morphology. No conduction disorders are modelled.</li>
+    <li>The pulse has a fixed shape and arrives 0.20 s after the R wave. ECG, PPG, pressure and respiration share the same beat times.</li>
+    <li>The PPG uses two wavelengths and a linear calibration. Venous pulsation, ambient light and dyshaemoglobins (COHb, MetHb) are not modelled.</li>
+    <li>Breathing is regular, with I:E = 1:2.</li>
+    <li>NIBP uses an arctangent artery model, linear deflation and fixed ratios. The cuff and limb tissue are not modelled.</li>
+    <li>Parameters are independent: lowering SpO₂ does not raise HR. Alarm limits and delays are illustrative defaults.</li>
+  </ul>
+
+  <h3>Engineering limitations</h3>
+  <ul>
+    <li><b>Motion:</b> motion pulls R toward 1, so the displayed SpO₂ drifts toward about 85 % while the SQI falls. At high motion the NIBP measurement fails with a motion message.</li>
+    <li><b>Fixed-ratio NIBP:</b> SBP and DBP are estimates, not measurements. In the hypotension preset the DBP estimate can stay just above the alarm limit.</li>
+    <li><b>Detector:</b> the QRS detector has no search-back. Dropouts and heavy noise can cause missed beats and a wrong HR.</li>
+    <li><b>Not represented:</b>
+      <ul>
+        <li>oximeter bias from skin pigmentation and low perfusion (FDA 2021)</li>
+        <li>cuff-size errors</li>
+        <li>arrhythmia analysis</li>
+        <li>pacemaker pulses</li>
+        <li>invasive-pressure catheter dynamics</li>
+        <li>electrosurgical interference</li>
+        <li>electrical safety and isolation</li>
+      </ul>
+    </li>
+  </ul>
+  <p>The full lists are in <code>TECHNICAL_REPORT.md</code> §8–9. The observed test results are in <code>TEST_REPORT.md</code>.</p>
+
+  <h3>Data provenance</h3>
+  <p>Every value is an observation with a source: <span class="badge simulated">simulated</span> <span class="badge derived">derived</span>
+    <span class="badge device">device</span> <span class="badge imported">imported</span> <span class="badge user">user</span>. It also has a quality flag (ok, low-quality, missing, invalid, artifact) and a provenance record.
+    Simulated data and real (device, imported, manual) data are never mixed in one series.</p>
+</section>
+
+<section class="panel" data-panel="tests" hidden>
+  <div class="row"><button id="btnSelfTest" class="primary">Run browser self-test</button><span id="stSummary" class="muted"></span></div>
+  <div class="table-wrap"><table id="stTable"><thead><tr><th>#</th><th>Test</th><th>Expected</th><th>Observed</th><th>Result</th></tr></thead><tbody></tbody></table></div>
+  <p class="hint">The unit tests run with <code>node --test tests/unit/*.test.js</code>. Tests that need real hardware (a BLE device, a serial or network HL7 feed) are listed as <b>not run</b>. They are never marked passed without hardware.</p>
+</section>
+
+<section class="panel prose" data-panel="refs" hidden>
+  <h2>References</h2>
+  <ol class="refs">
+    <li>McSharry PE, Clifford GD, Tarassenko L, Smith LA. A dynamical model for generating synthetic electrocardiogram signals. <i>IEEE Trans Biomed Eng</i>. 2003;50(3):289–294.</li>
+    <li>Pan J, Tompkins WJ. A real-time QRS detection algorithm. <i>IEEE Trans Biomed Eng</i>. 1985;32(3):230–236.</li>
+    <li>Webster JG, ed. <i>Design of Pulse Oximeters</i>. IOP Publishing; 1997.</li>
+    <li>Webster JG, ed. <i>Medical Instrumentation: Application and Design</i>. 4th ed. Wiley; 2010.</li>
+    <li>Allen J. Photoplethysmography and its application in clinical physiological measurement. <i>Physiol Meas</i>. 2007;28(3):R1–R39.</li>
+    <li>Geddes LA, Voelz M, Combs C, Reiner D, Babbs CF. Characterization of the oscillometric method for measuring indirect blood pressure. <i>Ann Biomed Eng</i>. 1982;10(6):271–280.</li>
+    <li>Forouzanfar M, Dajani HR, Groza VZ, Bolic M, Rajan S, Batkin I. Oscillometric blood pressure estimation: past, present, and future. <i>IEEE Rev Biomed Eng</i>. 2015;8:44–63.</li>
+    <li>U.S. Food and Drug Administration. Pulse Oximeter Accuracy and Limitations: FDA Safety Communication. 19 February 2021.</li>
+    <li>Babbs CF. Oscillometric measurement of systolic and diastolic blood pressures validated in a physiologic mathematical model. <i>BioMed Eng OnLine</i>. 2012;11:56.</li>
+    <li>Mosteller RD. Simplified calculation of body-surface area. <i>N Engl J Med</i>. 1987;317(17):1098.</li>
+    <li>World Health Organization. Body mass index (BMI) classification for adults.</li>
+    <li>IEC 60601-1-8: Medical electrical equipment, general requirements for alarm systems (vocabulary only; this app is not a compliant alarm system).</li>
+    <li>Bluetooth SIG. GATT Specification Supplement; Heart Rate, Pulse Oximeter, Blood Pressure, Health Thermometer and Weight Scale Service specifications.</li>
+    <li>IEEE 11073-20601. Health informatics, personal health device communication (SFLOAT/FLOAT number formats).</li>
+    <li>W3C Web Bluetooth Community Group. Web Bluetooth draft specification.</li>
+    <li>Health Level Seven International. HL7 Version 2 Product Suite. https://www.hl7.org/implement/standards/product_brief.cfm?product_id=185</li>
+    <li>Health Level Seven International. HL7 Version 2.x Implementation Guide: Transport Specification, MLLP Release 2.</li>
+    <li>IHE International. IHE Patient Care Device (PCD) Technical Framework, Volume 2, transaction PCD-01. https://www.ihe.net/resources/technical_frameworks/#pcd</li>
+    <li>ISO/IEEE 11073-10101. Health informatics, point-of-care medical device communication, nomenclature; NIST Rosetta Terminology Mapping Management System (RTMMS). https://rtmms.nist.gov/</li>
+    <li>IEEE 11073-10207. Domain information and service model for service-oriented point-of-care medical device communication. https://standards.ieee.org/ieee/11073-10207/6152/</li>
+    <li>IEEE 11073-20701. Service-oriented medical device exchange architecture and protocol binding. https://standards.ieee.org/ieee/11073-20701/6151/</li>
+    <li>Health Level Seven International. FHIR Release 4, Observation resource. https://hl7.org/fhir/R4/observation.html</li>
+    <li>Health Level Seven International. FHIR Release 4, Vital Signs profile. https://hl7.org/fhir/R4/observation-vitalsigns.html</li>
+    <li>Regenstrief Institute. LOINC. https://loinc.org/</li>
+    <li>Regenstrief Institute. The Unified Code for Units of Measure (UCUM). https://ucum.org/</li>
+    <li>W3C Web Platform Incubator Community Group. Web Serial API draft. https://wicg.github.io/serial/</li>
+    <li>Electron. Device access: Web Serial API. https://www.electronjs.org/docs/latest/tutorial/devices#web-serial-api</li>
+  </ol>
+  <p class="hint">The full list, with what each reference supports, is in <code>REFERENCES.md</code>.</p>
+</section>
+
+<footer class="foot">
+  PM-SIM is an original educational design. It does not reproduce the interface of any monitor manufacturer.
+  It runs fully offline. It makes no network requests. Measurements are not saved between sessions. Only the chosen device type and bed are kept in this browser's local storage.
+</footer>
+
+<!-- logic modules (no DOM) -->
+<script src="src/core/units.js"></script>
+<script src="src/core/observation.js"></script>
+<script src="src/core/store.js"></script>
+<script src="src/core/profile.js"></script>
+<script src="src/sim/rng.js"></script>
+<script src="src/sim/dsp.js"></script>
+<script src="src/sim/pulse.js"></script>
+<script src="src/sim/ecg.js"></script>
+<script src="src/sim/sensors.js"></script>
+<script src="src/sim/nibp.js"></script>
+<script src="src/sim/detectors.js"></script>
+<script src="src/sim/params.js"></script>
+<script src="src/sim/engine.js"></script>
+<script src="src/alarms/alarmEngine.js"></script>
+<script src="src/data/csv.js"></script>
+<script src="src/data/importer.js"></script>
+<script src="src/devices/gatt.js"></script>
+<script src="src/devices/webBluetooth.js"></script>
+<script src="src/devices/replay.js"></script>
+<script src="src/devices/mdc.js"></script>
+<script src="src/devices/hl7v2.js"></script>
+<script src="src/devices/fhir.js"></script>
+<script src="src/devices/sdc.js"></script>
+<script src="src/devices/webSerial.js"></script>
+<script src="src/devices/samples.js"></script>
+<script src="src/devices/catalog.js"></script>
+<!-- UI -->
+<script src="src/ui/dom.js"></script>
+<script src="src/ui/waveforms.js"></script>
+<script src="src/ui/trends.js"></script>
+<script src="src/ui/panels.js"></script>
+<script src="src/ui/dataPanel.js"></script>
+<script src="src/ui/devicesPanel.js"></script>
+<script src="src/ui/selftest.js"></script>
+<script src="src/ui/app.js"></script>
+</body>
+</html>
