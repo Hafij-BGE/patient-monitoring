@@ -4,11 +4,16 @@
  *   dz/dt = −Σ a_i Δθ_i exp(−Δθ_i² / 2b_i²) − (z − z0),  Δθ_i = (θ − θ_i) mod 2π.
  * On the limit cycle (r = 1) the x,y equations reduce to dθ/dt = ω, which is
  * what is integrated here. Heart-rate scaling of θ_i and b_i follows ecgsyn.m
- * (PhysioNet ECGSYN). The waveform is synthetic, single-lead and not diagnostic. */
+ * (PhysioNet ECGSYN). The waveform is synthetic, single-lead and not diagnostic.
+ * Arrhythmia teaching patterns (arrhythmia.js) change the beat kind per cycle:
+ *   af   no P wave, f-waves added, irregular intervals
+ *   pvc  occasional early wide beat (R at 0.6 × mean interval) + compensatory pause
+ *   vt   every beat wide at the set rate      vf  fibrillatory signal, no beats
+ *   asystole  flat line, no beats */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./rng.js'));
-  else (root.PM = root.PM || {}).ecg = factory(root.PM.rng);
-})(this, function (rngMod) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./rng.js'), require('./arrhythmia.js'));
+  else (root.PM = root.PM || {}).ecg = factory(root.PM.rng, root.PM.arrhythmia);
+})(this, function (rngMod, arr) {
   'use strict';
 
   const TWO_PI = 2 * Math.PI;
@@ -70,31 +75,59 @@
     return ampMv / Math.max(1e-6, zmax - zIso);
   }
 
+  // R phase of a premature beat: the cycle starts mean/2 after the previous R, so an
+  // R at −0.8π comes 0.1 cycle later → coupling ≈ 0.6 × mean, then a compensatory pause.
+  const PVC_THETA_R = -0.8 * Math.PI;
+
   /** Streaming generator at a fixed internal step (default 1 ms). */
   class EcgGenerator {
-    constructor(params, rng, dt) {
+    constructor(params, rng, dt, fibRng) {
       this.dt = dt || 1e-3;
       this.rng = rng || new rngMod.Rng(1);
+      this.fibRng = fibRng || new rngMod.Rng(97531);
       this.theta = -Math.PI;
       this.z = 0;
       this.t = 0;
+      this.kind = 'normal';
       this.setParams(params, true);
       this.rr = this.drawRR();
-      this.onR = null;     // callback(tR, rr) at each R peak (θ crosses 0)
+      this.onR = null;     // callback(tR, rr, {kind, amp}) at each R peak (θ crosses the R phase)
       this.onBeat = null;  // callback(tStart, rr) at each new cycle (θ wraps)
     }
 
     setParams(p, immediate) {
       this.p = Object.assign({}, p);
-      this.pending = { w: waveParams(p) };
-      this.pending.gain = calibrate(this.pending.w, p.hr, p.ecg_amp_mv);
-      if (immediate || !this.w) { this.w = this.pending.w; this.gain = this.pending.gain; }
+      const mode = p.arrhythmia || 'none', mean = 60 / p.hr;
+      const w = waveParams(mode === 'af' ? Object.assign({}, p, { p_scale: 0 }) : p);
+      const vw = arr.ventricularParams(mean, 0);
+      this.pending = { mode, w, gain: calibrate(w, p.hr, p.ecg_amp_mv), vw, pw: arr.ventricularParams(mean, PVC_THETA_R),
+        vgain: calibrate(vw, p.hr, 1.3 * p.ecg_amp_mv) };
+      if (immediate || !this.w) this.startCycle(false);
+    }
+
+    /** Pick up pending settings and choose the kind of the cycle that starts now. */
+    startCycle(allowPvc) {
+      const P = this.pending, mode = this.mode = P.mode;
+      let kind = 'normal';
+      if (mode === 'vt') kind = 'vt';
+      else if (mode === 'vf' || mode === 'asystole') kind = 'none';
+      else if (mode === 'pvc' && allowPvc && this.kind !== 'pvc' &&
+        this.rng.uniform() < Math.min(0.5, (this.p.pvc_per_min || 0) / this.p.hr)) kind = 'pvc';
+      this.kind = kind;
+      this.w = kind === 'vt' ? P.vw : kind === 'pvc' ? P.pw : P.w;
+      const gain = kind === 'vt' || kind === 'pvc' ? P.vgain : P.gain;
+      if (this.gain) this.z *= this.gain / gain; // keep the output continuous when the beat scale changes
+      this.gain = gain;
+      if (!this.fib && (mode === 'af' || mode === 'vf')) this.fib = {};
+      if (mode === 'af' && !this.fib.af) this.fib.af = new arr.Fibrillation(this.fibRng, 6, 9, 4);
+      if (mode === 'vf' && !this.fib.vf) this.fib.vf = new arr.Fibrillation(this.fibRng, 3, 7, 4);
     }
 
     drawRR() {
       const mean = 60 / this.p.hr;
       let rr;
-      if (this.p.rhythm === 'irregular') rr = mean * (0.65 + 0.7 * this.rng.uniform());
+      if (this.mode === 'af') rr = mean * (0.55 + 0.9 * this.rng.uniform());
+      else if (this.p.rhythm === 'irregular') rr = mean * (0.65 + 0.7 * this.rng.uniform());
       else rr = mean;
       rr += this.rng.gauss() * (this.p.hrv_ms || 0) / 1000;
       return Math.min(3, Math.max(0.25, Math.min(mean * 1.6, Math.max(mean * 0.5, rr))));
@@ -103,19 +136,24 @@
     /** Advance one internal step; returns the clean ECG value in mV. */
     step() {
       const omega = TWO_PI / this.rr;
-      const th0 = this.theta;
+      const th0 = this.theta, thR = this.w.theta[2];
       this.z = rk4(th0, this.z, omega, this.dt, this.w);
       let th1 = th0 + omega * this.dt;
-      if (th0 < 0 && th1 >= 0 && this.onR) this.onR(this.t + this.dt * (-th0) / (th1 - th0), this.rr);
+      if (th0 < thR && th1 >= thR && this.kind !== 'none' && this.onR)
+        this.onR(this.t + this.dt * (thR - th0) / (th1 - th0), this.rr, { kind: this.kind, amp: arr.PULSE_AMP[this.kind] });
       this.t += this.dt;
       if (th1 >= Math.PI) {
         th1 -= TWO_PI;
         // new cardiac cycle: pick up any morphology change and draw the next interval
-        this.w = this.pending.w; this.gain = this.pending.gain;
+        this.startCycle(true);
         this.rr = this.drawRR();
         if (this.onBeat) this.onBeat(this.t, this.rr);
       }
       this.theta = th1;
+      const amp = this.p.ecg_amp_mv;
+      if (this.mode === 'asystole') return 0;
+      if (this.mode === 'vf') return 0.5 * amp * this.fib.vf.step(this.dt);
+      if (this.mode === 'af') return this.gain * this.z + 0.07 * amp * this.fib.af.step(this.dt);
       return this.gain * this.z;
     }
   }

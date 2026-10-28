@@ -1,7 +1,8 @@
 /* Simulation engine: advances the simulated patient and the simulated monitor
  * on a fixed 1 ms base tick (simulation time, independent of screen refresh).
  *   ECG model 1 kHz → acquired at ecg_fs   PPG 125 Hz   impedance 50 Hz
- *   NIBP cuff 100 Hz                       numerics + temperature 1 Hz
+ *   NIBP cuff 100 Hz   capnogram 50 Hz     arterial line 125 Hz
+ *   numerics, temperature and rhythm analysis 1 Hz
  * Waveforms go into ring buffers (absolute sample indices) that the UI reads;
  * once per simulated second a numeric frame is emitted. The engine never
  * touches the DOM, so it runs unchanged under Node for the unit tests. */
@@ -9,20 +10,26 @@
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./dsp.js'), require('./rng.js'), require('./ecg.js'), require('./pulse.js'),
       require('./sensors.js'), require('./nibp.js'), require('./detectors.js'), require('./params.js'),
-      require('../core/observation.js'));
+      require('../core/observation.js'), require('./arrhythmia.js'));
   } else {
     const P = root.PM;
-    P.engine = factory(P.dsp, P.rng, P.ecg, P.pulse, P.sensors, P.nibp, P.detectors, P.params, P.observation);
+    P.engine = factory(P.dsp, P.rng, P.ecg, P.pulse, P.sensors, P.nibp, P.detectors, P.params, P.observation, P.arrhythmia);
   }
-})(this, function (dsp, rngMod, ecgMod, pulse, sensors, nibpMod, det, params, observation) {
+})(this, function (dsp, rngMod, ecgMod, pulse, sensors, nibpMod, det, params, observation, arr) {
   'use strict';
 
   const DT = 1e-3;
-  const PPG_FS = 125, RESP_FS = 50, CUFF_FS = 100;
+  const PPG_FS = 125, RESP_FS = 50, CUFF_FS = 100, CAP_FS = 50, ART_FS = 125;
   const PAT = 0.20;       // s, R peak → peripheral pulse foot (pulse arrival time, illustrative)
   const BUFFER_S = 60;    // seconds of waveform kept for display
+  const TAP_S = 12;       // seconds kept per signal-chain probe point
 
-  const ECG_KEYS = ['hr', 'rhythm', 'hrv_ms', 'ecg_amp_mv', 'p_scale', 't_scale', 'qrs_width'];
+  const PMSF = 10;        // mmHg, pressure the arteries settle to without heartbeats (illustrative mean systemic filling pressure)
+  const HYDRO_MMHG_PER_CM = 0.7356; // 1 cmH2O in mmHg (saline column between transducer and heart level)
+  // Catheter–tubing–transducer as a 2nd-order system (natural frequency fn, damping ζ); illustrative values.
+  const IBP_DAMPING = { optimal: { fn: 20, zeta: 0.6 }, 'under-damped': { fn: 6, zeta: 0.1 }, 'over-damped': { fn: 4, zeta: 1.5 } };
+
+  const ECG_KEYS = ['hr', 'rhythm', 'hrv_ms', 'ecg_amp_mv', 'p_scale', 't_scale', 'qrs_width', 'arrhythmia', 'pvc_per_min'];
   const ECG_CHAIN_KEYS = ['ecg_fs', 'ecg_filter', 'notch', 'mains_hz'];
 
   class Engine {
@@ -37,15 +44,22 @@
       this.k = 0; this.t = 0; this.carry = 0;
       this.startEpoch = Date.now();
       this.pulseBeats = [];
-      this.trueR = [];
-      this.ecg = new ecgMod.EcgGenerator(this.p, new rngMod.Rng(seed + 2), DT);
-      this.ecg.onR = (tR, rr) => {
+      this.trueR = []; this.trueKinds = [];
+      this.lastBeatT = 0; this.perf = 1;
+      if (this.taps) this.taps = {}; // probes stay enabled across a reset
+      this.ecg = new ecgMod.EcgGenerator(this.p, new rngMod.Rng(seed + 2), DT, new rngMod.Rng(seed + 10));
+      this.ecg.onR = (tR, rr, beat) => {
         this.trueR.push(tR); if (this.trueR.length > 64) this.trueR.shift();
-        this.pulseBeats.push({ t0: tR + PAT, T: rr }); if (this.pulseBeats.length > 6) this.pulseBeats.shift();
+        this.trueKinds.push(beat.kind); if (this.trueKinds.length > 64) this.trueKinds.shift();
+        this.lastBeatT = tR;
+        this.pulseBeats.push({ t0: tR + PAT, T: rr, amp: beat.amp }); if (this.pulseBeats.length > 6) this.pulseBeats.shift();
       };
       this.ppg = new sensors.PpgSensor(new rngMod.Rng(seed + 3), new rngMod.MotionSource(new rngMod.Rng(seed + 4)));
       this.resp = new sensors.RespSensor(new rngMod.Rng(seed + 5), this.motion);
       this.temp = new sensors.TempSensor(new rngMod.Rng(seed + 6), this.p.temp);
+      this.capno = new sensors.CapnoSensor(new rngMod.Rng(seed + 11));
+      this.artNoise = new rngMod.Rng(seed + 12);
+      this.ibpX = this.p.dbp; this.ibpV = 0;
       this.nibp = new nibpMod.Nibp(new rngMod.Rng(seed + 7), this.motion);
       this.nibp.onDone = res => { this.nibpEvent = res; if (this.onNibp) this.onNibp(res, this.t); };
       this.ecgDrop = new sensors.Dropouts(new rngMod.Rng(seed + 8));
@@ -53,9 +67,12 @@
       this.plethS = new dsp.Ring(PPG_FS * BUFFER_S);
       this.respS = new dsp.Ring(RESP_FS * BUFFER_S);
       this.cuffS = new dsp.Ring(CUFF_FS * BUFFER_S);
+      this.capS = new dsp.Ring(CAP_FS * BUFFER_S);
+      this.artS = new dsp.Ring(ART_FS * BUFFER_S);
+      this.capnoDet = new det.CapnoDetector();
       this.spo2Est = new det.SpO2Estimator(PPG_FS);
       this.breath = new det.BreathDetector(RESP_FS);
-      this.lastNaN = { ecg: -Infinity, ppg: -Infinity, resp: -Infinity };
+      this.lastNaN = { ecg: -Infinity, ppg: -Infinity, resp: -Infinity, cap: -Infinity };
       this.lastFrame = null; this.nibpEvent = null;
       this.tempReading = { value: null, status: 'starting' };
       this.scheduleNibp();
@@ -68,6 +85,8 @@
         this.ecgS = new dsp.Ring(fs * BUFFER_S); this.ecgS.fs = fs;
         this.qrs = new det.PanTompkins(fs);
         this.qrsTimes = [];
+        this.rhythm = new arr.RhythmAnalyzer(fs);
+        this.rhythm.reset(this.t);
       }
       const st = [];
       if (p.ecg_filter === 'monitor') st.push(dsp.bandpass(0.5, 40, fs));
@@ -75,6 +94,15 @@
       if (p.notch === 'on' && p.mains_hz < fs / 2) st.push(dsp.notch(p.mains_hz, fs, 30));
       this.ecgFilter = new dsp.Chain(st);
       this.ecgDec = Math.round(1000 / fs);
+    }
+
+    /** Signal-chain probe points for teaching views. Off by default so the
+     *  simulation pays nothing for them. Each probe is a Ring with its own fs. */
+    enableTaps(on) { this.taps = on ? (this.taps || {}) : null; }
+    tap(name, fs, v) {
+      let r = this.taps[name];
+      if (!r || r.fs !== fs) { r = this.taps[name] = new dsp.Ring(Math.round(fs * TAP_S)); r.fs = fs; }
+      r.push(v);
     }
 
     scheduleNibp() { this.nextAutoNibp = this.p.nibp_interval > 0 ? this.t + this.p.nibp_interval * 60 : Infinity; }
@@ -109,9 +137,11 @@
       const t = this.t = this.k * DT;
       const clean = this.ecg.step();
       this.resp.advance(DT, p.rr);
+      this.updatePerfusion(t);
+      this.stepTransducer(t);
       if (this.k % this.ecgDec === 0) this.acquireEcg(t, clean);
-      if (this.k % 8 === 0) this.acquirePpg(t);
-      if (this.k % 20 === 0) this.acquireResp(t);
+      if (this.k % 8 === 0) { this.acquirePpg(t); this.acquireArt(t); }
+      if (this.k % 20 === 0) { this.acquireResp(t); this.acquireCapno(t); }
       if (this.k % 10 === 0) this.acquireCuff(t);
       if (this.k % 1000 === 0) this.emitFrame(t);
     }
@@ -127,14 +157,23 @@
         x = clean + wander + noise + mains;
       } else this.lastNaN.ecg = t;
       const r = this.qrs.process(x, t); // detector sees the acquired (unfiltered-for-display) signal
-      if (r !== null) { this.qrsTimes.push(r); if (this.qrsTimes.length > 64) this.qrsTimes.shift(); }
-      this.ecgS.push(this.ecgFilter.process(x));
+      this.rhythm.process(x, t);
+      if (r !== null) { this.qrsTimes.push(r); if (this.qrsTimes.length > 64) this.qrsTimes.shift(); this.rhythm.onQrs(r); }
+      const y = this.ecgFilter.process(x);
+      this.ecgS.push(y);
+      if (this.taps) {
+        this.tap('ecg.clean', fs, clean); this.tap('ecg.acq', fs, x); this.tap('ecg.disp', fs, y);
+        this.tap('ecg.mwi', fs, Number.isFinite(x) ? this.qrs.m1 : NaN);
+        this.tap('ecg.thr', fs, Number.isFinite(this.qrs.thr) && Number.isFinite(x) ? this.qrs.thr : NaN);
+      }
     }
 
     acquirePpg(t) {
       const s = this.ppg.sample(t, 1 / PPG_FS, this.p, this.pulseBeats);
       if (!Number.isFinite(s.ir)) this.lastNaN.ppg = t;
-      this.plethS.push(this.spo2Est.process(s.red, s.ir, t, this.p.spo2_avg));
+      const pleth = this.spo2Est.process(s.red, s.ir, t, this.p.spo2_avg);
+      this.plethS.push(pleth);
+      if (this.taps) { this.tap('ppg.red', PPG_FS, s.red); this.tap('ppg.ir', PPG_FS, s.ir); this.tap('ppg.ac', PPG_FS, pleth); }
     }
 
     acquireResp(t) {
@@ -142,11 +181,50 @@
       if (!Number.isFinite(z)) this.lastNaN.resp = t;
       this.breath.process(z, t, this.p.resp_thr);
       this.respS.push(z);
+      if (this.taps) { this.tap('resp.raw', RESP_FS, z); this.tap('resp.bp', RESP_FS, Number.isFinite(z) ? this.breath.y : NaN); }
     }
 
+    /** Circulation state 0..1: relaxes to 1 (τ 0.8 s) while beats arrive, decays (τ 1.5 s)
+     *  when no beat has come for 2 expected intervals (VF, asystole). Illustrative. */
+    updatePerfusion(t) {
+      if (t - this.lastBeatT < 2 * 60 / this.p.hr + 0.5) this.perf += (1 - this.perf) * DT / 0.8;
+      else this.perf -= this.perf * DT / 1.5;
+    }
+
+    /** True arterial pressure (mmHg): diastolic level scaled by circulation + pulse train. */
     arterialPressure(t) {
       const p = this.p;
-      return p.dbp + (p.sbp - p.dbp) * Math.min(1, pulse.train(this.pulseBeats, t));
+      return PMSF + (p.dbp - PMSF) * this.perf + (p.sbp - p.dbp) * Math.min(1, pulse.train(this.pulseBeats, t));
+    }
+
+    /** Fluid-filled line: x'' + 2ζωn x' + ωn² x = ωn² (P_art − hydrostatic offset), semi-implicit Euler at 1 kHz. */
+    stepTransducer(t) {
+      const p = this.p, D = IBP_DAMPING[p.ibp_damping], wn = 2 * Math.PI * D.fn;
+      const target = p.ibp_line === 'open-to-air' ? 0 : this.arterialPressure(t) - HYDRO_MMHG_PER_CM * p.ibp_height_cm;
+      this.ibpV += (wn * wn * (target - this.ibpX) - 2 * D.zeta * wn * this.ibpV) * DT;
+      this.ibpX += this.ibpV * DT;
+    }
+
+    acquireArt(t) {
+      this.artS.push(this.ibpX + this.artNoise.gauss() * 0.3);
+      if (this.taps) { this.tap('art.true', ART_FS, this.arterialPressure(t)); this.tap('art.meas', ART_FS, this.artS.at(this.artS.total - 1)); }
+    }
+
+    acquireCapno(t) {
+      const c = this.capno.sample(this.resp, this.p, this.perf);
+      if (!Number.isFinite(c)) this.lastNaN.cap = t;
+      this.capnoDet.process(c, t);
+      this.capS.push(c);
+      if (this.taps) this.tap('cap.meas', CAP_FS, c);
+    }
+
+    /** Systolic = max, diastolic = min, mean = average of the last 4 s of the arterial trace. */
+    arterialNumbers() {
+      const a = this.artS.last(4 * ART_FS);
+      if (a.length < ART_FS) return null;
+      let sys = -Infinity, dia = Infinity, sum = 0;
+      for (const v of a) { if (v > sys) sys = v; if (v < dia) dia = v; sum += v; }
+      return { sys, dia, map: sum / a.length };
     }
 
     acquireCuff(t) {
@@ -162,14 +240,22 @@
       const spo = this.spo2Est.out;
       const leadsOff = p.contact < 10;
       const apnea = this.breath.apnea(t, p.apnea_delay);
+      const rh = this.rhythm.analyse(t, leadsOff);
+      const art = this.arterialNumbers();
+      const artNoPulse = art !== null && art.sys - art.dia < 5 && Math.abs(art.map) < 5;
+      const capFi = p.fico2, capEt = capFi + Math.max(0, p.etco2 - capFi) * (0.15 + 0.85 * this.perf);
       const frame = {
         t, timestamp: this.startEpoch + t * 1000,
-        truth: { hr: p.hr, spo2: p.spo2, sbp: p.sbp, dbp: p.dbp, map: (p.sbp + 2 * p.dbp) / 3, rr: p.rr, temp: p.temp },
+        truth: { hr: p.hr, spo2: p.spo2, sbp: p.sbp, dbp: p.dbp, map: (p.sbp + 2 * p.dbp) / 3, rr: p.rr, temp: p.temp,
+          etco2: p.capno_sensor === 'ok' ? capEt : null, arrhythmia: p.arrhythmia, perfusion: this.perf },
         est: {
-          hr: leadsOff ? null : this.qrs.heartRate(t),
+          hr: leadsOff || rh.rhythm === 'vfib' || rh.rhythm === 'asystole' ? null : this.qrs.heartRate(t),
+          rhythm: rh.rhythm, rhythmLabel: rh.label, pvcPerMin: rh.pvcPerMin, qrsWidthMs: rh.qrsWidthMs,
           pr: spo.pr, spo2: spo.spo2, sqi: spo.sqi, pi: spo.pi, spo2Status: spo.status,
           rr: this.breath.rate(t, p.apnea_delay), apnea,
           temp: this.tempReading.value, tempStatus: this.tempReading.status, tempRaw: this.tempReading.raw,
+          etco2: this.capnoDet.etco2(t, p.apnea_delay), fico2: this.capnoDet.fico2(t, p.apnea_delay), awrr: this.capnoDet.rate(t, p.apnea_delay),
+          art: art && !artNoPulse ? art : null,
         },
         nibp: { state: this.nibp.state, cuff: this.nibp.cuff, msg: this.nibp.msg, last: this.nibp.last, result: this.nibpEvent },
         technical: {
@@ -182,6 +268,8 @@
           tempUnavailable: this.tempReading.status === 'unavailable',
           tempError: this.tempReading.status === 'error',
           nibpFailed: this.nibp.state === 'failed',
+          capnoNoSignal: t - this.lastNaN.cap < 1,
+          artNoPulse,
         },
       };
       this.nibpEvent = null;
@@ -204,6 +292,14 @@
     sim('spo2_sqi', f.est.sqi, { method: 'R consistency over 4 × 1 s' });
     sim('pi', f.est.pi, { method: 'IR AC/DC × 100' }, lowSqi);
     sim('rr', f.est.rr, { method: 'impedance breath detector', setpoint: f.truth.rr, apnea: f.est.apnea });
+    if (f.est.etco2 !== undefined)
+      sim('etco2', f.est.etco2, { method: 'capnogram peak per breath', setpoint: f.truth.etco2, fico2: f.est.fico2, awrr: f.est.awrr });
+    if (f.est.art !== undefined) {
+      const a = f.est.art || {}, prov = { method: 'arterial line, 4-s window (max / min / mean)', setpointSbp: f.truth.sbp, setpointDbp: f.truth.dbp };
+      sim('art_sys', a.sys === undefined ? null : a.sys, prov);
+      sim('art_dia', a.dia === undefined ? null : a.dia, prov);
+      sim('art_map', a.map === undefined ? null : a.map, prov);
+    }
     if (f.est.tempStatus === 'error') sim('temp', f.est.tempRaw, { method: 'probe', status: 'error' }, O.QUALITY.INVALID);
     else sim('temp', f.est.temp, { method: 'probe, first-order lag', setpoint: f.truth.temp, status: f.est.tempStatus });
     const r = f.nibp.result;
@@ -219,5 +315,5 @@
   /** MAP ≈ (SBP + 2·DBP)/3 — the textbook single-beat approximation (derived, not measured). */
   const mapFormula = (sbp, dbp) => (sbp + 2 * dbp) / 3;
 
-  return { Engine, frameObservations, mapFormula, DT, PPG_FS, RESP_FS, CUFF_FS, PAT };
+  return { Engine, frameObservations, mapFormula, DT, PPG_FS, RESP_FS, CUFF_FS, CAP_FS, ART_FS, PAT, IBP_DAMPING, HYDRO_MMHG_PER_CM, TAP_S };
 });

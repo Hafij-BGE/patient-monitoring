@@ -56,9 +56,17 @@
       <div class="wave-label"><span>PLETH (IR)</span><span class="wave-scale">auto scale</span></div>
       <canvas id="cvPleth" aria-label="Simulated plethysmogram"></canvas>
     </div>
+    <div class="wave" data-ch="art">
+      <div class="wave-label"><span>ART</span><span class="wave-scale">0–200 mmHg</span></div>
+      <canvas id="cvArt" aria-label="Simulated invasive arterial pressure"></canvas>
+    </div>
     <div class="wave" data-ch="resp">
       <div class="wave-label"><span>RESP (impedance)</span><span class="wave-scale">auto scale</span></div>
       <canvas id="cvResp" aria-label="Simulated impedance respiration waveform"></canvas>
+    </div>
+    <div class="wave" data-ch="co2">
+      <div class="wave-label"><span>CO₂</span><span class="wave-scale">0–60 mmHg</span></div>
+      <canvas id="cvCo2" aria-label="Simulated capnogram"></canvas>
     </div>
     <div class="wave" data-ch="cuff">
       <div class="wave-label"><span>CUFF</span><span class="wave-scale">0–300 mmHg</span></div>
@@ -71,6 +79,7 @@
       <div class="t-head"><span>HR</span><span class="unit">bpm</span></div>
       <div class="t-val" id="vHr">--</div>
       <div class="t-foot"><span id="sHr"></span><span class="lim" id="lHr"></span></div>
+      <div class="t-sub">Rhythm <b id="vRhythm">--</b> · PVC <b id="vPvc">--</b>/min</div>
     </div>
     <div class="tile" data-ch="pleth" id="tSpo2">
       <div class="t-head"><span>SpO₂</span><span class="unit">%</span></div>
@@ -88,6 +97,17 @@
         <button id="btnNibp">Start NIBP</button>
         <button id="btnNibpStop">Stop</button>
       </div>
+    </div>
+    <div class="tile" data-ch="art" id="tArt">
+      <div class="t-head"><span>ART</span><span class="unit">mmHg</span></div>
+      <div class="t-val"><span id="vArt">--/--</span> <small>(<span id="vArtMap">--</span>)</small></div>
+      <div class="t-foot"><span id="sArt"></span><span class="lim" id="lArt"></span></div>
+    </div>
+    <div class="tile" data-ch="co2" id="tCo2">
+      <div class="t-head"><span>EtCO₂</span><span class="unit">mmHg</span></div>
+      <div class="t-val" id="vEtco2">--</div>
+      <div class="t-foot"><span id="sEtco2"></span><span class="lim" id="lEtco2"></span></div>
+      <div class="t-sub">FiCO₂ <b id="vFico2">--</b> · awRR <b id="vAwrr">--</b></div>
     </div>
     <div class="tile" data-ch="resp" id="tRr">
       <div class="t-head"><span>RR</span><span class="unit">br/min</span></div>
@@ -116,6 +136,8 @@
   <button role="tab" data-tab="trends">Trends</button>
   <button role="tab" data-tab="data">Data import/export</button>
   <button role="tab" data-tab="profile">Profile</button>
+  <button role="tab" data-tab="chain">Signal chain</button>
+  <button role="tab" data-tab="lessons">Lessons</button>
   <button role="tab" data-tab="science">Science</button>
   <button role="tab" data-tab="tests">Tests</button>
   <button role="tab" data-tab="refs">References</button>
@@ -218,6 +240,7 @@
       <div id="storeSummary" class="table-wrap"></div>
     </div>
   </div>
+  <div id="androidPanel" class="android-panel" hidden></div>
 </section>
 
 <section class="panel" data-panel="profile" hidden>
@@ -246,6 +269,27 @@
     The profile does not change the simulated signals. It stays in this tab.</p>
 </section>
 
+<section class="panel" data-panel="chain" hidden>
+  <p class="hint">How one channel travels from the simulated patient to the number on the screen. Each plot is a probe point inside the simulation,
+    drawn over the same time window (newest sample on the right). Change a control or a scenario and watch which stages change.</p>
+  <div class="row">
+    <label>Channel <select id="chSel" aria-label="Channel shown in the signal chain"></select></label>
+    <button id="chPng" type="button">Save last stage as PNG</button>
+  </div>
+  <p id="chIntro" class="chain-intro"></p>
+  <div id="chStages" class="stages"></div>
+  <p id="chReadout" class="chain-readout" aria-live="off"></p>
+</section>
+
+<section class="panel" data-panel="lessons" hidden>
+  <p class="hint">Short guided exercises on the simulator, each with a self-check quiz. The questions are about how this simulated monitor
+    measures; they are teaching material, not clinical guidance. Best scores are kept in this browser only.</p>
+  <div class="lessons">
+    <nav aria-label="Lessons"><ol id="lsList" class="ls-list"></ol></nav>
+    <article id="lsBody" class="ls-body"></article>
+  </div>
+</section>
+
 <section class="panel prose" data-panel="science" hidden>
   <h2>Models used (summary)</h2>
   <p>The full derivation, parameters and assumptions are in <code>TECHNICAL_REPORT.md</code>. All models are simplified teaching models.
@@ -270,6 +314,22 @@
     A band-pass filter and hysteresis threshold detect breaths. If no breath is detected for the apnea delay, apnea is declared.</p>
   <h3>Temperature: first-order probe</h3>
   <p class="eq">dT<sub>probe</sub>/dt = (T<sub>true</sub> − T<sub>probe</sub>) / τ</p>
+  <h3>Capnography: time-based CO₂ waveform</h3>
+  <p>The same breath oscillator drives the capnogram. During inspiration CO₂ falls to the inspired level FiCO₂ (phase 0). During expiration it stays at FiCO₂ for the dead space (phase I),
+    rises with time constant τ (phase II) and ends on a slightly rising plateau (phase III). EtCO₂ is the maximum of each breath.</p>
+  <p class="eq">c(v) = FiCO₂ + (P<sub>plateau</sub> − FiCO₂) · (1 − e<sup>−v/τ</sup>) / (1 − e<sup>−1/τ</sup>),   τ = 0.035 + 0.35 · obstruction</p>
+  <p>P<sub>plateau</sub> falls with cardiac output: with no perfusion (V-Fib, asystole) little CO₂ reaches the lungs, so EtCO₂ drops. Airway obstruction slows phase II ("shark fin").
+    Rebreathing lifts the inspired baseline. These are qualitative teaching shapes. Gas sampling delay and water traps are not modelled.</p>
+  <h3>Invasive arterial pressure: second-order transducer</h3>
+  <p>The fluid-filled catheter and transducer act as a second-order system with natural frequency f<sub>n</sub> and damping ratio ζ (Gardner 1981):</p>
+  <p class="eq">ẍ = ω<sub>n</sub>² (P<sub>art</sub> − h·0.7356 − x) − 2ζω<sub>n</sub> ẋ,   ω<sub>n</sub> = 2π f<sub>n</sub></p>
+  <p>Optimal: f<sub>n</sub> 20 Hz, ζ 0.6. Under-damped: 6 Hz, ζ 0.1 (systolic overshoot, ringing). Over-damped: 4 Hz, ζ 1.5 (blunted systolic, raised diastolic).
+    The mean pressure is almost unchanged in each case. h is the transducer height above the heart in cm; 1 cm of water ≈ 0.7356 mmHg. A line open to air reads 0.</p>
+  <h3>Rhythm analysis: rule-based teaching analyser</h3>
+  <p>The monitor band-passes the acquired ECG (0.5–40 Hz) and measures each detected QRS width. It then applies simple rules every second:
+    almost flat trace → asystole; no QRS for 4 s on a busy trace, or wide chaotic complexes → V-Fib; the last 4 complexes wide above 100 bpm → V-Tach;
+    narrow-to-narrow RR coefficient of variation above 0.12 → irregular; any wide complex in the last 60 s → PVCs. The first 8 s are "learning".
+    The thresholds were tuned on this simulator's own waveforms. This is not a validated arrhythmia algorithm (IEC 60601-2-27 requires testing against annotated databases) and it gives no diagnosis.</p>
   <h3>Main components of a bedside monitor</h3>
   <p>This is a generic block diagram from the textbook literature (Webster, <i>Medical Instrumentation</i>; Webster, <i>Design of Pulse Oximeters</i>; Allen 2007; Forouzanfar et al. 2015). It describes no specific product and claims no device specifications.</p>
   <ul>
@@ -284,7 +344,8 @@
 
   <h3>Simplifying assumptions</h3>
   <ul>
-    <li>One ECG lead with a fixed morphology. No conduction disorders are modelled.</li>
+    <li>One ECG lead with a fixed morphology. The arrhythmias are five teaching patterns (AF, PVCs, V-Tach, V-Fib, asystole). Blocks, flutter and paced rhythms are not modelled.</li>
+    <li>Perfusion is one number between 0 and 1. It falls when no effective beat occurs and drives the arterial pressure, the pulse and the EtCO₂.</li>
     <li>The pulse has a fixed shape and arrives 0.20 s after the R wave. ECG, PPG, pressure and respiration share the same beat times.</li>
     <li>The PPG uses two wavelengths and a linear calibration. Venous pulsation, ambient light and dyshaemoglobins (COHb, MetHb) are not modelled.</li>
     <li>Breathing is regular, with I:E = 1:2.</li>
@@ -301,9 +362,10 @@
       <ul>
         <li>oximeter bias from skin pigmentation and low perfusion (FDA 2021)</li>
         <li>cuff-size errors</li>
-        <li>arrhythmia analysis</li>
+        <li>validated arrhythmia detection (the analyser here is illustrative)</li>
         <li>pacemaker pulses</li>
-        <li>invasive-pressure catheter dynamics</li>
+        <li>catheter whip, air bubbles and clots in the arterial line</li>
+        <li>sidestream gas-sampling delay</li>
         <li>electrosurgical interference</li>
         <li>electrical safety and isolation</li>
       </ul>
@@ -338,6 +400,9 @@
     <li>Mosteller RD. Simplified calculation of body-surface area. <i>N Engl J Med</i>. 1987;317(17):1098.</li>
     <li>World Health Organization. Body mass index (BMI) classification for adults.</li>
     <li>IEC 60601-1-8: Medical electrical equipment, general requirements for alarm systems (vocabulary only; this app is not a compliant alarm system).</li>
+    <li>Gardner RM. Direct blood pressure measurement: dynamic response requirements. <i>Anesthesiology</i>. 1981;54(3):227–236.</li>
+    <li>Gravenstein JS, Jaffe MB, Gravenstein N, Paulus DA, eds. <i>Capnography</i>. 2nd ed. Cambridge University Press; 2011.</li>
+    <li>IEC 60601-2-27: Particular requirements for electrocardiographic monitoring equipment (cited for what a validated arrhythmia algorithm needs; this app does not comply).</li>
     <li>Bluetooth SIG. Heart Rate Service 1.0 and GATT Specification Supplement (Heart Rate Measurement 0x2A37). Used by the Android app only.</li>
     <li>Regenstrief Institute. The Unified Code for Units of Measure (UCUM). https://ucum.org/</li>
   </ol>
@@ -356,6 +421,7 @@
 <script src="src/core/profile.js"></script>
 <script src="src/sim/rng.js"></script>
 <script src="src/sim/dsp.js"></script>
+<script src="src/sim/arrhythmia.js"></script>
 <script src="src/sim/pulse.js"></script>
 <script src="src/sim/ecg.js"></script>
 <script src="src/sim/sensors.js"></script>
@@ -367,12 +433,17 @@
 <script src="src/data/csv.js"></script>
 <script src="src/data/importer.js"></script>
 <script src="src/devices/gatt.js"></script>
+<script src="src/devices/androidBridge.js"></script>
+<script src="src/lessons/lessons.js"></script>
 <!-- UI -->
 <script src="src/ui/dom.js"></script>
 <script src="src/ui/waveforms.js"></script>
 <script src="src/ui/trends.js"></script>
 <script src="src/ui/panels.js"></script>
 <script src="src/ui/dataPanel.js"></script>
+<script src="src/ui/chainPanel.js"></script>
+<script src="src/ui/lessonsPanel.js"></script>
+<script src="src/ui/androidPanel.js"></script>
 <script src="src/ui/selftest.js"></script>
 <script src="src/ui/app.js"></script>
 </body>

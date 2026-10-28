@@ -24,16 +24,17 @@ The set point of every parameter is known, so the app shows each estimate next t
 | Layer | Files | Role |
 |---|---|---|
 | Core data | `src/core/observation.js`, `units.js`, `profile.js`, `store.js` | Observation model, unit conversion, BMI/BSA, per-source time series |
-| Simulation | `src/sim/params.js`, `rng.js`, `dsp.js`, `ecg.js`, `pulse.js`, `sensors.js`, `nibp.js`, `detectors.js`, `engine.js` | Parameters, presets, signal models, estimators, the time-stepping engine |
-| Alarms | `src/alarms/alarmEngine.js` | Limit checks, delays, priorities, acknowledge, audio pause, history |
+| Simulation | `src/sim/params.js`, `rng.js`, `dsp.js`, `ecg.js`, `arrhythmia.js`, `pulse.js`, `sensors.js`, `nibp.js`, `detectors.js`, `engine.js` | Parameters, presets, signal models, arrhythmia patterns, estimators, the time-stepping engine |
+| Alarms | `src/alarms/alarmEngine.js` | Limit checks, rhythm alarms, delays, priorities, acknowledge, audio pause, history |
 | Data I/O | `src/data/csv.js`, `importer.js` | CSV/JSON parsing, column mapping, units, time zones, validation |
-| Device parser | `src/devices/gatt.js` | Parser for the Bluetooth Heart Rate Measurement characteristic (0x2A37), used by the Android app's BLE route |
-| UI | `src/ui/*.js`, `index.html`, `css/` | Canvas rendering, panels (Controls, NIBP, Alarms, Trends, Data import/export, Profile, Science, Tests, References) and wiring |
-| Android host | `android/` (Kotlin) | WebView wrapper around the same page, with a Health Connect reader and a native BLE Heart Rate client (in development) |
+| Lessons | `src/lessons/lessons.js` | Lesson content (objectives, steps, quiz questions) and quiz grading; no DOM |
+| Device parser and bridge | `src/devices/gatt.js`, `androidBridge.js` | Parser for the Bluetooth Heart Rate Measurement characteristic (0x2A37); conversion of Health Connect records and BLE packets from the Android app into observations |
+| UI | `src/ui/*.js` (including `chainPanel.js`, `lessonsPanel.js`, `androidPanel.js`), `index.html`, `css/` | Canvas rendering, panels and wiring. Tabs: Controls, NIBP, Alarms, Trends, Data import/export, Profile, Signal chain, Lessons, Science, Tests, References |
+| Android host | `android/` (Kotlin) | WebView wrapper around the same page, with a Health Connect reader, a native BLE Heart Rate client and a save dialog for exports (not tested with real hardware) |
 
 The simulation, alarm, data and parser modules never touch the DOM. Each uses a UMD wrapper, so the same file runs in the browser (`window.PM.*`) and in Node for the unit tests. There is no build step and no ES-module import, so `index.html` also works from `file://`.
 
-**Website and Android app.** The page is published as a static website at https://hafij-bge.github.io/patient-monitoring/ by the GitHub Actions workflow `.github/workflows/pages.yml`, which runs the unit tests and then deploys `index.html`, `css/`, `src/` and `fixtures/`. It can also be served locally (`python3 -m http.server 8766`) or opened from `file://`. The Content Security Policy (`connect-src 'none'`) means the page makes no network requests. The Android app (`android/`, package `edu.deu.pmsim`, version 1.1.0) wraps the same page in a WebView. It is the only place where real watch data enters (section 7.2) and it is still in development. An earlier Electron desktop app (Linux `.deb`, Windows build) was removed on 2026-10-28; the published GitHub release v1.0.0 stays online as an old version that is no longer built.
+**Website and Android app.** The page is published as a static website at https://hafij-bge.github.io/patient-monitoring/ by the GitHub Actions workflow `.github/workflows/pages.yml`, which runs the unit tests and then deploys `index.html`, `css/`, `src/` and `fixtures/`. It can also be served locally (`python3 -m http.server 8766`) or opened from `file://`. The Content Security Policy (`connect-src 'none'`) means the page makes no network requests. The Android app (`android/`, package `edu.deu.pmsim`, version 1.1.0) wraps the same page in a WebView. It is the only place where real watch data enters (section 7.2) and it has not been tested with real hardware. The earlier Electron desktop app (with the hospital routes and the Windows build) was removed on 2026-10-28. For v1.1.0 a new, minimal Linux desktop app was added in `desktop/`: an Electron shell that shows the same page from inside a `.deb` package, with no preload script, no Node access in the page and no device access, so the page's CSP applies unchanged. It was smoke-tested under a virtual X display (Xvfb): the page loaded and the browser self-test gave 14 passed, 0 failed, 1 not run.
 
 ### 2.1 Time base
 
@@ -44,10 +45,12 @@ The engine advances in fixed steps of **Δt = 1 ms**. Each subsystem samples at 
 | ECG | 1000 Hz (ODE) | `ecg_fs` = 125, 250, 500 or 1000 Hz | decimated from the 1 kHz model |
 | PPG red/IR | — | 125 Hz | |
 | Impedance respiration | — | 50 Hz | |
+| Capnogram (CO₂) | — | 50 Hz | driven by the respiration phase |
+| Arterial line (ART) | 1000 Hz (transducer ODE) | 125 Hz | |
 | Cuff pressure | — | 100 Hz | |
-| Numerics, temperature, alarms | — | 1 Hz | one *frame* per simulated second |
+| Numerics, rhythm analysis, temperature, alarms | — | 1 Hz | one *frame* per simulated second |
 
-Waveforms are kept in 60 s ring buffers. The UI calls `engine.advance(dt × speed)` from `requestAnimationFrame`, with dt capped at 0.1 s, so the playback speed (0.25–4×) changes simulated time, not the models.
+Waveforms are kept in 60 s ring buffers. For the Signal chain tab the engine also keeps the intermediate signals of each stage ("taps") for the last 12 s. The UI calls `engine.advance(dt × speed)` from `requestAnimationFrame`, with dt capped at 0.1 s, so the playback speed (0.25–4×) changes simulated time, not the models.
 
 Every random process uses its own seeded generator (seed + subsystem index), so the same seed and the same settings give an identical run. A unit test checks this.
 
@@ -78,7 +81,7 @@ with z₀ = 0 (baseline wander is added later, at acquisition). Parameters are t
 - regular: RRᵢ = 60/HR + N(0, σ²), where σ = `hrv_ms`,
 - irregular: RRᵢ = (60/HR) · (0.65 + 0.7 U), U ~ uniform(0, 1), that is, uniformly within ±35 %,
 
-then limited to 0.5–1.6 × the mean interval and to 0.25–3 s. The irregular mode is a timing demonstration only. It does not model atrial fibrillation.
+then limited to 0.5–1.6 × the mean interval and to 0.25–3 s. The irregular mode is a timing demonstration only. It does not model atrial fibrillation. A separate AF teaching pattern (no P waves, fibrillatory baseline) is described in section 3.10.
 
 **Acquisition.** At `ecg_fs` the acquired signal is
 
@@ -96,7 +99,17 @@ The arterial pulse is a shape function triggered by each simulated beat, delayed
 
 $$s(u) = g(u; 0.18, 0.07) + 0.45\, g(u; 0.45, 0.09),\qquad g(u;\mu,\sigma) = \exp\!\left(-\frac{(u-\mu)^2}{2\sigma^2}\right)$$
 
-The sum is detrended and normalised to 0…1. The first Gaussian stands for the systolic wave and the second for a late reflected or diastolic component. The shape and the 0.20 s delay are **illustrative teaching choices**, not values fitted to measured data. The arterial pressure used by the cuff model is p_art(t) = DBP + (SBP − DBP) · s(t).
+The sum is detrended and normalised to 0…1. The first Gaussian stands for the systolic wave and the second for a late reflected or diastolic component. The shape and the 0.20 s delay are **illustrative teaching choices**, not values fitted to measured data.
+
+**True arterial pressure.** The pressure in the artery, used by the cuff model (section 3.6) and the arterial line (section 3.9), is
+
+$$p_{art}(t) = P_{MSF} + (DBP - P_{MSF})\cdot perf + (SBP - DBP)\cdot\min(1, s(t))$$
+
+- P_MSF = 10 mmHg is an illustrative mean systemic filling pressure: the level the arteries settle to without heartbeats.
+- perf (0–1) is a perfusion state. It relaxes toward 1 with a time constant of 0.8 s while beats arrive. When no beat has come for 2 × 60/HR + 0.5 s (V-Fib, asystole), it decays with a time constant of 1.5 s. Both time constants are illustrative.
+- Each beat in the pulse train has an amplitude: 1 for a normal beat, 0.4 for a PVC and 0.5 for a V-Tach beat (teaching choices). A weak beat therefore gives a smaller pulse in the pleth, the ART trace and the cuff oscillations.
+
+With regular beats, perf stays at 1 and the formula reduces to DBP + (SBP − DBP) · s(t).
 
 ### 3.3 Pulse oximetry (red/IR photoplethysmogram)
 
@@ -203,6 +216,108 @@ Following Pan & Tompkins (1985), simplified:
 
 **Omitted:** the search-back for missed beats and the second (filtered-signal) threshold set of the original algorithm.
 
+### 3.8 Capnography (sidestream CO₂)
+
+**Forward model.** The CO₂ partial pressure c (mmHg) at the sampling line follows the respiration phase φ of section 3.4. FiCO₂ is the inspired level (`fico2`, 0 by default) and the plateau is
+
+$$c_{plateau} = FiCO_2 + \max(0,\ EtCO_2 - FiCO_2)\cdot(0.15 + 0.85\,perf)$$
+
+where EtCO₂ is the alveolar set point (`etco2`, default 38 mmHg) and perf is the perfusion state of section 3.2. When the circulation stops, the plateau falls toward 15 % of its normal height above FiCO₂.
+
+- **Inspiration** (φ < 1/3): the line is washed out, c = FiCO₂ + (c_end − FiCO₂) · exp(−φ/0.012), where c_end is the value at the end of the previous expiration.
+- **Expiration**, with u = (φ − 1/3)/(2/3):
+  - Dead space first: c = FiCO₂ while u < 0.06.
+  - Then an exponential rise to the plateau with a small upward slope:
+    $$c = Fi + (c_{plateau} - Fi)\,\frac{1 - e^{-v/\tau}}{1 - e^{-1/\tau}}\,(0.94 + 0.06\,v),\qquad v = \frac{u - 0.06}{0.94}$$
+  - τ = 0.035 + 0.35 · `airway_obstr`/100. Expiratory obstruction slows the rise and gives a sloped, "shark-fin" upstroke.
+- **Apnea** (RR = 0): c = FiCO₂.
+- Gaussian noise with SD 0.25 mmHg is added and the result is clipped at 0. A disconnected sampling line (`capno_sensor`) gives NaN.
+
+The phase constants, the time constants and the 15 %/85 % split are **illustrative teaching choices**.
+
+**Estimator (monitor side).** A breath starts when c rises above a threshold. The threshold is 4 mmHg for the first breath. After that it is max(2, 0.5 · (last EtCO₂ − last minimum) · exp(−Δt/6 s)), where Δt is the time since the last breath ended. The breath ends when c falls below FiCO₂ + 0.5 · (breath maximum − FiCO₂).
+
+- EtCO₂ = the maximum of the breath.
+- FiCO₂ = the minimum during inspiration.
+- awRR (airway respiratory rate) = 60 / mean of the last 4 breath intervals, reported once at least 2 intervals exist.
+- All three are null if no breath was detected within the apnea delay.
+- A NaN sample within the last 1 s raises the technical condition "CO₂ no signal".
+
+Presets: *Hypoventilation (high EtCO2)* (RR 6, EtCO₂ 58 mmHg), *Obstructed expiration* (obstruction 80 %, RR 22) and *CO2 rebreathing* (FiCO₂ 6 mmHg).
+
+### 3.9 Invasive arterial pressure (fluid-filled line)
+
+**Forward model.** A fluid-filled catheter–transducer system is modelled as a second-order system, the standard teaching model for a catheter–transducer line (Gardner 1981):
+
+$$\ddot x + 2\zeta\omega_n\dot x + \omega_n^2 x = \omega_n^2\,(p_{art} - 0.7356\cdot h)$$
+
+- x is the pressure reported by the transducer (mmHg) and ω_n = 2π f_n.
+- p_art is the true arterial pressure of section 3.2.
+- h is the transducer height above heart level (`ibp_height_cm`, −30 to +30 cm). 0.7356 mmHg/cm converts a water column to mmHg, so a transducer that is too high reads low.
+- The line state "open to air" sets the input to 0.
+- The equation is integrated with semi-implicit Euler at 1 kHz. The output is sampled at 125 Hz with Gaussian noise of SD 0.3 mmHg.
+
+| `ibp_damping` | f_n | ζ | Effect |
+|---|---|---|---|
+| optimal | 20 Hz | 0.6 | follows the true pressure |
+| under-damped | 6 Hz | 0.1 | ringing, systolic overshoot, diastolic undershoot |
+| over-damped | 4 Hz | 1.5 | blunted trace, systolic reads low |
+
+These f_n and ζ values are **illustrative**, chosen to make each case visible. They are not measured values of any catheter. The DC gain is 1 in all three cases, so the mean pressure is kept.
+
+**Estimator (monitor side).** Over the last 4 s (at least 1 s of data): SYS = maximum, DIA = minimum, MAP = mean. If SYS − DIA < 5 mmHg and |MAP| < 5 mmHg, the technical condition "ART no pulsatile signal" is raised and no ART value is reported.
+
+Presets: *Under-damped arterial line* and *Transducer too high* (20 cm).
+
+### 3.10 Arrhythmia patterns and rhythm analysis
+
+**Patient side** (`src/sim/arrhythmia.js`, `ecg.js`). The `arrhythmia` control selects one teaching pattern: none, AF, PVC, VT, VF or asystole. The patterns are simplified shapes for teaching. They are not models of the electrophysiology.
+
+- **Ventricular (wide) beats** reuse the McSharry ODE of section 3.1 with a different event set: no P wave, Q at −35 ms (SD 30 ms, −0.08), R at 0 (SD 40 ms, 1), S at +75 ms (SD 40 ms, −0.45) and a discordant T wave at min(0.3 s, 0.42 · RR) (SD 75 ms, −0.35). Times and widths are converted to angles, and amplitudes to aᵢ = Aᵢ · ω / bᵢ². The wide beat is scaled to 1.3 × `ecg_amp_mv`. These values are teaching choices.
+- **AF:** no P waves. RRᵢ = mean · (0.55 + 0.9 U), U ~ uniform(0, 1). A fibrillatory baseline of 6–9 Hz (sum of 4 sines with a random-walk frequency and a slow amplitude envelope) with amplitude 0.07 × `ecg_amp_mv` is added.
+- **PVC:** each normal cycle is followed by an early wide beat with probability min(0.5, `pvc_per_min`/HR), never two in a row. The early beat comes at about 0.6 × the mean interval and is followed by a compensatory pause.
+- **VT:** every beat is wide, at the set heart rate.
+- **VF:** no beats. The ECG is a fibrillatory signal of 3–7 Hz with amplitude 0.5 × `ecg_amp_mv`.
+- **Asystole:** no beats and a flat ECG (noise and wander are still added at acquisition).
+
+Without beats, perf falls (section 3.2), so ART, pleth and the CO₂ plateau fall as well. Presets: *AF pattern*, *Frequent PVCs* (14/min), *V-Tach pattern* (HR 170, 85/55 mmHg), *V-Fib pattern (no output)* and *Asystole pattern*.
+
+**Monitor side** (`RhythmAnalyzer` in `src/sim/detectors.js`). The analyser works on a 0.5–40 Hz band-passed copy of the ECG, keeps 6 s of it and uses the QRS times of section 3.7.
+
+- **QRS width** is measured around the largest deflection near each detected QRS (last 0.32 s), as the span where the signal stays above 15 % of the peak, relative to the median of the last 2 s. A complex is *wide* above 75 ms. This threshold was tuned on the simulator's own waveforms; the measured width reads lower than a clinical QRS duration.
+- Once per second the rules below are checked in order. The first match gives the label:
+  1. leads off, or a signal loss within the last 2 s → *Not analysed*,
+  2. first 8 s → *Learning*,
+  3. peak-to-peak below 0.3 mV over 4 s → *Asystole*,
+  4. no QRS for 4 s → *V-Fib* if the signal is mostly not flat, else *Asystole*,
+  5. median width wide and RR coefficient of variation > 0.3 (at least 3 widths) → *V-Fib*,
+  6. last 4 complexes wide and rate > 100 bpm → *V-Tach*,
+  7. coefficient of variation of narrow-to-narrow intervals > 0.12 (at least 6 intervals) → *Irregular*,
+  8. any wide complex in the last 60 s → *PVCs*,
+  9. otherwise → *Regular*.
+- PVC rate = wide complexes × 60 / max(10 s, time span covered).
+- For V-Fib and asystole the HR value is reported as missing.
+
+These rules are **not a validated arrhythmia algorithm**. A clinical arrhythmia detector is tested against annotated ECG databases (IEC 60601-2-27); this one was not.
+
+### 3.11 Monitor screen, signal chain view and lessons
+
+**Signal chain tab** (`src/ui/chainPanel.js`). For one channel at a time the tab plots each stage of the chain from the engine taps, with its unit and a short note:
+
+| Channel | Stages | Readout |
+|---|---|---|
+| ECG | patient model (mV) → electrodes, amplifier and ADC → display filter → Pan–Tompkins integrator output with the adaptive threshold and the detected QRS marks | HR, rhythm, QRS width |
+| SpO₂ / pleth | red channel → IR channel → ln, 0.5–5 Hz band-pass, inverted | R, SpO₂ (instant and averaged), SQI, status |
+| Respiration | demodulated impedance (Ω) → 0.1–1 Hz band-pass with the ± hysteresis thresholds and breath marks | RR, threshold |
+| Arterial line | pressure in the artery → transducer output with the true pressure drawn behind it, on the same scale | SYS/DIA (MAP), f_n, ζ, height |
+| Capnography | CO₂ partial pressure | EtCO₂, FiCO₂, awRR |
+
+The last stage can be saved as a PNG image.
+
+**Lessons tab** (`src/lessons/lessons.js`, `src/ui/lessonsPanel.js`). Seven guided lessons: ECG signal chain, pulse oximetry, NIBP, rhythms, capnography, arterial line and alarms (8–10 min each). Each lesson has objectives, a button that loads its scenario (preset), steps that can set controls or open a tab, and a quiz of 3 multiple-choice questions with an explanation for each answer. A unit test checks that the quiz answers about the model (for example the ratio R of the desaturation preset) agree with the simulator. The best score per lesson is kept in the browser's `localStorage` only; it is not measurement data.
+
+**Monitor screen.** Six sweeping waveforms: ECG, pleth (auto scale), ART (0–200 mmHg), respiration (auto scale), CO₂ (0–60 mmHg) and cuff pressure (0–300 mmHg). Respiration, CO₂ and cuff sweep at 6.25 mm/s. The HR tile also shows the rhythm label and the PVC rate. The ART tile shows SYS/DIA (MAP) with the set point and the SYS limits. The EtCO₂ tile shows FiCO₂ and awRR. The page layout adapts to narrow screens (one column at 1100 px and below, a phone layout at 720 px and below).
+
 ## 4. Data model and provenance
 
 Every stored value is an immutable observation:
@@ -213,10 +328,10 @@ Every stored value is an immutable observation:
 
 | Source | Meaning | Examples |
 |---|---|---|
-| `simulated` | produced by the engine, including its estimators | HR from the QRS detector, SpO₂ from the ratio of ratios |
+| `simulated` | produced by the engine, including its estimators | HR from the QRS detector, SpO₂ from the ratio of ratios, EtCO₂ from the capnogram, ART SYS/DIA/MAP from the arterial line |
 | `derived` | calculated from other values | BMI, BSA, pulse pressure, MAP formula |
-| `device` | received live from a connected sensor | Bluetooth Heart Rate Measurement packets (`gatt.js`; Android route, page-side wiring in development) |
-| `imported` | loaded from a file or read from another app's store | CSV/JSON table; planned for Android Health Connect records |
+| `device` | received from a wearable through the Android app | Health Connect records and Bluetooth Heart Rate Measurement packets (`androidBridge.js`, `gatt.js`) |
+| `imported` | loaded from a file | CSV/JSON table, including a health-app export file |
 | `user` | typed in by hand | a temperature read from a thermometer |
 
 Quality is one of `ok`, `low-quality`, `missing`, `invalid` and `artifact`. When the value is `null`, NaN or absent, the observation is always stored with value `null` and quality `missing`. **A missing value is never stored as 0.** Each simulated observation records the method and the set point in its provenance. Each imported one records the file, line and original unit. Each device observation records the route, the device name and the raw packet bytes.
@@ -247,6 +362,9 @@ The alarm engine uses the vocabulary of IEC 60601-1-8 (alarm condition, delay, p
 | NIBP SYS (mmHg) | 90 | 160 | 0 s (per measurement) |
 | NIBP DIA (mmHg) | 50 | 95 | 0 s |
 | NIBP MAP (mmHg) | 65 | 115 | 0 s |
+| EtCO₂ (mmHg) | 30 | 45 | 10 s |
+| ART SYS (mmHg) | 90 | 160 | 5 s |
+| ART MAP (mmHg) | 65 | 110 | 5 s |
 
 These defaults are illustrative and editable. They are not clinical recommendations.
 
@@ -255,7 +373,17 @@ These defaults are illustrative and editable. They are not clinical recommendati
 - Physiological alarms are medium priority. **Apnea** is high priority and replaces the RR-low alarm.
 - Missing values never raise a physiological alarm. They raise a technical alarm instead.
 
-**Technical alarms** (low priority, 2 s delay): ECG leads off, ECG signal lost, SpO₂ no signal, SpO₂ probe off, SpO₂ poor signal quality, resp signal lost, temp probe unavailable, temp probe error, NIBP measurement failed.
+**Rhythm alarms** come from the rhythm label of section 3.10. The priorities follow the spirit of IEC 60601-2-27; they do not claim compliance.
+
+| Rhythm label | Message | Priority | Delay |
+|---|---|---|---|
+| Asystole | ASYSTOLE | high | 0 s |
+| V-Fib | V-FIB | high | 0 s |
+| V-Tach | V-TACH | high | 0 s |
+| Irregular | Irregular HR | medium | 10 s |
+| PVCs, rate > 10/min | PVCs > 10/min | medium | 0 s |
+
+**Technical alarms** (low priority, 2 s delay): ECG leads off, ECG signal lost, SpO₂ no signal, SpO₂ probe off, SpO₂ poor signal quality, resp signal lost, temp probe unavailable, temp probe error, NIBP measurement failed, CO₂ no signal (sampling line disconnected), ART no pulsatile signal (line open to air?).
 
 **Operator actions.**
 
@@ -281,7 +409,7 @@ CSV and JSON files are read locally with `FileReader`. The importer handles CSV 
 
 Imported data is stored as `imported` and never drives the simulation. Values can also be typed in (manual entry, source `user`) and exported as CSV or JSON by source.
 
-### 7.2 Watch data in the Android app (in development)
+### 7.2 Watch data in the Android app (not tested with real hardware)
 
 On 2026-10-28 the Devices tab and all other device integration were removed from the web page: HL7 v2 (MLLP, serial, files), FHIR R4 and IEEE 11073 SDC import, the MDC code mapping, Web Bluetooth, Web Serial and the packet replay. The reason is the owner's decision to keep the project focused on the simulator. See `DEVICE_INTEGRATION_REPORT.md`.
 
@@ -291,20 +419,36 @@ Real wearable data now enters only through the Android app (`android/`), by thre
 2. **Native Bluetooth LE Heart Rate Service 0x180D.** The Kotlin side scans for the service, connects over GATT and subscribes to the Heart Rate Measurement characteristic 0x2A37. It passes the raw bytes to the page as hex.
 3. **Import of a health-app export file** (CSV/JSON) through the table importer of section 7.1.
 
-`src/devices/gatt.js` is the only device module that remains. It parses the Heart Rate Measurement characteristic (written from the Bluetooth SIG GATT Specification Supplement): flags, HR as uint8 or uint16, sensor contact, energy expended and RR intervals (units of 1/1024 s). A packet with the contact bits reporting "not detected" is stored with quality `artifact`; HR 0 is stored as missing, never as 0; a truncated packet is rejected. The parser is covered by 3 Node tests and one browser self-test scenario. The page-side wiring of the Android bridge (`window.PMAndroid` events to observations) is not yet part of `src/ui/`; the Android README documents the bridge.
+`src/devices/gatt.js` is the only device module that remains. It parses the Heart Rate Measurement characteristic (written from the Bluetooth SIG GATT Specification Supplement): flags, HR as uint8 or uint16, sensor contact, energy expended and RR intervals (units of 1/1024 s). A packet with the contact bits reporting "not detected" is stored with quality `artifact`; HR 0 is stored as missing, never as 0; a truncated packet is rejected. The parser is covered by 3 Node tests and one browser self-test scenario.
 
-The WebView page is served from the app's own assets and has no network access; the app has no `INTERNET` permission. HONOR's own watch protocol is proprietary and is not used. **Status: not hardware-tested.** The Android app is still being built and no watch, heart-rate sensor or Health Connect store was used in any test.
+**Page-side bridge** (`src/devices/androidBridge.js`, no DOM):
+
+- `healthConnectToObservations` turns Health Connect records into observations with source `device`. A record is rejected, with a reason, when its type is not supported, its value is not a number, it has no time, or its unit cannot be converted. A value outside the parameter's plausible range is rejected ("outside min–max unit"), never clamped. Exact duplicates (parameter, time, value) are dropped. The provenance records the route `health-connect`, the record type, the data origin (the app that wrote the record), the original value and unit, and that the time is the record time.
+- `bleHeartRateToObservations` takes the hex string of one 0x2A37 packet, parses it with `gatt.js` and stores the result as `device` with the route `ble-hrs`, the device name, the receive time and the raw hex.
+
+**"On this phone" panel** (`src/ui/androidPanel.js`, in the Data import/export tab). It is shown only when the page runs inside the Android app (`window.PMAndroid` exists). In a normal browser it stays hidden. It offers:
+
+- Health Connect: availability status, a button to request the read permissions, a period of the last 1, 7 or 30 days, a button to read the records, and a button to install or update Health Connect. The result message lists how many values were stored and rejected, with the reasons.
+- Bluetooth LE: scan, stop scan and disconnect; a list of found devices (name, address, signal strength) with a Connect button; the last heart rate, the contact state and RR intervals; the body sensor location if the device reports it. A malformed packet is ignored with a message.
+
+The app sends its results to the page as `pmandroid` events. The stored values appear in the Trends tab as a separate `device` series.
+
+**Exports in the app.** In the Android WebView a download link does nothing. When `window.PMAndroid` exists, every export of the page (CSV, JSON, alarm history, PNG) is passed to the app instead, which opens the Android save dialog. In a browser the normal download is used.
+
+The WebView page is served from the app's own assets and has no network access; the app has no `INTERNET` permission. HONOR's own watch protocol is proprietary and is not used. **Status: not hardware-tested.** The bridge and the panel were checked only with unit tests and a mock `PMAndroid` object in a desktop browser. No watch, heart-rate sensor or Health Connect store was used in any test.
 
 ## 8. Assumptions
 
-1. A single ECG lead with a fixed morphology, scaled by heart rate. No conduction disorders are modelled.
-2. The arterial pulse has a fixed shape and a fixed 0.20 s arrival time. Pressure, PPG and respiration share the same beat times.
+1. A single ECG lead with a fixed morphology, scaled by heart rate. The arrhythmia patterns (AF, PVC, VT, VF, asystole) are simplified teaching shapes. No other conduction disorders are modelled.
+2. The arterial pulse has a fixed shape and a fixed 0.20 s arrival time. Pressure, PPG, capnogram and respiration share the same beat and breath times. Circulation is reduced to one perfusion state (section 3.2).
 3. The PPG is two-wavelength transmission with a linear R-to-SpO₂ calibration. No venous pulsation, no ambient light, no dyshaemoglobins.
-4. Respiration is a regular oscillator with I:E = 1:2. No sighs, no obstructive pattern.
-5. NIBP uses an arctangent artery model, a linear deflation, one amplitude per beat and fixed ratios. The cuff and limb tissue are not modelled.
-6. Temperature is a first-order lag with no site differences.
-7. Set points change instantly. There is no physiological coupling between parameters; for example, changing SpO₂ does not change HR.
-8. Default alarm limits and delays are illustrative.
+4. Respiration is a regular oscillator with I:E = 1:2. No sighs. Expiratory obstruction is shown only in the capnogram shape, not in the impedance signal.
+5. The capnogram is a phase-driven shape, not a gas-exchange model. The sampling delay of a sidestream line is not modelled.
+6. The arterial line is a linear second-order system with fixed f_n and ζ per damping setting. There is no flush test and no air bubble or clot model.
+7. NIBP uses an arctangent artery model, a linear deflation, one amplitude per beat and fixed ratios. The cuff and limb tissue are not modelled.
+8. Temperature is a first-order lag with no site differences.
+9. Set points change instantly. There is no physiological coupling between parameters; for example, changing SpO₂ does not change HR. The only coupling is through the perfusion state: when beats stop, ART, pleth and the CO₂ plateau fall.
+10. Default alarm limits and delays are illustrative.
 
 ## 9. Limitations
 
@@ -318,8 +462,10 @@ These were observed or are known from the model design:
 - **SpO₂ calibration** is the linear example line, not a device calibration.
 - **Imported timestamps without a time zone** are read in the zone chosen in the import panel. Device clocks that carry no zone information cannot be corrected automatically.
 - A column named `rr` is read as respiratory rate, not as an RR interval.
+- **Rhythm analysis** is a set of simple rules, not a validated arrhythmia algorithm. It was checked only on the simulator's own patterns. The 75 ms width threshold was tuned on these waveforms, so the measured QRS width reads lower than a clinical QRS duration. Noisy ECG or dropouts can give wrong labels.
+- **Capnography and arterial line** parameters (wave shape constants, f_n, ζ, the perfusion time constants) are illustrative. They show the effects qualitatively and are not fitted to measured data.
 - **Watch data** (Android app only) has not been tested with any real watch, heart-rate sensor or Health Connect store. Consumer wearable readings are not clinical measurements (see `TEST_REPORT.md`).
-- Measurements are not persisted between sessions.
+- Measurements are not persisted between sessions. Only the best lesson quiz scores are kept, in the browser's `localStorage`.
 
 ## 10. References
 

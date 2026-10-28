@@ -69,6 +69,34 @@
     }
   }
 
+  /** Mainstream-style capnogram (mmHg) driven by the breathing oscillator phase.
+   *  Inspiration (phase < 1/3): CO2 washes out to the inspired level within ~50 ms.
+   *  Expiration: dead space first (6 %), then an exponential upstroke with time constant
+   *  τ = 0.035 + 0.35 × obstruction (fraction of the expiration) and a small phase-III slope.
+   *  The plateau falls with circulation: fi + (EtCO2 − fi) × (0.15 + 0.85 × perfusion).
+   *  Breath hold / apnea: flat at the inspired level. Shape is illustrative. */
+  class CapnoSensor {
+    constructor(rng) { this.rng = rng; this.endExp = 0; }
+    sample(resp, p, perf) {
+      if (p.capno_sensor === 'disconnected') return NaN;
+      const fi = p.fico2;
+      const plateau = fi + Math.max(0, p.etco2 - fi) * (0.15 + 0.85 * perf);
+      let c;
+      if (resp.holding) c = fi;
+      else if (resp.phase < 1 / 3) c = fi + (this.endExp - fi) * Math.exp(-resp.phase / 0.012);
+      else {
+        const u = (resp.phase - 1 / 3) / (2 / 3), u0 = 0.06;
+        if (u < u0) c = fi;
+        else {
+          const v = (u - u0) / (1 - u0), tau = 0.035 + 0.35 * p.airway_obstr / 100;
+          c = fi + (plateau - fi) * (1 - Math.exp(-v / tau)) / (1 - Math.exp(-1 / tau)) * (0.94 + 0.06 * v);
+        }
+        this.endExp = c;
+      }
+      return Math.max(0, c + this.rng.gauss() * 0.25);
+    }
+  }
+
   /** Temperature probe: first-order lag dT/dt = (T_true − T)/τ plus 0.02 °C noise. */
   class TempSensor {
     constructor(rng, initial) { this.rng = rng; this.T = initial; }
@@ -80,5 +108,5 @@
     }
   }
 
-  return { Dropouts, PpgSensor, RespSensor, TempSensor };
+  return { Dropouts, PpgSensor, RespSensor, CapnoSensor, TempSensor };
 });

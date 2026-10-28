@@ -12,7 +12,7 @@
   const alarms = new PM.alarms.AlarmEngine();
   const store = new PM.store.ObservationStore({ maxPerSeries: 20000 });
   const nibpRows = [];
-  let running = true, frozen = false, lastTs = null, alarmState = alarms.state();
+  let running = true, frozen = false, lastTs = null, chainTs = 0, alarmState = alarms.state();
 
   // ------------------------------------------------------------- waveforms
   const SV = PM.waveforms.SweepView;
@@ -21,15 +21,19 @@
     ecg: new SV($('#cvEcg'), { ring: () => engine.ecgS, fs: () => engine.ecgS.fs, color: cssVar('--ecg') || '#5ee07a', scale: 'ecg', grid: true }),
     pleth: new SV($('#cvPleth'), { ring: () => engine.plethS, fs: () => E.PPG_FS, color: cssVar('--pleth') || '#5ec8ff', scale: 'auto' }),
     resp: new SV($('#cvResp'), { ring: () => engine.respS, fs: () => E.RESP_FS, color: cssVar('--resp') || '#ffd36b', scale: 'auto' }),
+    art: new SV($('#cvArt'), { ring: () => engine.artS, fs: () => E.ART_FS, color: cssVar('--art') || '#ff5a5a', scale: [0, 200] }),
+    co2: new SV($('#cvCo2'), { ring: () => engine.capS, fs: () => E.CAP_FS, color: cssVar('--co2') || '#e6e6e6', scale: [0, 60] }),
     cuff: new SV($('#cvCuff'), { ring: () => engine.cuffS, fs: () => E.CUFF_FS, color: cssVar('--cuff') || '#ff9de2', scale: [0, 300] }),
   };
-  $$('.wave[data-ch="resp"] .wave-scale, .wave[data-ch="cuff"] .wave-scale').forEach(s => { s.textContent += ' · ' + SLOW_SWEEP + ' mm/s'; });
+  $$('.wave[data-ch="resp"] .wave-scale, .wave[data-ch="co2"] .wave-scale, .wave[data-ch="cuff"] .wave-scale').forEach(s => { s.textContent += ' · ' + SLOW_SWEEP + ' mm/s'; });
 
   function drawWaves() {
     const sw = engine.p.sweep;
     views.ecg.draw(engine.t, sw, engine.p.ecg_gain);
     views.pleth.draw(engine.t, sw);
+    views.art.draw(engine.t, sw);
     views.resp.draw(engine.t, SLOW_SWEEP);
+    views.co2.draw(engine.t, SLOW_SWEEP);
     views.cuff.draw(engine.t, SLOW_SWEEP);
   }
 
@@ -38,6 +42,7 @@
     lastTs = ts;
     if (running && dt > 0) engine.advance(dt * engine.p.speed);
     if (!frozen) drawWaves();
+    if (!frozen && visible('chain') && ts - chainTs > 66) { chainTs = ts; chain.draw(); }
     sound(ts);
     requestAnimationFrame(loop);
   }
@@ -76,7 +81,8 @@
   function updateTiles(f) {
     const est = f.est, tr = f.truth;
     setTxt('#vHr', fmt(est.hr)); setTxt('#sHr', f.technical.ecgLeadsOff ? 'leads off' : 'set ' + tr.hr); setTxt('#lHr', limText('hr'));
-    $('#tHr').classList.toggle('alarming', alarming('hr'));
+    setTxt('#vRhythm', est.rhythmLabel || '--'); setTxt('#vPvc', fmt(est.pvcPerMin));
+    $('#tHr').classList.toggle('alarming', alarming('hr') || alarming('rhythm'));
 
     setTxt('#vSpo2', fmt(est.spo2)); setTxt('#vPr', fmt(est.pr)); setTxt('#vPi', fmt(est.pi, 1)); setTxt('#vSqi', fmt(est.sqi));
     setTxt('#sSpo2', est.spo2Status !== 'ok' ? est.spo2Status : 'set ' + tr.spo2); setTxt('#lSpo2', limText('spo2'));
@@ -95,6 +101,17 @@
     }
     setTxt('#sNibp', 'set ' + tr.sbp + '/' + tr.dbp);
     $('#tNibp').classList.toggle('alarming', ['sbp', 'dbp', 'map'].some(alarming));
+
+    const a = est.art;
+    setTxt('#vArt', a ? fmt(a.sys) + '/' + fmt(a.dia) : '--/--'); setTxt('#vArtMap', a ? fmt(a.map) : '--');
+    setTxt('#sArt', f.technical.artNoPulse ? 'no pulse (line open?)' : 'set ' + tr.sbp + '/' + tr.dbp);
+    setTxt('#lArt', 'SYS ' + limText('art_sys'));
+    $('#tArt').classList.toggle('alarming', ['art_sys', 'art_map'].some(alarming));
+
+    setTxt('#vEtco2', fmt(est.etco2)); setTxt('#vFico2', fmt(est.fico2)); setTxt('#vAwrr', fmt(est.awrr));
+    setTxt('#sEtco2', f.technical.capnoNoSignal ? 'no CO₂ signal' : tr.etco2 === null ? '' : 'set ' + Math.round(tr.etco2));
+    setTxt('#lEtco2', limText('etco2'));
+    $('#tCo2').classList.toggle('alarming', alarming('etco2'));
 
     setTxt('#vRr', est.apnea ? 'APNEA' : fmt(est.rr)); setTxt('#sRr', 'set ' + tr.rr); setTxt('#lRr', limText('rr'));
     $('#tRr').classList.toggle('alarming', alarming('rr') || alarmState.active.some(a => a.id === 'apnea'));
@@ -206,8 +223,9 @@
     PM.panels.renderNibpTable($('#nibpTable tbody'), nibpRows);
     PM.panels.renderAlarmHistory($('#alarmHistory tbody'), alarms.history);
     renderAlarms(); drawOsc(); afterParams();
-    for (const id of ['#vHr', '#vSpo2', '#vPr', '#vPi', '#vSqi', '#vMap', '#vMapOsc', '#vMapF', '#vPp', '#vRr', '#vTemp']) $(id).textContent = '--';
-    $('#vNibp').textContent = '--/--'; $('#nibpAge').textContent = '';
+    for (const id of ['#vHr', '#vSpo2', '#vPr', '#vPi', '#vSqi', '#vMap', '#vMapOsc', '#vMapF', '#vPp', '#vRr', '#vTemp',
+      '#vRhythm', '#vPvc', '#vArtMap', '#vEtco2', '#vFico2', '#vAwrr']) $(id).textContent = '--';
+    $('#vNibp').textContent = '--/--'; $('#vArt').textContent = '--/--'; $('#nibpAge').textContent = '';
     setRunning(true);
   });
   $('#btnFreeze').addEventListener('click', () => {
@@ -228,7 +246,7 @@
 
   /** PNG of the four waveforms plus the current numbers and the notice. */
   function snapshot() {
-    const cvs = ['#cvEcg', '#cvPleth', '#cvResp', '#cvCuff'].map(id => $(id));
+    const cvs = ['#cvEcg', '#cvPleth', '#cvArt', '#cvResp', '#cvCo2', '#cvCuff'].map(id => $(id));
     const dpr = root.devicePixelRatio || 1, head = Math.round(64 * dpr);
     const w = Math.max(...cvs.map(c => c.width)), h = head + cvs.reduce((s, c) => s + c.height, 0);
     const out = document.createElement('canvas'); out.width = w; out.height = h;
@@ -236,7 +254,7 @@
     g.fillStyle = '#0b0f14'; g.fillRect(0, 0, w, h);
     g.fillStyle = '#e2e8f0'; g.font = Math.round(14 * dpr) + 'px system-ui, sans-serif';
     const f = engine.lastFrame;
-    const txt = f ? 'PM-SIM  t = ' + f.t.toFixed(0) + ' s   HR ' + fmt(f.est.hr) + '   SpO2 ' + fmt(f.est.spo2) + ' %   NIBP ' + $('#vNibp').textContent + '   RR ' + $('#vRr').textContent + '   Temp ' + fmt(f.est.temp, 1) + ' °C' : 'PM-SIM';
+    const txt = f ? 'PM-SIM  t = ' + f.t.toFixed(0) + ' s   HR ' + fmt(f.est.hr) + '   SpO2 ' + fmt(f.est.spo2) + ' %   NIBP ' + $('#vNibp').textContent + '   ART ' + $('#vArt').textContent + '   RR ' + $('#vRr').textContent + '   EtCO2 ' + fmt(f.est.etco2) + '   Temp ' + fmt(f.est.temp, 1) + ' °C' : 'PM-SIM';
     g.fillText(txt, 10 * dpr, 24 * dpr);
     g.fillStyle = '#fbbf24'; g.font = Math.round(12 * dpr) + 'px system-ui, sans-serif';
     g.fillText('Educational simulation only. Simulated values are not clinical data. ' + new Date().toISOString(), 10 * dpr, 48 * dpr);
@@ -244,6 +262,25 @@
     for (const c of cvs) { g.drawImage(c, 0, y); y += c.height; }
     canvasPng(out, 'pm-sim-monitor-' + stamp() + '.png');
   }
+
+  // ------------------------------------------------------------- signal chain
+  // Probe points cost a few ring-buffer pushes per sample; always on so the plots
+  // already hold the last 12 s when the tab opens.
+  engine.enableTaps(true);
+  const chain = PM.chainPanel.init({ getEngine: () => engine });
+
+  // ------------------------------------------------------------- lessons
+  PM.lessonsPanel.init({
+    applyPreset: id => { $('#selPreset').value = id; $('#selPreset').dispatchEvent(new Event('change')); },
+    setParams: update => {
+      const r = engine.setParams(update);
+      controls.sync(engine.p, Object.keys(update));
+      controls.showMsgs({ errors: r.errors, warnings: r.warnings });
+      afterParams();
+    },
+    showTab,
+    tabLabel: name => $('#tabs [data-tab="' + name + '"]').textContent,
+  });
 
   // ------------------------------------------------------------- tabs
   const visible = name => !$('section.panel[data-panel="' + name + '"]').hidden;
@@ -254,6 +291,7 @@
     if (name === 'trends') drawTrendNow();
     if (name === 'alarms') PM.panels.renderAlarmHistory($('#alarmHistory tbody'), alarms.history);
     if (name === 'data') dataPanel.renderSummary();
+    if (name === 'chain') chain.draw();
   }
   $$('#tabs [role=tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
@@ -301,6 +339,7 @@
   // ------------------------------------------------------------- other panels
   PM.panels.buildProfile(list => { store.addMany(list); refreshExt(); });
   PM.dataPanel.init({ store, getEngine: () => engine, onChange: refreshExt });
+  PM.androidPanel.init({ store, onChange: refreshExt });
   $('#btnSelfTest').addEventListener('click', () => PM.selftest.run());
 
   // ------------------------------------------------------------- start

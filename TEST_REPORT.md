@@ -1,6 +1,6 @@
 # Test Report
 
-PM-SIM, Patient Monitor Simulator. Updated 2026-10-28 after the device integration and the Electron desktop app were removed (the Devices tab, HL7/FHIR/SDC import, Web Bluetooth, Web Serial and the desktop builds no longer exist, so their tests were removed too).
+PM-SIM, Patient Monitor Simulator. Updated 2026-10-28 after the device integration and the Electron desktop app were removed (the Devices tab, HL7/FHIR/SDC import, Web Bluetooth, Web Serial and the desktop builds no longer exist, so their tests were removed too). Updated again on 2026-10-28 after capnography, the arterial line, arrhythmia patterns, the Signal chain and Lessons tabs and the Android page bridge were added. A new minimal Linux desktop app (`desktop/`, `.deb`) was then built; the browser self-test run inside the packaged app under Xvfb gave 14 passed, 0 failed, 1 not run (hardware).
 
 > **Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.**
 
@@ -8,11 +8,11 @@ PM-SIM, Patient Monitor Simulator. Updated 2026-10-28 after the device integrati
 
 | Test level | Result |
 |---|---|
-| Node unit tests (`node --test tests/unit/*.test.js`) | **47 tests in 5 files, 47 pass, 0 fail** (run 2026-10-28 after the removal; it was 71 tests before) |
-| Browser self-test (`index.html?selftest=1`) | **11 entries: 10 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-28 after the removal: **10 pass, 0 fail, 1 not run** (section 3). |
-| Manual interaction checks in a browser | 9 checks, all as expected (section 4). Made on 2026-10-28 before the Devices tab was removed; not repeated afterwards. |
-| Hardware tests (watch data on Android through Health Connect, native BLE Heart Rate Service, export file) | **Not run.** The Android app is still in development and no watch, heart-rate sensor or Health Connect store was used. |
-| Android app | Not tested on a device. An APK file (`release/PM-SIM-1.1.0-android.apk`) exists, but no behaviour of it has been verified on a device. |
+| Node unit tests (`node --test tests/unit/*.test.js`) | **64 tests in 8 files, 64 pass, 0 fail** (run 2026-10-28 after the new features; it was 47 tests before them) |
+| Browser self-test (`index.html?selftest=1`) | **15 entries: 14 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-28: **14 pass, 0 fail, 1 not run** (section 3). |
+| Manual interaction checks in a browser | 9 earlier checks (section 4.1) and 5 checks of the new features made on 2026-10-28 (section 4.2), all as expected. |
+| Hardware tests (watch data on Android through Health Connect, native BLE Heart Rate Service, export file) | **Not run.** No watch, heart-rate sensor or Health Connect store was used. |
+| Android app | Not tested on a device. An APK file (`release/PM-SIM-1.1.0-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
 | Website | Published from `.github/workflows/pages.yml`, which runs the unit tests before deploying. The deployed site was not checked as part of this report. |
 | Opening from `file://` | Checked statically only (section 5) |
 
@@ -39,13 +39,19 @@ The self-test runs each scenario on a fresh engine instance with a fixed seed. T
 | 8 | Input validation: DIA = 130 with SYS = 120 | Rejected with an error, previous DIA kept | error message; DIA kept at 80 | pass |
 | 9 | Import CSV with `temp (°F)` = 98.6, `weight (lb)` = 154, empty `hr` | 37.0 °C, 69.9 kg, empty cell stays missing | temp 37.00 °C, weight 69.85 kg, hr not stored | pass |
 | 10 | Bluetooth Heart Rate Measurement parser (used by the Android app): packet `1F 2C 01 0A 00 00 04 00 02`, a no-contact packet `04 50` and a truncated packet `01 48` | u16 HR 300, contact detected, RR intervals 1.0 s and 0.5 s; no-contact packet stored with quality `artifact` and source `device`; truncated packet rejected | hr 300, contact detected, RR 1/0.5 s; no-contact artifact; truncated rejected: true (browser self-test, 2026-10-28) | pass |
-| 11 | Watch data on Android (Health Connect, BLE, export file): readings arrive with source `device` and the route in the provenance | Live readings from a real watch or sensor | **not run**: no hardware available | not run |
+| 11 | V-Tach pattern preset, 20 s | Rhythm classified `vtach` and `rhythm:vtach` alarm active | rhythm vtach, HR 172, rhythm:vtach active | pass |
+| 12 | Hypoventilation preset (RR 6, EtCO₂ set to 58 mmHg), 30 s | EtCO₂ within ±3 mmHg of 58; EtCO₂-high alarm active after its 10 s delay | EtCO₂ 58.8 mmHg, etco2:high active | pass |
+| 13 | Arterial line: optimal vs under-damped, 120/80 mmHg, 20 s each | Optimal SYS/DIA within ±5 of 120/80; under-damped SYS ≥ 8 mmHg higher with MAP within ±2 | optimal about 120/79 (90), under-damped about 133/74 (91) | pass |
+| 14 | Health Connect records (Android bridge logic): one valid heart-rate record and one SpO₂ record of 150 % | Valid record stored as source `device`; SpO₂ 150 % rejected, not clamped | 1 stored (hr 61, device), 1 rejected | pass |
+| 15 | Watch data on Android (Health Connect, BLE, export file): readings arrive with source `device` and the route in the provenance | Live readings from a real watch or sensor | **not run**: no hardware available | not run |
 
-Entry 11 is reported as "not run" by design. The code never marks a hardware test as passed without hardware. Earlier versions of the self-test also had scenarios for the BLE packet replay, HL7 v2, the HL7 bed filter and MLLP framing, and FHIR/SDC import (15 entries: 13 pass, 2 not run). They were removed together with those features.
+Entry 14 tests only the page-side conversion code with records written in the test. It does not involve Health Connect or a phone. Entry 15 is reported as "not run" by design. The code never marks a hardware test as passed without hardware. Earlier versions of the self-test also had scenarios for the BLE packet replay, HL7 v2, the HL7 bed filter and MLLP framing, and FHIR/SDC import (15 entries: 13 pass, 2 not run). They were removed together with those features.
 
 ## 4. Manual interaction checks
 
-Performed on 2026-10-28 by driving the running app in the browser pane, before the Devices tab was removed. They were not repeated afterwards.
+### 4.1 Earlier checks
+
+Performed on 2026-10-28 by driving the running app in the browser pane, before the Devices tab was removed. They were not repeated afterwards. At that time the alarm limits table had 7 rows; the source now defines 10 limit rows (EtCO₂, ART SYS and ART MAP were added), and this row count was not re-checked by hand.
 
 | Check | Expected | Observed |
 |---|---|---|
@@ -58,6 +64,20 @@ Performed on 2026-10-28 by driving the running app in the browser pane, before t
 | Alarm limits table | One row per limited parameter | 7 rows |
 | Layout at 375 px width | No horizontal overflow | No overflow |
 | Browser console during all checks | No errors | No errors |
+
+### 4.2 Checks of the new features
+
+Performed on 2026-10-28 in the same browser pane, after capnography, the arterial line, the arrhythmia patterns, the Signal chain and Lessons tabs and the Android panel were added.
+
+| Check | Expected | Observed |
+|---|---|---|
+| Monitor screen at desktop width and at 375 px | No horizontal overflow | No overflow at either width |
+| Reset | The new tiles (ART, EtCO₂) are cleared like the others | As expected |
+| Hypoventilation preset | EtCO₂-high alarm after its delay; EtCO₂ tile highlighted | Alarm raised and tile highlighted |
+| Signal chain and Lessons tabs | Both render and update | As expected; no console errors |
+| Android panel: normal browser, then with a mock `PMAndroid` object | Hidden in a normal browser. With the mock: Health Connect records stored, an out-of-range record rejected, a BLE packet decoded, an export routed to `saveText` | As expected |
+
+The mock object only imitates the app's interface in a desktop browser. It is not a test of the Android app, Health Connect or a Bluetooth device.
 
 ## 5. Offline and `file://` operation
 
@@ -72,7 +92,9 @@ When served over `http://localhost`, the app made no network requests other than
 
 ## 6. Node unit and integration tests
 
-47 tests in 5 files (17 + 10 + 4 + 13 + 3). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
+64 tests in 8 files (17 + 10 + 4 + 13 + 3 + 10 + 3 + 4). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
+
+The first five files were already described before the new features were added. Their counts did not change.
 
 ### `tests/unit/sim.test.js` (17 tests)
 
@@ -138,6 +160,36 @@ When served over `http://localhost`, the app made no network requests other than
 
 These tests check the parser against packets built from the specification. They do not test a radio link or a real sensor.
 
+### `tests/unit/arrhythmia.test.js` (10 tests)
+
+- Each teaching rhythm gets its label in at least 90 % of the frames after the first 10 s of a 60 s run: baseline, tachycardia and bradycardia → regular; AF → irregular; PVC → pvc; VT → vtach; VF → vfib; asystole → asystole.
+- The analyser reports "learning" at the start, and "unavailable" (shown as "Not analysed") with the leads off.
+- PVC pattern over 90 s: each PVC is premature (< 0.8 × the mean interval) and followed by a compensatory pause (coupling + pause > 1.7 × the mean); at least 5 PVCs are checked; a PVC has a smaller pulse than a normal beat; the reported PVC rate is 6–25/min.
+- VT: measured QRS width > 100 ms and HR within ±10 bpm of 170. VF and asystole: HR missing, perfusion < 0.05, ART MAP < 15 mmHg and EtCO₂ < 10 mmHg after 40 s.
+- VT, VF and asystole raise their high-priority rhythm alarms within 20 s.
+- Capnography: baseline EtCO₂ within ±2 of 38 mmHg, FiCO₂ < 1 mmHg and awRR within ±1 of 14; hypoventilation EtCO₂ > 54 mmHg and awRR about 6; rebreathing FiCO₂ within ±1.5 of 6 mmHg; apnea gives EtCO₂ missing.
+- Expiratory obstruction makes the 40–95 % rise of the capnogram more than 2 times slower than at baseline, with the peak within 4 mmHg.
+- A disconnected sampling line gives EtCO₂ missing and the CO₂-no-signal technical flag.
+- Arterial line damping: optimal SYS and DIA within ±4 mmHg of the set point; under-damped SYS more than 6 mmHg above optimal; over-damped SYS more than 4 mmHg below optimal; MAP within ±2 mmHg in both cases; ζ under-damped < ζ optimal.
+- A transducer 20 cm too high lowers MAP by 20 × 0.7356 mmHg (within ±1.5). A line open to air gives no ART value and the no-pulsatile-signal flag.
+
+These tests check the analyser only on the simulator's own waveforms. They are not a validation against annotated ECG databases.
+
+### `tests/unit/lessons.test.js` (3 tests)
+
+- Lesson content is valid: unique ids, existing presets, every step's tab exists, every control change in a step passes the parameter validation without errors or warnings, objectives and steps are not empty.
+- Quizzes: at least 3 questions each, answer index in range, unique options, an explanation for every question. All correct answers give 100 % and "complete"; a partial set gives score 0 and "incomplete"; an unknown lesson id throws.
+- Quiz facts agree with the model: the ratio R in the desaturation preset is (110 − 84)/25 within ±0.08; the default mains frequency is 50 Hz and the apnea delay 20 s; Ks 0.3 gives an NIBP SBP more than 2 mmHg above Ks 0.5.
+
+### `tests/unit/androidBridge.test.js` (4 tests)
+
+- Valid Health Connect records (heart rate, SpO₂, temperature, plus one duplicate) give 3 `device` observations with value, unit, time, route `health-connect` and data origin; the duplicate is dropped and an error message from the app is passed through.
+- Rejections: an unsupported type (glucose), a non-number value, SpO₂ 140 % (out of range) and a record without time are rejected with reasons. A systolic pressure of 16 kPa is converted to mmHg (× 7.50062). Empty input gives no observations.
+- A BLE packet built with the test encoder (HR 72, contact, one RR interval of 0.8 s) gives one `device` observation with route `ble-hrs` and the device name; a malformed packet throws.
+- The Base64 helper used for binary exports matches Node's `Buffer` for 70 000 bytes.
+
+These tests use records and packets written in the test. They do not involve a phone, Health Connect or a Bluetooth device.
+
 ## 7. Defects found and fixed during testing
 
 Defects found in the removed device code are not listed here.
@@ -149,8 +201,9 @@ Defects found in the removed device code are not listed here.
 
 ## 8. Not tested and known limitations
 
-- **No real watch, heart-rate sensor or Health Connect store** was used. The Android app (`android/`) is still in development. Its three watch routes (Health Connect, native BLE Heart Rate Service, export file) have not been tested on a device, and the Heart Rate Measurement parser is checked only against packets built from the Bluetooth SIG specification. Consumer wearable readings are not clinical measurements.
-- **Page-side wiring of the Android bridge** is not part of `src/ui/` yet, so it has no test.
+- **No real watch, heart-rate sensor or Health Connect store** was used. The Android app (`android/`) has not been tested on a phone. Its three watch routes (Health Connect, native BLE Heart Rate Service, export file) and the native save dialog for exports have not been tested on a device, and the Heart Rate Measurement parser is checked only against packets built from the Bluetooth SIG specification. Consumer wearable readings are not clinical measurements.
+- **Page-side Android bridge** (`src/devices/androidBridge.js`, `src/ui/androidPanel.js`) is checked only with unit tests and a mock `PMAndroid` object in a desktop browser.
+- **Rhythm analysis** is checked only on the simulator's own patterns, not on recorded ECGs.
 - **Website:** the GitHub Pages workflow runs the unit tests before deploying. The live site at https://hafij-bge.github.io/patient-monitoring/ was not part of the testing described here.
 - **`file://`** was checked statically only (section 5).
 - Browsers other than Chromium were not tested.
@@ -162,4 +215,4 @@ Defects found in the removed device code are not listed here.
 node --test tests/unit/*.test.js
 ```
 
-Then open `index.html?selftest=1` (from a local server such as `python3 -m http.server 8766`, from the website, or directly) and compare the Tests tab with section 3. Expected: 10 pass, 0 fail, 1 not run. Values can differ slightly between browsers, but each must stay within the stated tolerance.
+Then open `index.html?selftest=1` (from a local server such as `python3 -m http.server 8766`, from the website, or directly) and compare the Tests tab with section 3. Expected: 14 pass, 0 fail, 1 not run. Values can differ slightly between browsers, but each must stay within the stated tolerance.

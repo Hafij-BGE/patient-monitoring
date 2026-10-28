@@ -177,5 +177,40 @@
     }
   }
 
-  return { PanTompkins, BreathDetector, SpO2Estimator };
+  /** Capnogram breath detector. An expiration starts when CO2 rises above the inspired
+   *  minimum by half of the last end-tidal swing (≥ 2 mmHg; the threshold relaxes over
+   *  ~6 s so a falling EtCO2 is still followed) and ends when it falls back through the
+   *  midpoint. EtCO2 = peak of the last expiration, FiCO2 = minimum before it,
+   *  awRR = 60 / mean of the last 4 breath intervals. All null after `delay` s without a breath. */
+  class CapnoDetector {
+    constructor() { this.reset(); }
+    reset() {
+      this.high = false; this.min = Infinity; this.max = -Infinity; this.fiCycle = 0;
+      this.lastEt = null; this.lastFi = null; this.lastEnd = null; this.intervals = [];
+    }
+    process(c, t) {
+      if (!Number.isFinite(c)) { this.high = false; this.min = Infinity; return null; }
+      let out = null;
+      if (!this.high) {
+        this.min = Math.min(this.min, c);
+        const relax = this.lastEnd === null ? 0 : Math.exp(-(t - this.lastEnd) / 6);
+        const rise = this.lastEt === null ? 4 : Math.max(2, 0.5 * (this.lastEt - this.min) * relax);
+        if (c > this.min + rise) { this.high = true; this.max = c; this.fiCycle = this.min; }
+      } else {
+        this.max = Math.max(this.max, c);
+        if (c < this.fiCycle + 0.5 * (this.max - this.fiCycle)) {
+          this.high = false; this.lastEt = this.max; this.lastFi = this.fiCycle; this.min = c;
+          if (this.lastEnd !== null) { this.intervals.push(t - this.lastEnd); if (this.intervals.length > 8) this.intervals.shift(); }
+          this.lastEnd = t; out = t;
+        }
+      }
+      return out;
+    }
+    recent(t, delay) { return this.lastEnd !== null && t - this.lastEnd <= delay; }
+    etco2(t, delay) { return this.recent(t, delay) ? this.lastEt : null; }
+    fico2(t, delay) { return this.recent(t, delay) ? this.lastFi : null; }
+    rate(t, delay) { return this.recent(t, delay) && this.intervals.length >= 2 ? 60 / meanOfLast(this.intervals, 4) : null; }
+  }
+
+  return { PanTompkins, BreathDetector, SpO2Estimator, CapnoDetector };
 });

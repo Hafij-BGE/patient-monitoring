@@ -29,6 +29,13 @@
   }
 
   function download(name, text, type) {
+    // Android app: <a download> does nothing in the WebView, so use the native save dialog.
+    const A = root.PMAndroid;
+    if (A && root.PM.androidBridge) {
+      if (typeof text === 'string') A.saveText(name, type || 'text/plain', text);
+      else text.arrayBuffer().then(buf => A.saveBase64(name, text.type || type || 'application/octet-stream', root.PM.androidBridge.toBase64(buf)));
+      return;
+    }
     const blob = text instanceof Blob ? text : new Blob([text], { type: type || 'text/plain' });
     const a = el('a', { href: URL.createObjectURL(blob), download: name });
     document.body.append(a); a.click(); a.remove();

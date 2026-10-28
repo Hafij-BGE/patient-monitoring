@@ -601,4 +601,41 @@ What was done in response:
 - The Electron desktop app, its build configuration, the Windows workflow and the local release builds were removed. The published GitHub release v1.0.0 stays online as an old version that is no longer built.
 - The app is published as a static website on GitHub Pages (https://hafij-bge.github.io/patient-monitoring/) by `.github/workflows/pages.yml`. It works the same way as the app.
 - An Android app (`edu.deu.pmsim`, 1.1.0, in `android/`) wraps the same page and is the only place where real watch data enters: Android Health Connect, native BLE Heart Rate Service, or a health-app export file. It is still being built and nothing has been tested with real hardware. HONOR's own protocol is proprietary and is not used.
-- Which of the simulator-side choices (signal-chain view, more waveforms, guided lessons and quiz, modern UI refresh) are finished is not recorded in these documents; the Tests tab, README and TECHNICAL_REPORT describe only what exists in the code.
+- Which of the simulator-side choices (signal-chain view, more waveforms, guided lessons and quiz, modern UI refresh) are finished is not recorded in these documents; the Tests tab, README and TECHNICAL_REPORT describe only what exists in the code. Revision note 3 records them.
+
+## Revision note 3 (2026-10-28, simulator upgrades)
+
+This note records the upgrade request of Revision note 2 and what was built for it. The prompts and answers are reproduced verbatim.
+
+The request:
+
+````text
+can you add more modern and informative simulator . make a apk of android, with data from honor watch. will only work on android
+````
+
+The choices for the simulator side:
+
+````text
+Signal-chain view, More waveforms, Guided lessons + quiz, Modern UI refresh
+````
+
+The answer to the question of how the HONOR watch data should reach the app (Health Connect, BLE heart rate, or an export-file import):
+
+````text
+Don't know, build all
+````
+
+The go-ahead:
+
+````text
+Yes, start upgrades
+````
+
+What was built in response:
+
+- **More waveforms.** Capnography (CO₂ waveform with EtCO₂, FiCO₂ and airway RR), an invasive arterial line (second-order transducer model with optimal, under-damped and over-damped settings and a transducer-height offset) and arrhythmia teaching patterns (AF, PVCs, V-Tach, V-Fib, asystole) with a rule-based rhythm analyser. New presets, alarm limits (EtCO₂, ART SYS, ART MAP), rhythm alarms and two technical alarms came with them (`TECHNICAL_REPORT.md` sections 3.8–3.10 and 6).
+- **Signal-chain view.** A new Signal chain tab shows each processing stage of the ECG, pleth, respiration, arterial line and capnography channels.
+- **Guided lessons and quiz.** A new Lessons tab with 7 lessons. Each has objectives, steps that set controls, and a 3-question quiz with explanations. Only the best scores are kept, in the browser's `localStorage`.
+- **Modern UI refresh.** Six sweeping waveforms, new ART and EtCO₂ tiles, the rhythm label and PVC rate in the HR tile, and a responsive layout for narrow screens and phones.
+- **Watch data, all three routes.** An "On this phone" panel in the Data import/export tab, shown only inside the Android app, reads Health Connect records and connects to a BLE heart-rate sensor. Records are range-checked (rejected, never clamped) and stored as source `device`. Exports in the app go through the Android save dialog. The export-file route uses the existing table importer.
+- **Tests.** 64 Node unit tests (from 47) and 15 browser self-test entries (14 automated, 1 hardware entry reported as not run). The Android app was **not tested with real hardware**: no phone, watch, heart-rate sensor or Health Connect store was used. The page side was checked only with mock data and a mock bridge object.

@@ -21,12 +21,12 @@
   function shape(u) { return (u < 0 || u >= 1) ? 0 : Math.max(0, detr(u) / peak); }
 
   /** Sum of the pulse shapes of recent beats at time t.
-   *  beats: [{t0: onset time (s), T: duration (s)}] */
+   *  beats: [{t0: onset time (s), T: duration (s), amp: relative stroke volume (default 1)}] */
   function train(beats, t) {
     let s = 0;
     for (let i = beats.length - 1; i >= 0; i--) {
       const b = beats[i];
-      if (t >= b.t0 && t < b.t0 + b.T) s += shape((t - b.t0) / b.T);
+      if (t >= b.t0 && t < b.t0 + b.T) s += (b.amp === undefined ? 1 : b.amp) * shape((t - b.t0) / b.T);
     }
     return s;
   }

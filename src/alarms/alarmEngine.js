@@ -14,7 +14,9 @@
  *  - Acknowledge silences one active alarm until it ends; a new occurrence is new.
  *  - Mute (audio paused) silences all audio for a countdown (default 120 s);
  *    visual indication continues.
- *  - Priorities: apnea = high, limit alarms = medium, technical = low. */
+ *  - Priorities (illustrative, in the spirit of IEC 60601-2-27 lethal-arrhythmia
+ *    alarms): apnea, asystole, V-Fib, V-Tach = high, delay 0; limit alarms,
+ *    irregular rhythm and frequent PVCs = medium; technical = low. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else (root.PM = root.PM || {}).alarms = factory();
@@ -32,7 +34,19 @@
     sbp:  { label: 'NIBP SYS', unit: 'mmHg', low: 90, high: 160, delay: 0, enabled: true },
     dbp:  { label: 'NIBP DIA', unit: 'mmHg', low: 50, high: 95,  delay: 0, enabled: true },
     map:  { label: 'NIBP MAP', unit: 'mmHg', low: 65, high: 115, delay: 0, enabled: true },
+    etco2:   { label: 'EtCO₂',   unit: 'mmHg', low: 30, high: 45,  delay: 10, enabled: true },
+    art_sys: { label: 'ART SYS', unit: 'mmHg', low: 90, high: 160, delay: 5,  enabled: true },
+    art_map: { label: 'ART MAP', unit: 'mmHg', low: 65, high: 110, delay: 5,  enabled: true },
   };
+
+  /** Rhythm alarm conditions keyed by the analyser's rhythm label. */
+  const RHYTHM = {
+    asystole: { priority: 'high', delay: 0, message: 'ASYSTOLE' },
+    vfib:     { priority: 'high', delay: 0, message: 'V-FIB' },
+    vtach:    { priority: 'high', delay: 0, message: 'V-TACH' },
+    irregular: { priority: 'medium', delay: 10, message: 'Irregular HR' },
+  };
+  const PVC_ALARM_PER_MIN = 10;
 
   const TECHNICAL = {
     ecgLeadsOff:     'ECG leads off',
@@ -44,6 +58,8 @@
     tempUnavailable: 'Temp probe unavailable',
     tempError:       'Temp probe error (implausible reading rejected)',
     nibpFailed:      'NIBP measurement failed',
+    capnoNoSignal:   'CO₂ no signal (sampling line disconnected)',
+    artNoPulse:      'ART no pulsatile signal (line open to air?)',
   };
   const TECH_DELAY = 2; // s; hides sub-second flicker of short dropouts
 
@@ -72,6 +88,8 @@
     return {
       hr: f.est.hr, spo2: f.est.spo2, rr: f.est.apnea ? null : f.est.rr, temp: f.est.temp,
       sbp: nb ? nb.sbp : null, dbp: nb ? nb.dbp : null, map: nb ? nb.map : null,
+      etco2: f.est.etco2 === undefined ? null : f.est.etco2,
+      art_sys: f.est.art ? f.est.art.sys : null, art_map: f.est.art ? f.est.art.map : null,
     };
   }
 
@@ -111,6 +129,10 @@
       }
       if (frame.est.apnea)
         cond['apnea'] = { kind: 'physiological', param: 'rr', priority: 'high', delay: 0, value: 0, limit: null, message: 'APNEA' };
+      const rh = RHYTHM[frame.est.rhythm];
+      if (rh) cond['rhythm:' + frame.est.rhythm] = { kind: 'physiological', param: 'rhythm', priority: rh.priority, delay: rh.delay, value: null, limit: null, message: rh.message };
+      if (frame.est.rhythm === 'pvc' && frame.est.pvcPerMin > PVC_ALARM_PER_MIN)
+        cond['rhythm:pvc'] = { kind: 'physiological', param: 'rhythm', priority: 'medium', delay: 0, value: frame.est.pvcPerMin, limit: PVC_ALARM_PER_MIN, message: 'PVCs > ' + PVC_ALARM_PER_MIN + '/min' };
       for (const [flag, text] of Object.entries(TECHNICAL)) {
         if (!frame.technical[flag]) continue;
         const msg = flag === 'nibpFailed' && frame.nibp && frame.nibp.msg ? text + ': ' + frame.nibp.msg : text;
@@ -169,6 +191,6 @@
     return [head].concat(history.map(a => [a.id, a.kind, a.priority, a.message, num(a.value), a.limit, num(a.tCond), num(a.tOn), num(a.tOff), num(a.ackAt)].map(cell).join(','))).join('\n') + '\n';
   }
 
-  return { AlarmEngine, DEFAULT_LIMITS, TECHNICAL, TECH_DELAY, PRIORITY, validateLimit, frameValues, historyCSV,
+  return { AlarmEngine, DEFAULT_LIMITS, TECHNICAL, RHYTHM, PVC_ALARM_PER_MIN, TECH_DELAY, PRIORITY, validateLimit, frameValues, historyCSV,
     NOTICE: 'Educational alarm logic — not a certified clinical alarm system.' };
 });

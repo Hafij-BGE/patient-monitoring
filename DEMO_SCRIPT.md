@@ -1,6 +1,6 @@
 # Demo Script
 
-A demonstration of PM-SIM in about 8 minutes. Each step names what to click, what to say and what the audience should see. Times are cumulative.
+A demonstration of PM-SIM in about 11 minutes. Each step names what to click, what to say and what the audience should see. Times are cumulative.
 
 > **Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.**
 
@@ -17,7 +17,7 @@ A demonstration of PM-SIM in about 8 minutes. Each step names what to click, wha
 
 **Say:**
 
-- PM-SIM simulates a multiparameter bedside monitor: ECG, pulse oximetry, respiration, non-invasive blood pressure and temperature.
+- PM-SIM simulates a multiparameter bedside monitor: ECG, pulse oximetry, respiration, capnography (CO₂), invasive arterial pressure, non-invasive blood pressure and temperature.
 - The signals come from published models. The numbers are then measured *from those signals* by simplified monitor algorithms, the way a real monitor does it.
 - Point at the notice bar: this is an educational simulation, not a medical device.
 - Point at one tile: the large number is the measured value, the small "set" value under it is what the model was told. The difference is the measurement error. The badge shows the data source (here `simulated`).
@@ -52,7 +52,22 @@ A demonstration of PM-SIM in about 8 minutes. Each step names what to click, wha
 
 Return to **Baseline adult**.
 
-## 4. NIBP measurement (3:15–4:30)
+## 4. New waveforms and tiles (3:15–4:30)
+
+**Show:** the six sweeps (ECG, pleth, ART, respiration, CO₂, cuff) and the ART and EtCO₂ tiles. The HR tile also shows the rhythm label.
+
+1. Choose the **V-Tach pattern** preset.
+   - *Expected:* wide QRS complexes at about 170 bpm. Within a few seconds the rhythm label reads *V-Tach* and a **high-priority** V-TACH alarm appears. The ART pulses become smaller.
+   - *Say:* the rhythm label comes from simple rules on QRS width and timing. It is a teaching analyser, not a validated arrhythmia algorithm.
+2. Return to **Baseline adult**, then choose **Hypoventilation (high EtCO2)**.
+   - *Expected:* fewer, longer breaths on the CO₂ trace. EtCO₂ rises toward 58 mmHg. After the 10 s delay the EtCO₂-high alarm appears and the EtCO₂ tile is highlighted.
+3. Return to **Baseline adult**, then choose **Under-damped arterial line**.
+   - *Expected:* ringing on the ART trace and a higher systolic value, while MAP stays about the same.
+   - *Say:* the catheter and transducer act like a spring–mass system. Its natural frequency and damping decide how faithfully the trace follows the true pressure. The values used here are illustrative.
+
+Return to **Baseline adult**.
+
+## 5. NIBP measurement (4:30–5:45)
 
 **Click:** **Start NIBP** in the NIBP tile, then open the **NIBP** tab.
 
@@ -66,11 +81,11 @@ Return to **Baseline adult**.
 
 **Optional:** set **Motion artifact** to 70 % and start again. The measurement fails with "motion artifact" and reports no numbers. Reset afterwards.
 
-## 5. Alarms (4:30–5:30)
+## 6. Alarms (5:45–6:45)
 
 **Click:** the **Alarms** tab.
 
-1. Show the limits table: 7 parameters, each with a low limit, a high limit and a delay.
+1. Show the limits table: 10 parameters, each with a low limit, a high limit and a delay.
 2. Choose the **Tachycardia (fast rate)** preset. After the 5 s delay a HR-high alarm appears in the alarm bar.
 3. Click **Acknowledge**. The alarm stays listed while the condition lasts, but it is marked acknowledged.
 4. Click **Audio pause 2 min**. Show the countdown.
@@ -78,7 +93,28 @@ Return to **Baseline adult**.
 
 **Say:** physiological alarms (patient values) and technical alarms (sensor problems) are kept apart and have different priorities.
 
-## 6. Real data next to the simulation (5:30–6:45)
+## 7. Signal chain (6:45–7:30)
+
+**Click:** the **Signal chain** tab.
+
+1. Choose **ECG**.
+   - *Expected:* numbered stages from the patient model, through electrodes, amplifier and ADC, and the display filter, to the QRS detector's integrator output with its adaptive threshold and the detected beats.
+2. Choose **Arterial line**.
+   - *Expected:* the pressure in the artery and the transducer output on the same scale, with f_n and ζ in the readout.
+
+**Say:** every number on the monitor comes out of a chain like this. Each stage can add error.
+
+## 8. A guided lesson (7:30–8:30)
+
+**Click:** the **Lessons** tab and open **Capnography: reading the CO₂ waveform** (or any other lesson).
+
+1. Show the objectives and click **Load the scenario**.
+2. Click one **Do it** button. The controls change and the effect shows on the monitor.
+3. Answer the 3 quiz questions. Each answer shows an explanation.
+
+**Say:** the quiz is graded in the browser. Only the best score is remembered, in this browser only. It is not measurement data.
+
+## 9. Real data next to the simulation (8:30–9:30)
 
 **Click:** the **Data import/export** tab.
 
@@ -88,9 +124,9 @@ Return to **Baseline adult**.
    - *Expected:* stored as 37.5 °C with source `user`.
 3. Open the **Trends** tab and choose temperature. Simulated, imported and user values are drawn as separate series. Nothing is merged, and gaps are breaks, not zeros.
 
-## 7. Watch data on Android (6:45–7:15)
+## 10. Watch data on Android (9:30–10:00)
 
-This part is a short spoken note, or a planned demonstration on a phone. It is **not** part of the web page: real watch data enters PM-SIM only through the Android app, which wraps the same page. The Android app is still in development and has **not been tested with real hardware**, so do not present any result from it as verified.
+This part is a short spoken note, or an optional demonstration if a phone is available. Real watch data enters PM-SIM only through the Android app, which wraps the same page. In a normal browser the "On this phone" panel is hidden. The Android app has **not been tested with real hardware**, so do not present any result from it as verified.
 
 **Say:**
 
@@ -99,20 +135,26 @@ This part is a short spoken note, or a planned demonstration on a phone. It is *
 - Watch readings are consumer wearable values. In the app they are meant to be shown next to the simulation with their source, and they are never used to generate the ECG.
 - The app has no internet permission, and the data stays on the phone.
 
-**If the phone demonstration is done later:** install the APK (`release/PM-SIM-1.1.0-android.apk`), grant the Health Connect permissions, and show the values that arrive with the route recorded as their source. Until that has been done on a real device, report it as planned.
+**Optional, only if a phone is available:** install the APK (`release/PM-SIM-1.1.0-android.apk`) and open the **Data import/export** tab. The "On this phone" panel appears there.
 
-## 8. Tests (7:15–7:45)
+1. Under **Health Connect**, tap **Allow reading…**, choose a period and tap **Read records**. The message lists the stored and rejected values. The values appear in **Trends** as a separate `device` series.
+2. Under **Bluetooth heart-rate sensor**, tap **Scan**, then **Connect** on a heart-rate device. The last heart rate is shown.
+3. Export a CSV. The Android save dialog opens.
+
+This has not been done on a real device yet. Until it has, report it as planned, not as a result.
+
+## 11. Tests (10:00–10:30)
 
 **Click:** the **Tests** tab, then **Run browser self-test** (or open `index.html?selftest=1`).
 
-**Expected:** 10 pass, 0 fail, 1 not run. Each row shows the input, the expected result and the observed result.
+**Expected:** 14 pass, 0 fail, 1 not run. Each row shows the input, the expected result and the observed result.
 
-**Say:** the one hardware entry (watch data on Android through Health Connect, BLE or an export file) is reported as "not run" because no watch was connected. The app never marks a hardware test as passed without hardware. The same models and parsers are also checked by 47 Node unit tests (`node --test tests/unit/*.test.js`).
+**Say:** the one hardware entry (watch data on Android through Health Connect, BLE or an export file) is reported as "not run" because no watch was connected. The app never marks a hardware test as passed without hardware. The same models and parsers are also checked by 64 Node unit tests (`node --test tests/unit/*.test.js`).
 
-## 9. Closing (7:45–8:00)
+## 12. Closing (10:30–10:45)
 
 **Say:**
 
 - The model, its equations, assumptions and limitations are in `TECHNICAL_REPORT.md`, with sources in `REFERENCES.md`. The Android-only watch routes and their status are in `DEVICE_INTEGRATION_REPORT.md`. The page is online at https://hafij-bge.github.io/patient-monitoring/.
-- Limitations to name aloud: the waveforms come from simplified models, the SpO₂ calibration is a textbook example, NIBP fails under strong motion, and no real watch or sensor was tested.
+- Limitations to name aloud: the waveforms come from simplified models, the SpO₂ calibration is a textbook example, NIBP fails under strong motion, the rhythm analyser is not validated, the capnography and arterial-line constants are illustrative, and no real watch or sensor was tested.
 - Educational simulation only.

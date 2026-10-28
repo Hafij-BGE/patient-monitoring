@@ -50,7 +50,7 @@ Each entry lists what it supports in PM-SIM. Web pages were consulted in October
 18. **Bluetooth SIG.** Heart Rate Service 1.0 and Heart Rate Profile 1.0. https://www.bluetooth.com/specifications/specs/heart-rate-service-1-0/
     Supports: heart-rate notification behaviour used by the Android app's BLE route.
 19. **Android Developers.** Health Connect. https://developer.android.com/health-and-fitness/guides/health-connect
-    Supports: the read-only, permission-based access to heart rate, SpO₂, respiratory rate, blood pressure, body temperature, weight, height and steps in the Android app.
+    Supports: the read-only, permission-based access to heart rate, SpO₂, respiratory rate, blood pressure, body temperature, weight, height and steps in the Android app, and the record fields (time, data origin) kept in the provenance by `src/devices/androidBridge.js`.
 20. **Android Developers.** Bluetooth Low Energy overview. https://developer.android.com/develop/connectivity/bluetooth/ble/ble-overview
     Supports: scanning, GATT connection and notifications in the Android app's native BLE client.
 21. **Regenstrief Institute.** The Unified Code for Units of Measure (UCUM). https://ucum.org/
@@ -64,3 +64,14 @@ Each entry lists what it supports in PM-SIM. Web pages were consulted in October
     Supports: the difference between medical and consumer oximetry and known accuracy limits.
 24. **U.S. Food and Drug Administration.** Pulse Oximeter Accuracy and Limitations: FDA Safety Communication, 19 February 2021. https://www.fda.gov/medical-devices/products-and-medical-procedures/pulse-oximeters
     Supports: limitations of SpO₂ readings mentioned in the report and the app.
+
+## Capnography, arterial line and rhythm analysis
+
+These entries were added on 2026-10-28 with the capnography, arterial-line and arrhythmia features. The constants used in PM-SIM for these features are teaching choices and are not taken from these documents (see `TECHNICAL_REPORT.md` sections 3.8–3.10).
+
+25. **Gardner RM.** Direct blood pressure measurement—dynamic response requirements. *Anesthesiology.* 1981;54:227–236.
+    Supports: describing a fluid-filled catheter–transducer system by its natural frequency and damping coefficient, and the effect of under- and over-damping on systolic and diastolic readings (`src/sim/engine.js`, IBP damping).
+26. **ISO 80601-2-55.** Medical electrical equipment, Part 2-55: Particular requirements for the basic safety and essential performance of respiratory gas monitors.
+    Supports: vocabulary only (end-tidal and inspired CO₂, sidestream sampling). PM-SIM does not claim compliance.
+27. **IEC 60601-2-27.** Medical electrical equipment, Part 2-27: Particular requirements for the basic safety and essential performance of electrocardiographic monitoring equipment.
+    Supports: the note that a clinical arrhythmia detector is tested against annotated ECG databases (`src/sim/arrhythmia.js`). The rhythm alarm priorities in `src/alarms/alarmEngine.js` are set only in the spirit of this standard. PM-SIM's rhythm analyser was not tested this way and does not claim compliance.

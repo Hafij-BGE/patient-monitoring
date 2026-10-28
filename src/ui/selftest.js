@@ -67,6 +67,23 @@
         const ok = p.hr === 300 && p.contact === 'detected' && p.rrIntervals.join() === '1,0.5' && art.quality === 'artifact' && art.source === 'device' && rejected;
         return { pass: ok, observed: 'hr ' + p.hr + ', contact ' + p.contact + ', RR ' + p.rrIntervals.join('/') + ' s; no-contact ' + art.quality + '; truncated rejected: ' + rejected };
       } },
+    { name: 'V-Tach pattern preset', expected: 'rhythm classified vtach and rhythm:vtach alarm active',
+      run() { const r = sim(preset('vt'), 20, { alarms: true }); const on = r.st.active.some(a => a.id === 'rhythm:vtach');
+        return { pass: r.f.est.rhythm === 'vtach' && on, observed: 'rhythm ' + r.f.est.rhythm + ', HR ' + fmt(r.f.est.hr) + ', rhythm:vtach ' + (on ? 'active' : 'not active') }; } },
+    { name: 'Hypoventilation preset: capnography', expected: 'EtCO₂ within ±3 mmHg of 58, EtCO₂ high alarm active after its 10 s delay',
+      run() { const r = sim(preset('hypovent'), 30, { alarms: true }); const on = r.st.active.some(a => a.id === 'etco2:high');
+        return { pass: near(r.f.est.etco2, 58, 3) && on, observed: 'EtCO₂ ' + fmt(r.f.est.etco2, 1) + ' mmHg, etco2:high ' + (on ? 'active' : 'not active') }; } },
+    { name: 'Arterial line: optimal vs under-damped', expected: 'optimal SYS/DIA within ±5 of 120/80; under-damped SYS ≥ 8 mmHg higher with MAP within ±2',
+      run() { const a = sim(preset('baseline'), 20).f.est.art, b = sim(preset('underdamped'), 20).f.est.art;
+        const ok = a && b && near(a.sys, 120, 5) && near(a.dia, 80, 5) && b.sys - a.sys >= 8 && Math.abs(b.map - a.map) <= 2;
+        return { pass: !!ok, observed: a && b ? 'optimal ' + fmt(a.sys) + '/' + fmt(a.dia) + ' (' + fmt(a.map) + '), under-damped ' + fmt(b.sys) + '/' + fmt(b.dia) + ' (' + fmt(b.map) + ')' : 'no ART value' }; } },
+    { name: 'Health Connect records (Android bridge logic)', expected: 'valid record stored as source "device"; SpO₂ 150 % rejected, not clamped',
+      run() { const r = PM.androidBridge.healthConnectToObservations({ records: [
+          { param: 'hr', value: 61, unit: 'bpm', time: Date.UTC(2026, 0, 1), type: 'HeartRateRecord' },
+          { param: 'spo2', value: 150, unit: '%', time: Date.UTC(2026, 0, 1), type: 'OxygenSaturationRecord' }] });
+        const o = r.observations[0];
+        return { pass: r.observations.length === 1 && o.source === 'device' && o.provenance.route === 'health-connect' && r.rejected.length === 1,
+          observed: r.observations.length + ' stored (' + (o ? o.param + ' ' + o.value + ', ' + o.source : '-') + '), ' + r.rejected.length + ' rejected' }; } },
     { name: 'Watch data on Android (Health Connect / BLE / export file, hardware)', expected: 'readings arrive with source "device" and the route in the provenance', hardware: true },
   ];
 
