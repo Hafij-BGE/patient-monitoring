@@ -8,11 +8,11 @@ PM-SIM, Patient Monitor Simulator. Updated 2026-10-28 after the device integrati
 
 | Test level | Result |
 |---|---|
-| Node unit tests (`node --test tests/unit/*.test.js`) | **78 tests in 10 files, 78 pass, 0 fail** (run 2026-10-28 after the glucose model; it was 64 tests before the scenario and glucose tests, and 47 before that) |
+| Node unit tests (`node --test tests/unit/*.test.js`) | **79 tests in 10 files, 79 pass, 0 fail** (run 2026-10-28 after the NIBP set-point fix; 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
 | Browser self-test (`index.html?selftest=1`) | **16 entries: 15 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-28: **15 pass, 0 fail, 1 not run** (section 3). |
 | Manual interaction checks in a browser | 9 earlier checks (section 4.1) and 5 checks of the new features made on 2026-10-28 (section 4.2), all as expected. |
 | Hardware tests (watch data on Android through Health Connect, native BLE Heart Rate Service, export file) | **Not run.** No watch, heart-rate sensor or Health Connect store was used. |
-| Android app | Not tested on a device. An APK file (`release/PM-SIM-1.2.0-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
+| Android app | Not tested on a device. An APK file (`release/PM-SIM-1.2.1-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
 | Website | Published from `.github/workflows/pages.yml`, which runs the unit tests before deploying. The deployed site was not checked as part of this report. |
 | Opening from `file://` | Checked statically only (section 5) |
 
@@ -93,11 +93,11 @@ When served over `http://localhost`, the app made no network requests other than
 
 ## 6. Node unit and integration tests
 
-78 tests in 10 files (17 + 10 + 4 + 13 + 3 + 10 + 3 + 4 + 6 + 8). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
+79 tests in 10 files (18 + 10 + 4 + 13 + 3 + 10 + 3 + 4 + 6 + 8). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
 
 The first five files were already described before the new features were added. Their counts did not change.
 
-### `tests/unit/sim.test.js` (17 tests)
+### `tests/unit/sim.test.js` (18 tests)
 
 - §19.1 HR 60 bpm gives a 1.000 s beat interval (model and detector).
 - §19.2 RR 12 br/min gives a 5 s breathing cycle; the detector reports 12.
@@ -105,6 +105,7 @@ The first five files were already described before the new features were added. 
 - §19.4 Pulse pressure = SBP − DBP in the NIBP result.
 - The NIBP oscillometric estimate stays within ±5 mmHg of the set point in low-noise cases.
 - NIBP fails with a message under strong motion, and re-inflates when SBP is above the first target.
+- NIBP aborts when the pressure set point changes during a measurement (120/80 to 78/42 while the cuff deflates gives "patient pressure changed during measurement; repeat" and a technical failure, not a reading). The next measurement at the new set point is within ±5 mmHg of 78/42, and a change of 3 mmHg during a measurement does not abort it. Before the fix this test failed: the mixed oscillogram gave 121/112 mmHg with no error.
 - Oscillogram analysis rejects too few beats.
 - The SpO₂ estimator tracks the set point and reports SQI, PI and pulse rate.
 - Motion biases SpO₂ toward R ≈ 1 (≈ 85 %) and lowers SQI.

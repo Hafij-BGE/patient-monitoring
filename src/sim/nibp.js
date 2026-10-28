@@ -9,7 +9,14 @@
  *   P_c + G·[v(p_art − P_c) − v(DBP − P_c)]
  * as it deflates linearly. The monitor side extracts one oscillation amplitude per
  * beat, takes MAP at the maximum and SBP/DBP where the envelope falls to Ks·max and
- * Kd·max (fixed-ratio method; Geddes 1982, Forouzanfar 2015). */
+ * Kd·max (fixed-ratio method; Geddes 1982, Forouzanfar 2015).
+ *
+ * Set-point change: an oscillogram that mixes beats from two pressure levels
+ * gives a wrong reading that the envelope analysis can still accept. The
+ * measurement is therefore aborted when the simulated SBP or DBP moves more than
+ * SETPOINT_TOL from its value at the start, or the arterial stiffness changes.
+ * This is a simulator rule (the model knows the set point); a real monitor has
+ * to infer instability from the oscillations themselves. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(require('./dsp.js'));
   else (root.PM = root.PM || {}).nibp = factory(root.PM.dsp);
@@ -19,6 +26,8 @@
   const W_COLLAPSE = 3, W_DISTEND = 15, GAIN = 3; // mmHg
   const MIN_OSC = 0.5; // mmHg: oscillations below this are treated as noise when deciding to stop
   const INFLATE_RATE = 25, DUMP_RATE = 50, TIMEOUT = 120; // mmHg/s, mmHg/s, s
+  const SETPOINT_TOL = 5; // mmHg: larger SBP/DBP changes during a measurement abort it
+  const SETPOINT_ERROR = 'patient pressure changed during measurement; repeat';
 
   function volume(P, stiffness) {
     const w = (P < 0 ? W_COLLAPSE : W_DISTEND) * (stiffness || 1);
@@ -67,6 +76,7 @@
       const lastS = this.last && this.last.sbp ? this.last.sbp : 0;
       this.target = Math.min(280, Math.max(160, lastS + 30) + this.extra);
       this.state = 'inflating'; this.t0 = t; this.seg = []; this.beats = []; this.msg = 'inflating'; this.retried = false;
+      this.ref = null; // set point, taken on the first step
       return true;
     }
     cancel(t) { if (this.state === 'inflating' || this.state === 'deflating') this.finish(t, { error: 'cancelled by user' }); }
@@ -85,6 +95,11 @@
     }
     /** Called at 100 Hz. art = true arterial pressure, beatStart = a pulse onset occurred since the last call. */
     step(t, dt, p, art, beatStart) {
+      if (this.state === 'inflating' || this.state === 'deflating') {
+        if (!this.ref) this.ref = { sbp: p.sbp, dbp: p.dbp, stiffness: p.stiffness };
+        else if (Math.abs(p.sbp - this.ref.sbp) > SETPOINT_TOL || Math.abs(p.dbp - this.ref.dbp) > SETPOINT_TOL || p.stiffness !== this.ref.stiffness)
+          this.finish(t, { error: SETPOINT_ERROR });
+      }
       if (this.state === 'inflating') {
         this.cuff = Math.min(this.target, this.cuff + INFLATE_RATE * dt);
         if (this.cuff >= this.target) { this.state = 'deflating'; this.msg = 'deflating'; this.seg = []; this.segOk = false; }
@@ -126,5 +141,5 @@
     }
   }
 
-  return { Nibp, analyse, volume, W_COLLAPSE, W_DISTEND, GAIN };
+  return { Nibp, analyse, volume, W_COLLAPSE, W_DISTEND, GAIN, SETPOINT_TOL };
 });

@@ -77,6 +77,34 @@ test('NIBP fails with a message under strong motion; re-inflates when SBP is abo
   assert.ok(r2 && !r2.error && r2.target > 175, 'target ' + (r2 && r2.target));
 });
 
+test('NIBP aborts when the pressure set point changes during a measurement; small drift is accepted', () => {
+  // Reproduces the report defect: baseline 120/80, switch to 78/42 while the cuff deflates.
+  const e = new Engine({});
+  let res = null;
+  e.onNibp = r => { res = r; };
+  e.startNibp();
+  while (e.nibp.state !== 'deflating' || e.nibp.cuff > 110) e.advance(0.1);
+  e.setParams({ sbp: 78, dbp: 42 });
+  e.advance(120);
+  assert.ok(res && res.error && /changed during/.test(res.error), 'result ' + JSON.stringify(res && { e: res.error, s: res.sbp, d: res.dbp }));
+  assert.equal(e.lastFrame.technical.nibpFailed, true);
+  // the next measurement at the new set point is normal
+  res = null;
+  e.startNibp();
+  e.advance(120);
+  assert.ok(res && !res.error, 'repeat: ' + (res && res.error));
+  assert.ok(Math.abs(res.sbp - 78) <= 5 && Math.abs(res.dbp - 42) <= 5, res.sbp + '/' + res.dbp);
+  // a change of up to 5 mmHg does not abort
+  const d = new Engine({});
+  let r2 = null;
+  d.onNibp = r => { r2 = r; };
+  d.startNibp();
+  while (d.nibp.state !== 'deflating' || d.nibp.cuff > 110) d.advance(0.1);
+  d.setParams({ sbp: 123, dbp: 78 });
+  d.advance(120);
+  assert.ok(r2 && !r2.error, 'drift: ' + (r2 && r2.error));
+});
+
 test('oscillogram analysis rejects too few beats', () => {
   assert.match(analyse([{ pc: 100, amp: 1 }], 0.5, 0.8).error, /too few/);
 });
