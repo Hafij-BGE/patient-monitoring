@@ -1,6 +1,6 @@
 {
   "name": "pm-sim",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "PM-SIM: educational patient monitor simulator (ECG, SpO2, NIBP, respiration, temperature)",
   "private": true,
   "license": "MIT",

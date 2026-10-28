@@ -28,8 +28,8 @@ PM-SIM needs no installation, no build step, no network access after loading and
 
    (also `npm start`, see `package.json`), then open `http://localhost:8766/`.
 3. **Directly from the file:** open `index.html` in a browser. This works from `file://` because the page uses plain scripts and no network calls.
-4. **Android app (in development):** `android/` holds a WebView wrapper (package `edu.deu.pmsim`, version 1.2.0) that loads the same web page from the app's own assets. It is the **only** place where real watch data enters the app, through three routes: Android Health Connect (read with the user's permission), native Bluetooth LE Heart Rate Service 0x180D, and import of a health-app export file. The app is still being built and **nothing has been tested with real hardware**. Build notes are in `android/README.md`. 
-5. **Linux desktop app (.deb):** `desktop/` holds a small Electron shell that shows the same page from inside the package (no preload, no device access, same CSP). `desktop/build-deb.sh` builds `release/PM-SIM-1.2.0-amd64.deb`; install with `sudo apt install ./PM-SIM-1.2.0-amd64.deb` and start **PM-SIM** from the application menu.
+4. **Android app (in development):** `android/` holds a WebView wrapper (package `edu.deu.pmsim`, version 1.2.1) that loads the same web page from the app's own assets. It is the **only** place where real watch data enters the app, through three routes: Android Health Connect (read with the user's permission), native Bluetooth LE Heart Rate Service 0x180D, and import of a health-app export file. The app is still being built and **nothing has been tested with real hardware**. Build notes are in `android/README.md`. 
+5. **Linux desktop app (.deb):** `desktop/` holds a small Electron shell that shows the same page from inside the package (no preload, no device access, same CSP). `desktop/build-deb.sh` builds `release/PM-SIM-1.2.1-amd64.deb`; install with `sudo apt install ./PM-SIM-1.2.1-amd64.deb` and start **PM-SIM** from the application menu.
 6. **Windows desktop app (.exe):** the same Electron shell, built on a GitHub Windows runner by `.github/workflows/windows.yml` (run it by hand with a release tag). It adds an NSIS installer, a portable `.exe` and a `.zip` to that release. The files are not code-signed, so Windows SmartScreen shows a warning.
 
 Useful URL options:
@@ -48,7 +48,7 @@ Requires Node.js 18 or later. No packages to install.
 node --test tests/unit/*.test.js
 ```
 
-Current result: 78 tests, 78 pass. Details are in `TEST_REPORT.md`.
+Current result: 79 tests, 79 pass. Details are in `TEST_REPORT.md`.
 
 ## Features
 
@@ -93,7 +93,7 @@ src/devices/
   androidBridge.js      turns Health Connect records and BLE notifications from the Android app into observations
 src/lessons/            lesson content and quiz grading (no DOM)
 src/ui/                 canvas waveforms and trends, panels (signal chain, lessons, Android section, glucose), data tab, self-test, app wiring
-android/                Android WebView app (edu.deu.pmsim 1.2.0, in development): Health Connect and BLE bridge
+android/                Android WebView app (edu.deu.pmsim 1.2.1, in development): Health Connect and BLE bridge
 desktop/                Linux .deb and Windows .exe: Electron shell (main.cjs), package config and build-deb.sh
 .github/workflows/
   pages.yml             runs the unit tests and deploys the site to GitHub Pages
