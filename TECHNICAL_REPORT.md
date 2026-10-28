@@ -24,17 +24,17 @@ The set point of every parameter is known, so the app shows each estimate next t
 | Layer | Files | Role |
 |---|---|---|
 | Core data | `src/core/observation.js`, `units.js`, `profile.js`, `store.js` | Observation model, unit conversion, BMI/BSA, per-source time series |
-| Simulation | `src/sim/params.js`, `rng.js`, `dsp.js`, `ecg.js`, `arrhythmia.js`, `pulse.js`, `sensors.js`, `nibp.js`, `detectors.js`, `engine.js` | Parameters, presets, signal models, arrhythmia patterns, estimators, the time-stepping engine |
-| Alarms | `src/alarms/alarmEngine.js` | Limit checks, rhythm alarms, delays, priorities, acknowledge, audio pause, history |
+| Simulation | `src/sim/params.js`, `rng.js`, `dsp.js`, `ecg.js`, `arrhythmia.js`, `pulse.js`, `sensors.js`, `nibp.js`, `detectors.js`, `glucose.js`, `engine.js` | Parameters, presets, signal models, arrhythmia patterns, glucose–insulin model and projection, estimators, the time-stepping engine |
+| Alarms | `src/alarms/alarmEngine.js`, `severity.js` | Limit checks, rhythm alarms, delays, priorities, acknowledge, audio pause, history |
 | Data I/O | `src/data/csv.js`, `importer.js` | CSV/JSON parsing, column mapping, units, time zones, validation |
 | Lessons | `src/lessons/lessons.js` | Lesson content (objectives, steps, quiz questions) and quiz grading; no DOM |
 | Device parser and bridge | `src/devices/gatt.js`, `androidBridge.js` | Parser for the Bluetooth Heart Rate Measurement characteristic (0x2A37); conversion of Health Connect records and BLE packets from the Android app into observations |
-| UI | `src/ui/*.js` (including `chainPanel.js`, `lessonsPanel.js`, `androidPanel.js`), `index.html`, `css/` | Canvas rendering, panels and wiring. Tabs: Controls, NIBP, Alarms, Trends, Data import/export, Profile, Signal chain, Lessons, Science, Tests, References |
+| UI | `src/ui/*.js` (including `chainPanel.js`, `lessonsPanel.js`, `androidPanel.js`, `glucosePanel.js`), `index.html`, `css/` | Canvas rendering, panels and wiring. Tabs: Controls, NIBP, Alarms, Trends, Glucose, Data import/export, Profile, Signal chain, Lessons, Science, Tests, References |
 | Android host | `android/` (Kotlin) | WebView wrapper around the same page, with a Health Connect reader, a native BLE Heart Rate client and a save dialog for exports (not tested with real hardware) |
 
 The simulation, alarm, data and parser modules never touch the DOM. Each uses a UMD wrapper, so the same file runs in the browser (`window.PM.*`) and in Node for the unit tests. There is no build step and no ES-module import, so `index.html` also works from `file://`.
 
-**Website and Android app.** The page is published as a static website at https://hafij-bge.github.io/patient-monitoring/ by the GitHub Actions workflow `.github/workflows/pages.yml`, which runs the unit tests and then deploys `index.html`, `css/`, `src/` and `fixtures/`. It can also be served locally (`python3 -m http.server 8766`) or opened from `file://`. The Content Security Policy (`connect-src 'none'`) means the page makes no network requests. The Android app (`android/`, package `edu.deu.pmsim`, version 1.1.0) wraps the same page in a WebView. It is the only place where real watch data enters (section 7.2) and it has not been tested with real hardware. The earlier Electron desktop app (with the hospital routes and the Windows build) was removed on 2026-10-28. For v1.1.0 a new, minimal Linux desktop app was added in `desktop/`: an Electron shell that shows the same page from inside a `.deb` package, with no preload script, no Node access in the page and no device access, so the page's CSP applies unchanged. It was smoke-tested under a virtual X display (Xvfb): the page loaded and the browser self-test gave 14 passed, 0 failed, 1 not run.
+**Website and Android app.** The page is published as a static website at https://hafij-bge.github.io/patient-monitoring/ by the GitHub Actions workflow `.github/workflows/pages.yml`, which runs the unit tests and then deploys `index.html`, `css/`, `src/` and `fixtures/`. It can also be served locally (`python3 -m http.server 8766`) or opened from `file://`. The Content Security Policy (`connect-src 'none'`) means the page makes no network requests. The Android app (`android/`, package `edu.deu.pmsim`, version 1.1.0) wraps the same page in a WebView. It is the only place where real watch data enters (section 7.2) and it has not been tested with real hardware. The earlier Electron desktop app (with the hospital routes and the Windows build) was removed on 2026-10-28. For v1.1.0 a new, minimal Linux desktop app was added in `desktop/`: an Electron shell that shows the same page from inside a `.deb` package, with no preload script, no Node access in the page and no device access, so the page's CSP applies unchanged. It was smoke-tested under a virtual X display (Xvfb): the page loaded and the browser self-test of v1.1.0 gave 14 passed, 0 failed, 1 not run. After the glucose model was added the self-test has 16 entries; the browser run gave 15 passed, 0 failed, 1 not run.
 
 ### 2.1 Time base
 
@@ -318,6 +318,78 @@ The last stage can be saved as a PNG image.
 
 **Monitor screen.** Six sweeping waveforms: ECG, pleth (auto scale), ART (0–200 mmHg), respiration (auto scale), CO₂ (0–60 mmHg) and cuff pressure (0–300 mmHg). Respiration, CO₂ and cuff sweep at 6.25 mm/s. The HR tile also shows the rhythm label and the PVC rate. The ART tile shows SYS/DIA (MAP) with the set point and the SYS limits. The EtCO₂ tile shows FiCO₂ and awRR. The page layout adapts to narrow screens (one column at 1100 px and below, a phone layout at 720 px and below).
 
+### 3.12 Scenarios (presets) and the scenario selector
+
+A scenario sets **every** patient-profile, physiological and sensor control: it starts from the defaults and applies its own changes, so nothing from the previous scenario remains. Processing and display settings (filters, sweep, averaging, NIBP interval, speed, seed) are kept. When any patient or sensor control is changed by hand, in Controls or in the Profile tab, the selector shows **Custom (edited)**. If the values are changed back to those of a scenario, the selector shows that scenario again (`matchPreset` in `src/sim/params.js`).
+
+There are 40 scenarios. The first 25 change one or two signs, or one sensor setting. The other 15 are **combined-sign patterns taken from the literature**. Each lists its sources (field `refs`, entries 28–44 and 51 of `REFERENCES.md`) and a teaching note, which the app shows when the scenario is loaded.
+
+| Scenario | Values (others at default) | Sources |
+|---|---|---|
+| Blood loss, ATLS class II | HR 110, 118/92 mmHg, RR 24 | 28, 29 |
+| Blood loss, ATLS class III | HR 130, 88/68 mmHg, RR 32, PI 0.8 % | 28–30 |
+| Infection screening (SIRS / qSOFA) | HR 112, RR 24, 96/58 mmHg, 38.7 °C | 31 |
+| Acute allergic reaction | 78/42 mmHg, HR 128, SpO₂ 90 %, obstruction 60 %, RR 24, EtCO₂ 30 | 32, 33, 35 |
+| Hypoventilation masked by O₂ | RR 7, EtCO₂ 55 (SpO₂ stays 97 %) | 34, 35 |
+| Compensatory hyperventilation | RR 28, EtCO₂ 24, HR 115, 102/64 mmHg | 35, 36 |
+| Dead-space pattern (PE-type) | HR 115, SpO₂ 89 %, 105/70 mmHg, EtCO₂ 30, RR 24 | 37, 38 |
+| Hypothermia stage II | 30.5 °C, HR 45, 92/58 mmHg, RR 9, PI 0.3 % | 39 |
+| Hypermetabolic, early (MH-type) | EtCO₂ 60, HR 125, RR 12, 37.6 °C | 40, 41 |
+| Hypermetabolic, late (MH-type) | EtCO₂ 75, HR 145, RR 12, 39.5 °C, PVC pattern | 40, 41 |
+| Obstructive hypercapnic (COPD-type) | SpO₂ 89 %, EtCO₂ 52, obstruction 60 %, RR 24, HR 100 | 35, 42 |
+| Raised-potassium ECG, early | T-wave size 1.9× | 43 |
+| Raised-potassium ECG, late | T 1.9×, P 0.3×, QRS width 1.7× | 43 |
+| Raised-ICP reflex (Cushing) | 200/90 mmHg, HR 46, RR 8 | 44 |
+| Hyperglycaemic-crisis pattern (DKA-type) | type 1 diabetes, fasting glucose 320 mg/dL, no basal insulin, RR 28, EtCO₂ 24, HR 115, 102/64 mmHg | 35, 36, 51 |
+
+Where a source gives a range (for example ATLS class III: HR 120–140, RR 30–40) the value lies inside it. Where a source gives only a direction (for example "pulse pressure decreased", "bradycardia"), the number is an **illustrative choice** in that direction. The ECG scale factors for raised potassium are illustrative; the source gives only the order of the changes, and the patterns carry no potassium values. The DKA-type pattern shows only glucose above 250 mg/dL together with the compensatory breathing of [35, 36]; ketones, pH and potassium are not modelled. Every scenario is an illustrative pattern for education only. Real presentations vary and the values are not diagnostic. A unit test checks that every sourced scenario passes validation without clamping, that its references exist in `REFERENCES.md` and that no two scenarios have the same settings.
+
+### 3.13 Glucose–insulin model and projection
+
+`src/sim/glucose.js` (pure, no DOM) adds plasma glucose and insulin to the simulated patient. It joins three published model parts. Time is in minutes. Numbers in brackets are entries in `REFERENCES.md`.
+
+```
+Glucose, Bergman minimal model [45], insulin action in the form of [47]:
+  dG/dt = −(SG + X)·G + SG·Gb + Ra          G  plasma glucose, mg/dL
+  dX/dt = −p2·X + p2·SI·(I − Ib)            X  insulin action, 1/min
+Meal absorption, two-compartment gut [48]:
+  dD1/dt = −D1/tG,  dD2/dt = (D1 − D2)/tG,  Ra = D2/tG · MW/VG     a meal adds AG·carbs to D1
+Subcutaneous insulin [48]:
+  dS1/dt = u − S1/tI,  dS2/dt = (S1 − S2)/tI,  dI/dt = S2/(tI·VI) − ke·I + secretion
+Endogenous secretion (no diabetes and type 2 only):
+  secretion = ke·I_fast + σ·max(0, G − Gb)
+```
+
+The model starts in steady state at the set fasting glucose Gb and the set basal rate u. Only I − Ib acts on glucose, so the fasting insulin value sets the level shown in the tile, not the glucose response. MW = 180.16 mg/mmol (molar mass of glucose); 1 mmol/L = 18.016 mg/dL. The integration is forward Euler with steps of at most 0.5 min. G is held in 1–1000 mg/dL and I ≥ 0. The uptake term SG + X is held at ≥ 0, which keeps the system bounded; [53] discusses this property of the minimal model.
+
+| Parameter | Value | Source |
+|---|---|---|
+| VG, glucose distribution volume | 0.16 L/kg (1.6 dL/kg) | [48] |
+| VI, insulin distribution volume | 0.12 L/kg | [48] |
+| ke, insulin elimination | 0.138 /min | [48] |
+| tI, subcutaneous absorption time-to-maximum | 55 min | [48] |
+| AG, carbohydrate bioavailability | 0.8 | [48] |
+| tG, meal appearance time-to-maximum | 40 min | [48] |
+| p2, insulin action rate | 0.0113 /min (mean of the 10 subjects in Table 1 of [47], calculated here) | [47] |
+| SG, glucose effectiveness | 0.026 /min (normal subjects, regular FSIGT) | [46] |
+| SI, no diabetes | 4.1 × 10⁻⁴ /min per µU/mL | [49] |
+| SI, type 2 | 0.61 × 10⁻⁴ /min per µU/mL | [49] |
+| SI, type 1 | 4.1 × 10⁻⁴ (inside the type 1 range of [47]) | [47], [49] |
+| Secretion, type 1 | none (structural choice, as in [47]) | [47] |
+| σ, secretion gain above fasting | 0.1 µU/mL per min per mg/dL | **illustrative** |
+| Secretion gain, type 2 | 0.5 × σ | **illustrative**, direction from [50] |
+| Fasting insulin | user-set, 2–50 µU/mL (default 10) | **illustrative** |
+
+σ was chosen so the "no diabetes" model returns close to fasting within about 3 h after a 50 g meal. It is not a fitted or published value.
+
+**Controls** (group *Glucose and insulin* in the Controls tab): fasting glucose 50–400 mg/dL, fasting insulin 2–50 µU/mL, basal insulin 0–5 U/h. The *glucose model time scale* (1×, 10× or 60×) is in the processing group. The default is 60×: one simulated second is one model minute, so a meal response is visible within a few minutes. Diabetes status (none, type 1, type 2) and weight are in the patient profile, which is part of the Controls tab. Changing diabetes status, fasting glucose, fasting insulin or weight restarts the model in steady state. Changing the basal rate acts as a step change from the current state.
+
+**Glucose tab** (`src/ui/glucosePanel.js`). *Give now* adds a meal (0–200 g carbohydrate) or a subcutaneous bolus (0–30 U) to the running model. *Projection* runs a copy of the model forward 2, 3 or 4 h (`forecast()` in `glucose.js`) with an optional planned meal and bolus at chosen minutes. It draws this curve next to the same model with no further events. It reports the first time glucose crosses 70, 54, 180 and 250 mg/dL and the percentage of time in 70–180 mg/dL. The thresholds are the consensus CGM ranges of [52] and the level 1 and level 2 hypoglycaemia values of [51]. The plot and the tab carry the label "Model projection, not a clinical prediction". The projection uses population parameters. It is not fitted to any person, does not learn from data and is not dosing advice.
+
+**Monitor and alarms.** The GLU tile shows glucose in mg/dL and mmol/L, insulin in µU/mL and the model clock, with a "model" badge. There is no glucose sensor or CGM model, so the value shown is the model value. Glucose and insulin are stored as `simulated` observations with the method text "(model value, no sensor)". Alarm defaults: glucose < 70 or > 180 mg/dL (medium priority), and < 54 mg/dL (level 2, high priority).
+
+**Measured behaviour** (`tests/unit/glucose.test.js`). Fasting 90 mg/dL, 50 g meal, no basal insulin. Peak / 2 h / 4 h values: no diabetes 167 / 120 / 83 mg/dL; type 2 183 / 162 / 100; type 1 without insulin 185 / 167 / 105. In type 1 (fasting 200 mg/dL, basal 0.8 U/h) a 6 U bolus lowers the 4 h value by more than 10 mg/dL.
+
 ## 4. Data model and provenance
 
 Every stored value is an immutable observation:
@@ -340,12 +412,14 @@ The store keeps one series per (source, parameter). Series are never merged acro
 
 ## 5. Patient profile
 
+Age, sex, height, weight and diabetes status are simulation parameters (group *Patient profile* at the top of the Controls tab). The Profile tab shows and edits the same values, so both always agree, and a change in either sets the scenario selector to Custom. Ranges: age 18–100 years (the vital-sign models are adult), height 120–220 cm, weight 30–250 kg. The label and the weight history stay in the Profile tab only.
+
 - **BMI** = weight (kg) / height (m)².
 - **BSA** (Mosteller 1987) = √(height (cm) × weight (kg) / 3600) m².
 - The WHO adult BMI categories (< 18.5, 18.5–24.9, 25.0–29.9, ≥ 30) are shown **only from age 20**. Below that the app explains that BMI-for-age references are needed and shows no category.
 - Weight history records dated weights and shows the absolute and percentage change.
 
-BMI and BSA are stored as `derived`. They do not change any simulated signal.
+BMI and BSA are stored as `derived`. Age, sex, height, BMI and BSA do not change any simulated signal. Weight and diabetes status are inputs of the glucose model only (section 3.13).
 
 ## 6. Alarm system
 
@@ -365,6 +439,7 @@ The alarm engine uses the vocabulary of IEC 60601-1-8 (alarm condition, delay, p
 | EtCO₂ (mmHg) | 30 | 45 | 10 s |
 | ART SYS (mmHg) | 90 | 160 | 5 s |
 | ART MAP (mmHg) | 65 | 110 | 5 s |
+| Glucose (mg/dL, model value) | 70 | 180 | 0 s |
 
 These defaults are illustrative and editable. They are not clinical recommendations.
 
@@ -372,6 +447,7 @@ These defaults are illustrative and editable. They are not clinical recommendati
 - Comparison is strict: a value equal to the limit does not alarm.
 - Physiological alarms are medium priority. **Apnea** is high priority and replaces the RR-low alarm.
 - Missing values never raise a physiological alarm. They raise a technical alarm instead.
+- **Glucose level 2:** below 54 mg/dL a separate high-priority alarm "GLUCOSE < 54 (level 2)" is raised as well. The 70, 180 and 54 mg/dL values follow [51, 52].
 
 **Rhythm alarms** come from the rhythm label of section 3.10. The priorities follow the spirit of IEC 60601-2-27; they do not claim compliance.
 
@@ -391,6 +467,8 @@ These defaults are illustrative and editable. They are not clinical recommendati
 - *Audio paused* silences all tones for a 120 s countdown. Visual indication continues.
 - Alarms are non-latching: an alarm ends when its condition ends.
 - Every alarm is written to the history with condition start, activation, end and acknowledge times. The history can be exported as CSV.
+
+**Showing several alarms and where they come from** (`src/alarms/severity.js`). The alarm bar lists **every** active alarm, highest priority first, after a count such as "3 alarms: 1 high, 2 medium". Each active alarm is also linked to the tiles and the controls it concerns (for example SpO₂ probe off → SpO₂ tile and the *SpO₂ probe state* control; low SQI → SpO₂ tile and the motion, PPG noise and perfusion controls). Tiles and controls are coloured by the highest priority present: red for high, amber for medium, dashed cyan for technical (low). The alarm text is shown inside the tile and under the control. A control whose value differs from its default is marked "not default". The colours follow only what the alarm engine reports; `severity.js` contains no thresholds of its own.
 
 ## 7. Data import and watch data
 
@@ -449,6 +527,7 @@ The WebView page is served from the app's own assets and has no network access; 
 8. Temperature is a first-order lag with no site differences.
 9. Set points change instantly. There is no physiological coupling between parameters; for example, changing SpO₂ does not change HR. The only coupling is through the perfusion state: when beats stop, ART, pleth and the CO₂ plateau fall.
 10. Default alarm limits and delays are illustrative.
+11. Glucose and insulin follow the population model of section 3.13. They are not coupled to the cardiovascular or respiratory signals; the DKA-type scenario sets those signs separately.
 
 ## 9. Limitations
 
@@ -465,6 +544,7 @@ These were observed or are known from the model design:
 - **Rhythm analysis** is a set of simple rules, not a validated arrhythmia algorithm. It was checked only on the simulator's own patterns. The 75 ms width threshold was tuned on these waveforms, so the measured QRS width reads lower than a clinical QRS duration. Noisy ECG or dropouts can give wrong labels.
 - **Capnography and arterial line** parameters (wave shape constants, f_n, ζ, the perfusion time constants) are illustrative. They show the effects qualitatively and are not fitted to measured data.
 - **Watch data** (Android app only) has not been tested with any real watch, heart-rate sensor or Health Connect store. Consumer wearable readings are not clinical measurements (see `TEST_REPORT.md`).
+- **Glucose model.** Population parameters only; no person is fitted. Renal glucose excretion, glucagon, counter-regulation, exercise and the change of endogenous glucose output with insulin are not modelled. Without insulin action, glucose still returns towards fasting through SG (glucose effectiveness), so untreated type 1 hyperglycaemia resolves slowly in the model, unlike in reality. Minimal-model SI is lower than clamp-derived sensitivity (about 66 % lower in [54]), so a bolus has a modest effect. Secretion gain σ, the type 2 factor 0.5 and fasting insulin are illustrative. There is no CGM or glucose meter model (no sensor lag, no noise). Ketones and pH are not modelled.
 - Measurements are not persisted between sessions. Only the best lesson quiz scores are kept, in the browser's `localStorage`.
 
 ## 10. References

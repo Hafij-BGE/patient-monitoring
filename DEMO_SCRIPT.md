@@ -41,7 +41,7 @@ A demonstration of PM-SIM in about 11 minutes. Each step names what to click, wh
 
 ## 3. Presets (2:15–3:15)
 
-**Use:** the preset selector in the top bar. Each preset changes only the controls it names, and the message lists them.
+**Use:** the preset selector in the top bar. Each preset sets all patient, physiology and sensor controls: its own values, all others at default. The message lists the changed controls, and literature patterns also show their note and sources. Changing a control by hand switches the selector to **Custom (edited)**.
 
 | Preset | What to point out |
 |---|---|
@@ -124,6 +124,20 @@ Return to **Baseline adult**.
    - *Expected:* stored as 37.5 °C with source `user`.
 3. Open the **Trends** tab and choose temperature. Simulated, imported and user values are drawn as separate series. Nothing is merged, and gaps are breaks, not zeros.
 
+## 9a. Glucose model and projection (optional, about 1 min)
+
+Use this step if time allows; it is not counted in the 11 minutes.
+
+**Click:** Controls → Patient profile, set **Diabetes status** to *type 1*. Under **Glucose and insulin**, set basal insulin to 0.8 U/h. The scenario label shows **Custom (edited)**.
+
+**Click:** the **Glucose** tab. Under *Projection*, plan a 60 g meal at minute 15 and a 4 U bolus at minute 0, horizon 3 h.
+
+- *Expected:* a solid blue curve (with the plan) and a dashed grey curve (no further events), the green 70–180 mg/dL band, and the time each threshold is crossed. The plot is labelled "Model projection, not a clinical prediction".
+
+**Click:** **Give meal** (50 g, under *Give now*). The GLU tile rises over the next minutes (model time runs at 60× by default). Above 180 mg/dL the tile turns amber and a GLUCOSE-high alarm appears.
+
+**Say:** this is a population model (Bergman minimal model with Hovorka meal and insulin absorption, parameters from published studies). It is not fitted to any person, it has no sensor model, and it is not dosing advice. Reset afterwards.
+
 ## 10. Watch data on Android (9:30–10:00)
 
 This part is a short spoken note, or an optional demonstration if a phone is available. Real watch data enters PM-SIM only through the Android app, which wraps the same page. In a normal browser the "On this phone" panel is hidden. The Android app has **not been tested with real hardware**, so do not present any result from it as verified.
@@ -147,9 +161,9 @@ This has not been done on a real device yet. Until it has, report it as planned,
 
 **Click:** the **Tests** tab, then **Run browser self-test** (or open `index.html?selftest=1`).
 
-**Expected:** 14 pass, 0 fail, 1 not run. Each row shows the input, the expected result and the observed result.
+**Expected:** 15 pass, 0 fail, 1 not run. Each row shows the input, the expected result and the observed result.
 
-**Say:** the one hardware entry (watch data on Android through Health Connect, BLE or an export file) is reported as "not run" because no watch was connected. The app never marks a hardware test as passed without hardware. The same models and parsers are also checked by 64 Node unit tests (`node --test tests/unit/*.test.js`).
+**Say:** the one hardware entry (watch data on Android through Health Connect, BLE or an export file) is reported as "not run" because no watch was connected. The app never marks a hardware test as passed without hardware. The same models and parsers are also checked by 78 Node unit tests (`node --test tests/unit/*.test.js`).
 
 ## 12. Closing (10:30–10:45)
 

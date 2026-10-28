@@ -35,8 +35,9 @@
           slider.addEventListener('input', () => { input.value = slider.value; send(key, Number(slider.value), true); });
           row.append(input, slider);
         }
-        row.append(el('div.help', { text: s.help || '' }));
-        rows[key] = { row, input, slider, spec: s };
+        const issue = el('div.ctl-issue', { 'aria-live': 'polite' });
+        row.append(issue, el('div.help', { text: s.help || '' }));
+        rows[key] = { row, input, slider, issue, spec: s };
         box.append(row);
       }
       container.append(box);
@@ -57,21 +58,36 @@
       for (const w of r.warnings) msgs.append(el('div', null, el('span.warn', { text: name(w.key) + ': ' + w.msg })));
     }
 
-    function sync(params, changed) {
+    // Every row whose value differs from the default is marked, whatever changed it.
+    function sync(params) {
       for (const [key, r] of Object.entries(rows)) {
         const v = params[key];
         if (document.activeElement !== r.input) r.input.value = String(v);
         if (r.slider && document.activeElement !== r.slider) r.slider.value = String(v);
-        if (changed) r.row.classList.toggle('changed', changed.includes(key));
+        r.row.classList.toggle('changed', String(v) !== String(PM.params.DEFAULTS[key]));
       }
     }
-    return { sync, showMsgs };
+
+    /** graded: {key: {sev, messages}} from PM.severity.grade(...).controls. */
+    function markSeverity(graded) {
+      for (const [key, r] of Object.entries(rows)) {
+        const g = graded[key];
+        for (const p of ['high', 'medium', 'low']) r.row.classList.toggle('sev-' + p, !!g && g.sev === p);
+        const text = g ? '⚠ ' + g.messages.join(' · ') : '';
+        if (r.issue.textContent !== text) r.issue.textContent = text;
+      }
+    }
+    return { sync, showMsgs, markSeverity };
   }
 
   // ------------------------------------------------------------- alarms
   function renderAlarmBar(listEl, st, onAck) {
     listEl.textContent = '';
     if (!st.active.length) { listEl.append(el('span.muted', { text: 'No active alarms' })); return; }
+    const c = PM.severity.counts(st.active);
+    listEl.append(el('span.alarm-count.' + st.highest, { title: 'All active alarms are listed, highest priority first',
+      text: st.active.length + (st.active.length === 1 ? ' alarm' : ' alarms') + ': ' +
+        ['high', 'medium', 'low'].filter(p => c[p]).map(p => c[p] + ' ' + p).join(', ') }));
     for (const a of st.active) {
       const unack = a.ackAt === null;
       const val = a.value !== null && a.value !== undefined && a.kind === 'physiological' && a.id !== 'apnea'
@@ -138,40 +154,51 @@
 
   // ------------------------------------------------------------- profile
   /** Profile panel. `onDerived(list)` receives derived BMI/BSA observations. */
-  function buildProfile(onDerived) {
-    const P = PM.profile, U = PM.units;
-    const state = JSON.parse(JSON.stringify(P.DEFAULT_PROFILE));
-    $('#pLabel').value = state.label; $('#pAge').value = state.ageYears;
-    $('#pHeight').value = state.heightCm; $('#pWeight').value = state.weightKg;
+  /**
+   * Profile tab. Age, sex, height and weight are simulation parameters (the same
+   * values as the "Patient profile" controls), so both views always agree.
+   * opts: { apply(update) -> {params, errors, warnings}, onDerived(observations) }.
+   * Returns { refresh(params) }, called after any parameter change.
+   */
+  function buildProfile(opts) {
+    const P = PM.profile, U = PM.units, S = PM.params.SPEC;
+    const local = { label: P.DEFAULT_PROFILE.label, weightHistory: [] };
+    let cur = PM.params.DEFAULTS;
+    for (const o of S.sex.options) $('#pSex').append(el('option', { value: o, text: o }));
+    $('#pLabel').value = local.label;
     let hUnit = 'cm', wUnit = 'kg';
-    $('#pHeightUnit').addEventListener('change', e => {
-      const v = Number($('#pHeight').value);
-      if (Number.isFinite(v) && $('#pHeight').value !== '') $('#pHeight').value = e.target.value === 'in' ? (v / 2.54).toFixed(1) : (v * 2.54).toFixed(1);
-      hUnit = e.target.value;
-    });
-    $('#pWeightUnit').addEventListener('change', e => {
-      const v = Number($('#pWeight').value);
-      if (Number.isFinite(v) && $('#pWeight').value !== '') $('#pWeight').value = e.target.value === 'lb' ? U.kgToLb(v).toFixed(1) : U.lbToKg(v).toFixed(1);
-      wUnit = e.target.value;
-    });
+    $('#pHeightUnit').addEventListener('change', e => { hUnit = e.target.value; fill(true); });
+    $('#pWeightUnit').addEventListener('change', e => { wUnit = e.target.value; fill(true); });
 
     function num(id) { const s = $(id).value.trim().replace(',', '.'); return s === '' ? null : Number(s); }
+    const range = k => S[k].min + '–' + S[k].max + ' ' + S[k].unit;
+
+    // Writes the current parameters into the form (unless the user is typing there).
+    function fill(force) {
+      const form = $('#profileForm');
+      if (!force && form.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
+      $('#pAge').value = cur.age_years;
+      $('#pSex').value = cur.sex;
+      $('#pHeight').value = hUnit === 'in' ? (cur.height_cm / 2.54).toFixed(1) : String(cur.height_cm);
+      $('#pWeight').value = wUnit === 'lb' ? U.kgToLb(cur.weight_kg).toFixed(1) : String(cur.weight_kg);
+    }
 
     $('#profileForm').addEventListener('submit', e => {
       e.preventDefault();
       const msg = $('#pMsg'); msg.textContent = '';
       const age = num('#pAge'), h = num('#pHeight'), w = num('#pWeight');
-      const errs = [];
-      if (age !== null && (!Number.isFinite(age) || age < 0 || age > 120)) errs.push('age must be 0–120 years');
       const hCm = h === null ? null : (hUnit === 'in' ? h * 2.54 : h);
       const wKg = w === null ? null : (wUnit === 'lb' ? U.lbToKg(w) : w);
-      if (hCm !== null && !U.inRange('height', hCm)) errs.push('height must be ' + U.PARAMS.height.min + '–' + U.PARAMS.height.max + ' cm');
-      if (wKg !== null && !U.inRange('weight', wKg)) errs.push('weight must be ' + U.PARAMS.weight.min + '–' + U.PARAMS.weight.max + ' kg');
+      const errs = [];
+      const check = (k, v, name) => { if (v === null || !Number.isFinite(v) || v < S[k].min || v > S[k].max) errs.push(name + ' must be ' + range(k)); };
+      check('age_years', age, 'age'); check('height_cm', hCm, 'height'); check('weight_kg', wKg, 'weight');
       if (errs.length) { msg.append(el('span.err', { text: errs.join('; ') + '. Not updated.' })); return; }
-      state.label = $('#pLabel').value.trim().slice(0, 40) || 'SIM-PATIENT-01';
-      state.ageYears = age; state.heightCm = hCm; state.weightKg = wKg;
-      msg.append(el('span.ok', { text: 'Profile updated.' }));
-      render(true);
+      local.label = $('#pLabel').value.trim().slice(0, 40) || P.DEFAULT_PROFILE.label;
+      const r = opts.apply({ age_years: Math.round(age), sex: $('#pSex').value,
+        height_cm: Math.round(hCm), weight_kg: Math.round(wKg * 2) / 2 });
+      if (r.errors.length) { msg.append(el('span.err', { text: r.errors.map(x => x.key + ': ' + x.msg).join('; ') })); return; }
+      msg.append(el('span.ok', { text: 'Profile updated. The same values are in Controls → Patient profile.' }));
+      cur = r.params; fill(true); render(true);
     });
 
     $('#whForm').addEventListener('submit', e => {
@@ -180,40 +207,48 @@
       const d = $('#whDate').value, kg = num('#whKg');
       if (!d) { msg.append(el('span.err', { text: 'choose a date' })); return; }
       if (kg === null || !U.inRange('weight', kg)) { msg.append(el('span.err', { text: 'weight must be ' + U.PARAMS.weight.min + '–' + U.PARAMS.weight.max + ' kg' })); return; }
-      state.weightHistory = state.weightHistory.filter(x => x.date !== d).concat([{ date: d, kg }]);
+      local.weightHistory = local.weightHistory.filter(x => x.date !== d).concat([{ date: d, kg }]);
       $('#whKg').value = '';
       render(false);
     });
 
     function render(emit) {
-      const b = P.bmi(state.weightKg, state.heightCm), bsa = P.bsaMosteller(state.weightKg, state.heightCm);
-      const cat = P.bmiCategory(b, state.ageYears === null ? NaN : state.ageYears);
-      const ft = state.heightCm ? U.cmToFtIn(state.heightCm) : null;
+      const hCm = cur.height_cm, wKg = cur.weight_kg;
+      const b = P.bmi(wKg, hCm), bsa = P.bsaMosteller(wKg, hCm);
+      const cat = P.bmiCategory(b, cur.age_years);
+      const ft = U.cmToFtIn(hCm);
       const card = (title, val, sub) => el('div.card', null, el('div.muted', { text: title }), el('b', { text: val }), sub ? el('div.hint', { text: sub }) : null);
       const box = $('#pDerived'); box.textContent = '';
       box.append(
         card('BMI', b === null ? '--' : b.toFixed(1) + ' kg/m²', cat.category ? cat.category + '. ' + cat.note : cat.note),
         card('BSA (Mosteller)', bsa === null ? '--' : bsa.toFixed(2) + ' m²', 'Derived from height and weight'),
-        card('Height', state.heightCm === null ? '--' : state.heightCm.toFixed(1) + ' cm', ft ? ft.ft + ' ft ' + ft.in + ' in' : ''),
-        card('Weight', state.weightKg === null ? '--' : state.weightKg.toFixed(1) + ' kg', state.weightKg === null ? '' : U.kgToLb(state.weightKg).toFixed(1) + ' lb'));
-      const hist = P.normaliseHistory(state.weightHistory), ch = P.weightChange(state.weightHistory);
+        card('Height', hCm.toFixed(1) + ' cm', ft.ft + ' ft ' + ft.in + ' in'),
+        card('Weight', wKg.toFixed(1) + ' kg', U.kgToLb(wKg).toFixed(1) + ' lb'),
+        card('Diabetes status', cur.diabetes, 'Selects the glucose model parameters'));
+      const hist = P.normaliseHistory(local.weightHistory), ch = P.weightChange(local.weightHistory);
       const list = $('#whList'); list.textContent = '';
       if (hist.length) {
         list.append(el('table', null, el('thead', null, el('tr', null, el('th', { text: 'Date' }), el('th.num', { text: 'kg' }), el('th', { text: '' }))),
           el('tbody', null, hist.map(x => el('tr', null, el('td', { text: x.date }), el('td.num', { text: x.kg.toFixed(1) }),
-            el('td', null, el('button', { text: 'remove', onclick: () => { state.weightHistory = state.weightHistory.filter(y => y.date !== x.date); render(false); } })))))));
+            el('td', null, el('button', { text: 'remove', onclick: () => { local.weightHistory = local.weightHistory.filter(y => y.date !== x.date); render(false); } })))))));
         if (ch) list.append(el('p.hint', { text: 'Change ' + ch.from.date + ' → ' + ch.to.date + ' (' + ch.days + ' days): ' + (ch.absKg >= 0 ? '+' : '') + ch.absKg.toFixed(1) + ' kg (' + (ch.pct >= 0 ? '+' : '') + ch.pct.toFixed(1) + ' %)' }));
       } else list.append(el('p.muted', { text: 'No weight entries' }));
-      if (emit && onDerived) {
+      if (emit && opts.onDerived) {
         const O = PM.observation, now = Date.now(), out = [];
-        const prov = { formula: '', inputs: { heightCm: state.heightCm, weightKg: state.weightKg }, profile: state.label };
+        const prov = { formula: '', inputs: { heightCm: hCm, weightKg: wKg }, profile: local.label };
         if (b !== null) out.push(O.make({ param: 'bmi', value: b, source: O.SOURCE.DERIVED, timestamp: now, provenance: Object.assign({}, prov, { formula: 'weight / height²' }) }));
         if (bsa !== null) out.push(O.make({ param: 'bsa', value: bsa, source: O.SOURCE.DERIVED, timestamp: now, provenance: Object.assign({}, prov, { formula: 'Mosteller √(h·w/3600)' }) }));
-        onDerived(out);
+        opts.onDerived(out);
       }
     }
-    render(false);
-    return { state, render };
+
+    function refresh(params) {
+      const same = ['age_years', 'sex', 'height_cm', 'weight_kg', 'diabetes'].every(k => params[k] === cur[k]);
+      cur = params;
+      if (!same) { fill(false); render(false); }
+    }
+    fill(true); render(false);
+    return { refresh };
   }
 
   PM.panels = { buildControls, renderAlarmBar, buildLimits, renderAlarmHistory, renderNibpTable, buildProfile };

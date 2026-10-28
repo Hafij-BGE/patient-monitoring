@@ -10,12 +10,12 @@
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./dsp.js'), require('./rng.js'), require('./ecg.js'), require('./pulse.js'),
       require('./sensors.js'), require('./nibp.js'), require('./detectors.js'), require('./params.js'),
-      require('../core/observation.js'), require('./arrhythmia.js'));
+      require('../core/observation.js'), require('./arrhythmia.js'), require('./glucose.js'));
   } else {
     const P = root.PM;
-    P.engine = factory(P.dsp, P.rng, P.ecg, P.pulse, P.sensors, P.nibp, P.detectors, P.params, P.observation, P.arrhythmia);
+    P.engine = factory(P.dsp, P.rng, P.ecg, P.pulse, P.sensors, P.nibp, P.detectors, P.params, P.observation, P.arrhythmia, P.glucose);
   }
-})(this, function (dsp, rngMod, ecgMod, pulse, sensors, nibpMod, det, params, observation, arr) {
+})(this, function (dsp, rngMod, ecgMod, pulse, sensors, nibpMod, det, params, observation, arr, glucoseMod) {
   'use strict';
 
   const DT = 1e-3;
@@ -31,6 +31,8 @@
 
   const ECG_KEYS = ['hr', 'rhythm', 'hrv_ms', 'ecg_amp_mv', 'p_scale', 't_scale', 'qrs_width', 'arrhythmia', 'pvc_per_min'];
   const ECG_CHAIN_KEYS = ['ecg_fs', 'ecg_filter', 'notch', 'mains_hz'];
+  // Changing these restarts the glucose model in steady state; basal_insulin acts as a step change.
+  const GLU_RESET_KEYS = ['diabetes', 'fasting_glucose', 'fasting_insulin', 'weight_kg'];
 
   class Engine {
     constructor(p) { this.onFrame = null; this.onNibp = null; this.reset(p); }
@@ -75,6 +77,7 @@
       this.lastNaN = { ecg: -Infinity, ppg: -Infinity, resp: -Infinity, cap: -Infinity };
       this.lastFrame = null; this.nibpEvent = null;
       this.tempReading = { value: null, status: 'starting' };
+      this.glu = new glucoseMod.GlucoseModel(this.p);
       this.scheduleNibp();
       this.buildEcgChain();
     }
@@ -117,11 +120,18 @@
       if (changed.some(k => ECG_KEYS.includes(k))) this.ecg.setParams(this.p);
       if (changed.some(k => ECG_CHAIN_KEYS.includes(k))) this.buildEcgChain();
       if (changed.includes('nibp_interval')) this.scheduleNibp();
+      if (changed.some(k => GLU_RESET_KEYS.includes(k))) this.glu.reset(this.p);
+      else if (changed.includes('basal_insulin')) this.glu.setParams(this.p);
       return res;
     }
 
     startNibp() { return this.nibp.start(this.t); }
     cancelNibp() { this.nibp.cancel(this.t); }
+    /** Glucose model events: a meal (g carbohydrate) or a subcutaneous insulin bolus (U). */
+    giveMeal(grams) { if (grams > 0) this.glu.meal(grams); }
+    giveBolus(units) { if (units > 0) this.glu.bolus(units); }
+    /** Model projection from the current glucose state; see glucose.js forecast(). */
+    glucoseForecast(horizonMin, events) { return this.glu.forecast(horizonMin, events); }
 
     /** Advance by dtSim seconds of simulation time. */
     advance(dtSim) {
@@ -243,11 +253,14 @@
       const rh = this.rhythm.analyse(t, leadsOff);
       const art = this.arterialNumbers();
       const artNoPulse = art !== null && art.sys - art.dia < 5 && Math.abs(art.map) < 5;
+      this.glu.advance(p.glu_clock / 60); // one simulated second = glu_clock/60 model minutes
+      const glu = this.glu.values();
       const capFi = p.fico2, capEt = capFi + Math.max(0, p.etco2 - capFi) * (0.15 + 0.85 * this.perf);
       const frame = {
         t, timestamp: this.startEpoch + t * 1000,
         truth: { hr: p.hr, spo2: p.spo2, sbp: p.sbp, dbp: p.dbp, map: (p.sbp + 2 * p.dbp) / 3, rr: p.rr, temp: p.temp,
-          etco2: p.capno_sensor === 'ok' ? capEt : null, arrhythmia: p.arrhythmia, perfusion: this.perf },
+          etco2: p.capno_sensor === 'ok' ? capEt : null, arrhythmia: p.arrhythmia, perfusion: this.perf,
+          glucose: glu.glucose, insulin: glu.insulin },
         est: {
           hr: leadsOff || rh.rhythm === 'vfib' || rh.rhythm === 'asystole' ? null : this.qrs.heartRate(t),
           rhythm: rh.rhythm, rhythmLabel: rh.label, pvcPerMin: rh.pvcPerMin, qrsWidthMs: rh.qrsWidthMs,
@@ -256,6 +269,7 @@
           temp: this.tempReading.value, tempStatus: this.tempReading.status, tempRaw: this.tempReading.raw,
           etco2: this.capnoDet.etco2(t, p.apnea_delay), fico2: this.capnoDet.fico2(t, p.apnea_delay), awrr: this.capnoDet.rate(t, p.apnea_delay),
           art: art && !artNoPulse ? art : null,
+          glucose: glu.glucose, insulin: glu.insulin, gluMin: this.glu.t, // model values, no sensor model
         },
         nibp: { state: this.nibp.state, cuff: this.nibp.cuff, msg: this.nibp.msg, last: this.nibp.last, result: this.nibpEvent },
         technical: {
@@ -299,6 +313,10 @@
       sim('art_sys', a.sys === undefined ? null : a.sys, prov);
       sim('art_dia', a.dia === undefined ? null : a.dia, prov);
       sim('art_map', a.map === undefined ? null : a.map, prov);
+    }
+    if (f.est.glucose !== undefined) {
+      sim('glucose', f.est.glucose, { method: 'minimal model + meal and insulin absorption (model value, no sensor)', modelMin: f.est.gluMin });
+      sim('insulin', f.est.insulin, { method: 'insulin kinetics of the glucose model (model value, no sensor)', modelMin: f.est.gluMin });
     }
     if (f.est.tempStatus === 'error') sim('temp', f.est.tempRaw, { method: 'probe', status: 'error' }, O.QUALITY.INVALID);
     else sim('temp', f.est.temp, { method: 'probe, first-order lag', setpoint: f.truth.temp, status: f.est.tempStatus });

@@ -9,13 +9,27 @@
   'use strict';
 
   const GROUPS = {
+    patient: 'Patient profile (part of the scenario)',
     physiology: 'Physiological inputs (the simulated patient)',
+    metabolic: 'Glucose and insulin (model, section 3.13)',
     sensor: 'Sensor and artifact settings (the measurement)',
     processing: 'Processing and display settings (the monitor)',
   };
 
   // type: num | sel. "help" states the control's effect.
   const SPEC = {
+    // ---- patient profile (also shown in the Profile tab) ----
+    age_years:   { group: 'patient', label: 'Age', unit: 'years', type: 'num', min: 18, max: 100, step: 1, def: 40,
+                   help: 'Used for the adult BMI category (Profile tab). The simulated vital signs use adult settings at every age; age does not change them.' },
+    sex:         { group: 'patient', label: 'Sex', type: 'sel', options: ['unspecified', 'female', 'male'], def: 'unspecified',
+                   help: 'Recorded with the profile only. No calculation in PM-SIM uses it.' },
+    height_cm:   { group: 'patient', label: 'Height', unit: 'cm', type: 'num', min: 120, max: 220, step: 1, def: 172,
+                   help: 'Used for BMI and BSA (Profile tab).' },
+    weight_kg:   { group: 'patient', label: 'Body weight', unit: 'kg', type: 'num', min: 30, max: 250, step: 0.5, def: 70,
+                   help: 'Used for BMI and BSA, and for the glucose and insulin distribution volumes of the glucose model.' },
+    diabetes:    { group: 'patient', label: 'Diabetes status', type: 'sel', options: ['none', 'type1', 'type2'], def: 'none',
+                   help: 'Selects the glucose–insulin model parameter set (no, absent or reduced insulin secretion; insulin sensitivity). It does not change the other signals.' },
+
     // ---- physiology ----
     hr:          { group: 'physiology', label: 'Heart rate', unit: 'bpm', type: 'num', min: 30, max: 220, step: 1, def: 72,
                    help: 'Mean cardiac cycle rate. Sets the ECG beat interval (60/HR s), PPG pulse timing and the arterial pulse train.' },
@@ -57,6 +71,14 @@
                    help: 'Slows the expiratory CO2 upstroke (time constant 0.035 → 0.385 of the breath): rounded "shark-fin" capnogram.' },
     temp:        { group: 'physiology', label: 'Core temperature', unit: '°C', type: 'num', min: 30, max: 43, step: 0.1, def: 37.0,
                    help: 'True temperature seen by the probe; the displayed value follows it with the sensor time constant.' },
+
+    // ---- glucose–insulin model (src/sim/glucose.js) ----
+    fasting_glucose:{ group: 'metabolic', label: 'Fasting glucose (start value)', unit: 'mg/dL', type: 'num', min: 50, max: 400, step: 1, def: 90,
+                   help: 'Steady-state plasma glucose Gb the model starts at and returns to. Changing it restarts the glucose model. 1 mmol/L = 18.016 mg/dL.' },
+    fasting_insulin:{ group: 'metabolic', label: 'Fasting insulin (display level)', unit: 'µU/mL', type: 'num', min: 2, max: 50, step: 1, def: 10,
+                   help: 'Illustrative user-set level, not a reference value. Sets the insulin level shown and the endogenous secretion at fasting; only changes above this level act on glucose. Ignored for type 1 (no secretion). 1 µU/mL = 1 mU/L.' },
+    basal_insulin:{ group: 'metabolic', label: 'Basal insulin infusion (subcutaneous)', unit: 'U/h', type: 'num', min: 0, max: 5, step: 0.05, def: 0,
+                   help: 'Continuous subcutaneous insulin. The model starts in steady state at the current rate; changing it later lowers or raises glucose from there.' },
 
     // ---- sensor & artifacts ----
     ecg_noise_uv: { group: 'sensor', label: 'ECG broadband noise (SD)', unit: 'µV', type: 'num', min: 0, max: 300, step: 5, def: 15,
@@ -113,7 +135,7 @@
                    help: 'Hysteresis level on the band-passed impedance. Too high misses shallow breaths; too low counts cardiogenic artifact.' },
     apnea_delay: { group: 'processing', label: 'Apnea detection delay', unit: 's', type: 'num', min: 10, max: 60, step: 1, def: 20,
                    help: 'Time without a detected breath before apnea is declared.' },
-    nibp_interval:{ group: 'processing', label: 'NIBP auto interval', unit: 'min', type: 'sel', options: [0, 1, 2, 5, 15], def: 0,
+    nibp_interval:{ group: 'processing', label: 'NIBP auto interval', unit: 'min', type: 'sel', options: [0, 1, 2, 5, 15], def: 5,
                    help: '0 = manual start only. Otherwise a measurement starts automatically at this interval (simulation time).' },
     nibp_ks:     { group: 'processing', label: 'Systolic ratio Ks', unit: '', type: 'num', min: 0.3, max: 0.8, step: 0.01, def: 0.5,
                    help: 'SBP = cuff pressure above the maximum where oscillation amplitude falls to Ks × maximum.' },
@@ -123,6 +145,8 @@
                    help: 'Horizontal scale of the waveforms (screen calibration assumed 96 dpi).' },
     ecg_gain:    { group: 'processing', label: 'ECG gain', unit: 'mm/mV', type: 'sel', options: [5, 10, 20], def: 10,
                    help: 'Vertical scale of the ECG trace.' },
+    glu_clock:   { group: 'processing', label: 'Glucose model time scale', unit: '×', type: 'sel', options: [1, 10, 60], def: 60,
+                   help: 'Glucose model minutes per simulated minute. 60 = one simulated second advances the glucose model one minute, so a meal response is visible in a few minutes. The other signals keep their own time.' },
     speed:       { group: 'processing', label: 'Playback speed', unit: '×', type: 'sel', options: [0.25, 0.5, 1, 2, 4], def: 1,
                    help: 'Simulation time per real second. All rates stay correct in simulation time.' },
     seed:        { group: 'processing', label: 'Random seed', unit: '', type: 'num', min: 1, max: 999999, step: 1, def: 2026,
@@ -190,6 +214,40 @@
     { id: 'rebreathing', name: 'CO2 rebreathing', changes: { fico2: 6 } },
     { id: 'underdamped', name: 'Under-damped arterial line', changes: { ibp_damping: 'under-damped' } },
     { id: 'transducer', name: 'Transducer too high', changes: { ibp_height_cm: 20 } },
+
+    // Combined-sign teaching patterns from the literature. "refs" are entry numbers in
+    // REFERENCES.md. Where a source gives only a direction (up/down), the number is an
+    // illustrative choice inside that direction; see TECHNICAL_REPORT.md section 3.12.
+    { id: 'haem-2', name: 'Blood-loss pattern, ATLS class II', changes: { hr: 110, sbp: 118, dbp: 92, rr: 24 }, refs: [28, 29],
+      note: 'Fast heart rate and a narrow pulse pressure while systolic pressure is still normal.' },
+    { id: 'haem-3', name: 'Blood-loss pattern, ATLS class III', changes: { hr: 130, sbp: 88, dbp: 68, rr: 32, pi: 0.8 }, refs: [28, 29, 30],
+      note: 'Systolic pressure now falls; low perfusion index. Only a minority of real trauma patients fit an ATLS class.' },
+    { id: 'sepsis-screen', name: 'Infection-screening pattern (SIRS / qSOFA thresholds)', changes: { hr: 112, rr: 24, sbp: 96, dbp: 58, temp: 38.7 }, refs: [31],
+      note: 'Several moderate changes cross screening thresholds together. Screening thresholds are not a diagnosis.' },
+    { id: 'anaphylaxis', name: 'Acute allergic-reaction pattern', changes: { sbp: 78, dbp: 42, hr: 128, spo2: 90, airway_obstr: 60, rr: 24, etco2: 30 }, refs: [32, 33, 35],
+      note: 'Hypotension, tachycardia, falling SpO2 and an obstructive capnogram together. Skin signs cannot be shown.' },
+    { id: 'hypovent-o2', name: 'Hypoventilation masked by supplemental O2', changes: { rr: 7, etco2: 55 }, refs: [34, 35],
+      note: 'EtCO2 rises while SpO2 stays normal: capnography shows the problem first.' },
+    { id: 'acidosis-breathing', name: 'Compensatory hyperventilation (low EtCO2)', changes: { rr: 28, etco2: 24, hr: 115, sbp: 102, dbp: 64 }, refs: [35, 36],
+      note: 'Fast breathing with low EtCO2 can be compensation for acidosis. Breath depth is not modelled.' },
+    { id: 'dka-pattern', name: 'Hyperglycaemic-crisis pattern (DKA-type)', changes: { diabetes: 'type1', fasting_glucose: 320, rr: 28, etco2: 24, hr: 115, sbp: 102, dbp: 64 }, refs: [35, 36, 51],
+      note: 'Type 1 without insulin: glucose above 250 mg/dL with compensatory fast breathing and low EtCO2. Ketones and pH are not modelled.' },
+    { id: 'pe-pattern', name: 'Dead-space pattern (PE-type)', changes: { hr: 115, spo2: 89, sbp: 105, dbp: 70, etco2: 30, rr: 24 }, refs: [37, 38],
+      note: 'Low EtCO2 with a normal or high rate suggests dead space rather than hyperventilation.' },
+    { id: 'hypothermia', name: 'Cold-exposure pattern (hypothermia stage II)', changes: { temp: 30.5, hr: 45, sbp: 92, dbp: 58, rr: 9, pi: 0.3 }, refs: [39],
+      note: 'Slowed vital signs and a weak pleth from vasoconstriction. Osborn waves are not modelled.' },
+    { id: 'mh-early', name: 'Hypermetabolic pattern, early (MH-type)', changes: { etco2: 60, hr: 125, rr: 12, temp: 37.6 }, refs: [40, 41],
+      note: 'EtCO2 climbs at a fixed ventilator rate before temperature rises.' },
+    { id: 'mh-late', name: 'Hypermetabolic pattern, late (MH-type)', changes: { etco2: 75, hr: 145, rr: 12, temp: 39.5, arrhythmia: 'pvc' }, refs: [40, 41],
+      note: 'Temperature now rises and ectopic beats appear.' },
+    { id: 'copd', name: 'Obstructive hypercapnic pattern (COPD-type)', changes: { spo2: 89, etco2: 52, airway_obstr: 60, rr: 24, hr: 100 }, refs: [35, 42],
+      note: 'Shark-fin capnogram with high EtCO2. An SpO2 near 90 % can be a deliberate target in this group.' },
+    { id: 'hyperk-early', name: 'Raised-potassium ECG, early', changes: { t_scale: 1.9 }, refs: [43],
+      note: 'Peaked T waves first. ECG changes track potassium levels poorly.' },
+    { id: 'hyperk-late', name: 'Raised-potassium ECG, late', changes: { t_scale: 1.9, p_scale: 0.3, qrs_width: 1.7 }, refs: [43],
+      note: 'Then flattened P waves and a wide QRS.' },
+    { id: 'cushing', name: 'Raised-ICP reflex pattern (Cushing)', changes: { sbp: 200, dbp: 90, hr: 46, rr: 8 }, refs: [44],
+      note: 'High pressure with a slow heart rate, the opposite of shock. Irregular breathing cannot be set.' },
   ];
 
   /** Parameters for a preset, keeping the current display/processing settings. */
@@ -203,5 +261,16 @@
     return { params, changed, preset: p };
   }
 
-  return { GROUPS, SPEC, DEFAULTS, PRESETS, validate, applyPreset };
+  /** Id of the preset whose patient and sensor settings equal params, or 'custom'.
+   *  Display/processing settings are ignored. prefer wins when several match. */
+  function matchPreset(params, prefer) {
+    const keys = Object.keys(SPEC).filter(k => SPEC[k].group !== 'processing');
+    const same = p => { const q = applyPreset(p.id).params; return keys.every(k => String(q[k]) === String(params[k])); };
+    const pref = PRESETS.find(p => p.id === prefer);
+    if (pref && same(pref)) return pref.id;
+    const hit = PRESETS.find(same);
+    return hit ? hit.id : 'custom';
+  }
+
+  return { GROUPS, SPEC, DEFAULTS, PRESETS, validate, applyPreset, matchPreset };
 });

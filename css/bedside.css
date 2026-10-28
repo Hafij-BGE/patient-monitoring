@@ -1,0 +1,76 @@
+/* Bedside view: full-screen monitor layout (waveforms left, large numerics right,
+   status strip on top, softkeys at the bottom). Original PM-SIM styling; it does not
+   copy any manufacturer's screen. Everything is scoped under body.bedside. */
+
+#btnBedside[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.bs-top, .bs-keys { display: none; }
+
+body.bedside {
+  --bs-bg: #04070b; --bs-line: #1a2330; --bs-key: #111a25; --bs-key-line: #2b3a4d;
+  height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; background: var(--bs-bg); color: var(--screen-text);
+}
+body.bedside .topbar, body.bedside .tabs, body.bedside .panel, body.bedside .legend, body.bedside .foot, body.bedside #tExt { display: none !important; }
+
+/* the educational notice stays visible, only slimmer */
+body.bedside .notice { position: static; flex: none; padding: 3px 12px; font-size: 12px; }
+
+body.bedside .bs-top { display: flex; flex: none; gap: 6px 18px; align-items: center; flex-wrap: wrap; padding: 4px 12px;
+  background: #0b131d; border-bottom: 1px solid var(--bs-line); font-size: 13px; font-variant-numeric: tabular-nums; }
+.bs-top .bs-bed { font-weight: 700; letter-spacing: .5px; color: #9fd8ff; }
+.bs-top .bs-sim { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 9px; border: 1px solid #f2c94c; color: #f2c94c; }
+.bs-top .bs-scn { color: var(--screen-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; }
+.bs-top .bs-muted { color: var(--screen-muted); }
+.bs-top .bs-state.paused { color: #ffb020; font-weight: 700; }
+.bs-top .bs-clock { margin-left: auto; font-weight: 600; }
+
+body.bedside .alarmbar { flex: none; margin: 0; border-radius: 0; min-height: 34px; padding: 3px 12px; background: var(--bs-bg); border-bottom: 1px solid var(--bs-line); }
+body.bedside .alarm-actions { display: none; }
+
+body.bedside .monitor { flex: 1 1 auto; min-height: 0; margin: 0; border-radius: 0; padding: 0; gap: 0; background: var(--bs-bg);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 36%); grid-template-rows: minmax(0, 1fr); }
+body.bedside .waves { gap: 0; min-height: 0; border-right: 1px solid var(--bs-line); }
+body.bedside .wave { flex: 1 1 0; min-height: 0; border-bottom: 1px solid var(--bs-line); }
+body.bedside .wave[data-ch="ecg"] { flex-grow: 1.6; }
+body.bedside .wave[data-ch="cuff"] { flex-grow: .7; }
+body.bedside .wave canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+body.bedside .wave-label { z-index: 1; font-size: 12.5px; left: 8px; top: 4px; }
+
+body.bedside .tiles { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(0, 1fr); gap: 0; min-height: 0; align-content: stretch; }
+body.bedside .tile { border: none; border-bottom: 1px solid var(--bs-line); border-radius: 0; padding: 6px 12px; min-height: 0; overflow: hidden;
+  display: flex; flex-direction: column; }
+body.bedside .tile:nth-child(odd):not(.wide) { border-right: 1px solid var(--bs-line); }
+body.bedside .t-head { font-size: 14px; }
+body.bedside .t-val { font-size: clamp(36px, 6.4vh, 76px); flex: 1 1 auto; display: flex; flex-wrap: wrap; align-content: center; align-items: baseline; gap: 0 8px; line-height: 1.05; }
+body.bedside .tile.wide .t-val, body.bedside #tArt .t-val { font-size: clamp(30px, 5.2vh, 60px); }
+body.bedside .t-val small { font-size: .5em; }
+body.bedside .t-foot { font-size: 12px; }
+body.bedside .tile.sev-high, body.bedside .tile.sev-medium, body.bedside .tile.sev-low { border-width: 0 0 1px 0; padding: 6px 12px; box-shadow: inset 4px 0 0 currentColor; }
+body.bedside .tile.sev-high { box-shadow: inset 6px 0 0 var(--hi); }
+body.bedside .tile.sev-medium { box-shadow: inset 6px 0 0 var(--med); }
+body.bedside .tile.sev-low { box-shadow: inset 4px 0 0 var(--lo); }
+body.bedside .tile .row { display: none; }
+
+body.bedside .bs-keys { display: flex; flex: none; gap: 4px; padding: 5px 8px; background: #0b131d; border-top: 1px solid var(--bs-line);
+  overflow-x: auto; scrollbar-width: thin; }
+.bs-keys button, .bs-keys select { flex: 1 0 auto; min-width: 0; white-space: nowrap; min-height: 40px; background: var(--bs-key); color: var(--screen-text);
+  border: 1px solid var(--bs-key-line); border-radius: 4px; padding: 4px 10px; font-size: 13px; font-weight: 600; }
+.bs-keys select { flex: 2 1 140px; max-width: 280px; font-weight: 500; }
+@media (max-width: 1000px) { .bs-keys button, .bs-keys select { padding: 4px 7px; font-size: 12px; } }
+.bs-keys button:hover { border-color: #5aa9e6; }
+.bs-keys button[aria-pressed="true"] { background: #4a3a10; color: #ffe39a; border-color: #8a6a1c; }
+.bs-keys .bs-exit { background: #1d2a3a; }
+
+@media (max-width: 760px) {
+  body.bedside { height: auto; min-height: 100vh; overflow: visible; }
+  body.bedside .notice { position: sticky; top: 0; }
+  body.bedside .monitor { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  body.bedside .waves { border-right: none; }
+  body.bedside .wave { flex: none; height: 74px; }
+  body.bedside .wave[data-ch="ecg"] { height: 110px; }
+  body.bedside .wave[data-ch="cuff"] { height: 56px; }
+  body.bedside .tiles { grid-auto-rows: auto; }
+  body.bedside .t-val { font-size: 36px; }
+  body.bedside .tile.wide .t-val, body.bedside #tArt .t-val { font-size: 30px; }
+  body.bedside .bs-keys { position: sticky; bottom: 0; }
+  .bs-top .bs-scn { max-width: 100%; }
+}

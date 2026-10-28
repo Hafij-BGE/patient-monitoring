@@ -37,7 +37,11 @@
     etco2:   { label: 'EtCO₂',   unit: 'mmHg', low: 30, high: 45,  delay: 10, enabled: true },
     art_sys: { label: 'ART SYS', unit: 'mmHg', low: 90, high: 160, delay: 5,  enabled: true },
     art_map: { label: 'ART MAP', unit: 'mmHg', low: 65, high: 110, delay: 5,  enabled: true },
+    // Glucose (model value): hypoglycaemia level 1 below 70 mg/dL [51], above the 70–180 time-in-range band [52].
+    glucose: { label: 'Glucose', unit: 'mg/dL', low: 70, high: 180, delay: 0, enabled: true },
   };
+  /** Glucose below this is hypoglycaemia level 2 [51]: a separate high-priority alarm. */
+  const GLUCOSE_LEVEL2 = 54;
 
   /** Rhythm alarm conditions keyed by the analyser's rhythm label. */
   const RHYTHM = {
@@ -90,6 +94,7 @@
       sbp: nb ? nb.sbp : null, dbp: nb ? nb.dbp : null, map: nb ? nb.map : null,
       etco2: f.est.etco2 === undefined ? null : f.est.etco2,
       art_sys: f.est.art ? f.est.art.sys : null, art_map: f.est.art ? f.est.art.map : null,
+      glucose: f.est.glucose === undefined ? null : f.est.glucose,
     };
   }
 
@@ -129,6 +134,8 @@
       }
       if (frame.est.apnea)
         cond['apnea'] = { kind: 'physiological', param: 'rr', priority: 'high', delay: 0, value: 0, limit: null, message: 'APNEA' };
+      if (this.limits.glucose.enabled && Number.isFinite(vals.glucose) && vals.glucose < GLUCOSE_LEVEL2)
+        cond['glucose:level2'] = { kind: 'physiological', param: 'glucose', priority: 'high', delay: 0, value: vals.glucose, limit: GLUCOSE_LEVEL2, message: 'GLUCOSE < ' + GLUCOSE_LEVEL2 + ' (level 2)' };
       const rh = RHYTHM[frame.est.rhythm];
       if (rh) cond['rhythm:' + frame.est.rhythm] = { kind: 'physiological', param: 'rhythm', priority: rh.priority, delay: rh.delay, value: null, limit: null, message: rh.message };
       if (frame.est.rhythm === 'pvc' && frame.est.pvcPerMin > PVC_ALARM_PER_MIN)
@@ -191,6 +198,6 @@
     return [head].concat(history.map(a => [a.id, a.kind, a.priority, a.message, num(a.value), a.limit, num(a.tCond), num(a.tOn), num(a.tOff), num(a.ackAt)].map(cell).join(','))).join('\n') + '\n';
   }
 
-  return { AlarmEngine, DEFAULT_LIMITS, TECHNICAL, RHYTHM, PVC_ALARM_PER_MIN, TECH_DELAY, PRIORITY, validateLimit, frameValues, historyCSV,
+  return { AlarmEngine, DEFAULT_LIMITS, GLUCOSE_LEVEL2, TECHNICAL, RHYTHM, PVC_ALARM_PER_MIN, TECH_DELAY, PRIORITY, validateLimit, frameValues, historyCSV,
     NOTICE: 'Educational alarm logic — not a certified clinical alarm system.' };
 });

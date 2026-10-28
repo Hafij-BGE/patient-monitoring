@@ -158,7 +158,7 @@ test('§19.10 JSON import: wrapped wide records with nested units, null as missi
   assert.deepEqual(series(a.observations, 'weight'), [70.2]);
   const b = load('vitals_long.json');
   assert.equal(b.report.accepted, 2);
-  assert.match(b.report.invalid[0].reason, /unknown parameter "glucose"/);
+  assert.match(b.report.invalid[0].reason, /unknown parameter "cholesterol"/);
 });
 
 test('§19.14 imported, simulated and user data stay separate; exports re-import as "imported"', () => {
@@ -188,7 +188,7 @@ test('manual entry validates value, unit, range and timestamp', () => {
   assert.match(imp.manualEntry({ param: 'hr', value: 900 }).error, /outside plausible range/);
   assert.match(imp.manualEntry({ param: 'temp', value: 37, unit: 'K' }).error, /unsupported unit/);
   assert.match(imp.manualEntry({ param: 'hr', value: 70, timestamp: 'soon' }).error, /unrecognised timestamp/);
-  assert.equal(imp.manualEntry({ param: 'glucose', value: 5 }).error, 'unknown parameter');
+  assert.equal(imp.manualEntry({ param: 'cholesterol', value: 5 }).error, 'unknown parameter');
   const ok = imp.manualEntry({ param: 'temp', value: '37,2', unit: '°C', device: 'home thermometer' }).observation;
   assert.equal(ok.value, 37.2);
   assert.equal(ok.source, 'user');

@@ -6,6 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; connect-src 'none'; media-src 'self' blob:">
 <title>PM-SIM Patient Monitor Simulator</title>
 <link rel="stylesheet" href="css/monitor.css">
+<link rel="stylesheet" href="css/bedside.css">
 </head>
 <body>
 <div class="notice" id="notice" role="note">
@@ -119,6 +120,12 @@
       <div class="t-val" id="vTemp">--</div>
       <div class="t-foot"><span id="sTemp"></span><span class="lim" id="lTemp"></span></div>
     </div>
+    <div class="tile wide" data-ch="glu" id="tGlu">
+      <div class="t-head"><span>GLU</span><span class="unit">mg/dL</span><span class="badge model" title="Value of the glucose–insulin model, not a sensor reading">model</span></div>
+      <div class="t-val" id="vGlu">--</div>
+      <div class="t-foot"><span id="sGlu"></span><span class="lim" id="lGlu"></span></div>
+      <div class="t-sub"><b id="vGluMmol">--</b> mmol/L · insulin <b id="vIns">--</b> µU/mL · <span id="vGluClock">--</span></div>
+    </div>
     <div class="tile external" id="tExt">
       <div class="t-head"><span>OTHER SOURCES</span><span class="unit">latest</span></div>
       <div id="extList" class="ext-list"><span class="muted">No imported or manual data yet</span></div>
@@ -134,6 +141,7 @@
   <button role="tab" data-tab="nibp">NIBP</button>
   <button role="tab" data-tab="alarms">Alarms</button>
   <button role="tab" data-tab="trends">Trends</button>
+  <button role="tab" data-tab="glucose">Glucose</button>
   <button role="tab" data-tab="data">Data import/export</button>
   <button role="tab" data-tab="profile">Profile</button>
   <button role="tab" data-tab="chain">Signal chain</button>
@@ -146,6 +154,7 @@
 <section class="panel" data-panel="controls">
   <p class="hint">Each control lists its unit, its range and what it does. Values outside the range are clamped, and a warning is shown.
     A scenario preset resets the patient and sensor settings, keeps the display settings, and highlights what it changed.</p>
+  <div class="sev-legend" aria-label="Colour key"><span class="h">high-priority alarm</span><span class="m">medium-priority alarm</span><span class="l">technical alarm</span><span class="d">not the default value</span></div>
   <div id="controlMsgs" class="msgs" aria-live="polite"></div>
   <div id="controls" class="control-groups"></div>
 </section>
@@ -201,6 +210,42 @@
     Hatched bands are intervals with missing values, or with no data for longer than 3 × the usual sample interval.</p>
 </section>
 
+<section class="panel" data-panel="glucose" hidden>
+  <p class="warn" id="gluNotice"></p>
+  <div class="split">
+    <div>
+      <h3>Give now</h3>
+      <div class="row wrap">
+        <label class="inline">Meal <input id="gluMealNow" inputmode="decimal" value="50" size="4" aria-label="Meal carbohydrate in grams"> g carbohydrate (0–200)</label>
+        <button id="gluMealBtn">Give meal</button>
+      </div>
+      <div class="row wrap">
+        <label class="inline">Insulin bolus <input id="gluBolusNow" inputmode="decimal" value="4" size="4" aria-label="Subcutaneous insulin bolus in units"> U subcutaneous (0–30)</label>
+        <button id="gluBolusBtn">Give bolus</button>
+      </div>
+      <div id="gluMsg" class="msgs" aria-live="polite"></div>
+      <p class="hint">Fasting glucose, fasting insulin and basal insulin are in Controls → Glucose and insulin; diabetes status and weight in Controls → Patient profile
+        (also in the Profile tab); the model time scale in Controls → Processing. Changing diabetes status, fasting values or weight restarts the model at its fasting steady state.</p>
+    </div>
+    <div>
+      <h3>Projection plan</h3>
+      <div class="form-grid">
+        <label>Horizon <select id="gluHorizon"><option value="120">2 h</option><option value="180" selected>3 h</option><option value="240">4 h</option></select></label>
+        <label>Planned meal (g) <input id="gluPlanMeal" inputmode="decimal" value="0"></label>
+        <label>… at minute <input id="gluPlanMealAt" inputmode="decimal" value="0"></label>
+        <label>Planned bolus (U) <input id="gluPlanBolus" inputmode="decimal" value="0"></label>
+        <label>… at minute <input id="gluPlanBolusAt" inputmode="decimal" value="0"></label>
+      </div>
+    </div>
+  </div>
+  <canvas id="cvGlu" class="plot tall" aria-label="Glucose model projection over the chosen horizon"></canvas>
+  <div class="row"><button id="gluPng">PNG</button></div>
+  <div id="gluSummary" class="stats"></div>
+  <p class="hint">Solid line: projection with the planned events. Dashed line: the same model with no further events. Green band: 70–180 mg/dL target range;
+    dotted lines: 54 and 250 mg/dL level 2 thresholds (consensus CGM metrics [52]; ADA Standards of Care [51]). Time is model time; the projection updates every 2 s while this tab is open.
+    1 mmol/L = 18.016 mg/dL.</p>
+</section>
+
 <section class="panel" data-panel="data" hidden>
   <div class="split">
     <div>
@@ -248,6 +293,7 @@
     <form id="profileForm" class="form-grid" autocomplete="off">
       <label>Label (fictional) <input id="pLabel"></label>
       <label>Age (years) <input id="pAge" inputmode="decimal"></label>
+      <label>Sex <select id="pSex"></select></label>
       <label>Height <span class="pair"><input id="pHeight" inputmode="decimal"><select id="pHeightUnit"><option value="cm">cm</option><option value="in">in</option></select></span></label>
       <label>Weight <span class="pair"><input id="pWeight" inputmode="decimal"><select id="pWeightUnit"><option value="kg">kg</option><option value="lb">lb</option></select></span></label>
       <div class="row"><button type="submit" class="primary">Update</button><span id="pMsg" class="msgs"></span></div>
@@ -266,7 +312,8 @@
   </div>
   <p class="hint">BMI = weight / height². BSA (Mosteller) = √(height[cm] × weight[kg] / 3600).
     Adult BMI categories are shown only for ages 20 and over. Younger people need age- and sex-specific growth references.
-    The profile does not change the simulated signals. It stays in this tab.</p>
+    Age, sex, height, weight and diabetes status are the same values as Controls → Patient profile; changing them here or there sets the scenario to Custom.
+    Weight sets the glucose model's distribution volumes and diabetes status selects its parameter set; no other signal uses the profile. The label and the weight history stay in this tab.</p>
 </section>
 
 <section class="panel" data-panel="chain" hidden>
@@ -428,8 +475,10 @@
 <script src="src/sim/nibp.js"></script>
 <script src="src/sim/detectors.js"></script>
 <script src="src/sim/params.js"></script>
+<script src="src/sim/glucose.js"></script>
 <script src="src/sim/engine.js"></script>
 <script src="src/alarms/alarmEngine.js"></script>
+<script src="src/alarms/severity.js"></script>
 <script src="src/data/csv.js"></script>
 <script src="src/data/importer.js"></script>
 <script src="src/devices/gatt.js"></script>
@@ -444,7 +493,9 @@
 <script src="src/ui/chainPanel.js"></script>
 <script src="src/ui/lessonsPanel.js"></script>
 <script src="src/ui/androidPanel.js"></script>
+<script src="src/ui/glucosePanel.js"></script>
 <script src="src/ui/selftest.js"></script>
 <script src="src/ui/app.js"></script>
+<script src="src/ui/bedside.js"></script>
 </body>
 </html>

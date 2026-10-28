@@ -24,6 +24,8 @@
     art_map:  { label: 'Arterial mean (invasive)',      unit: 'mmHg', min: 15, max: 280 },
     etco2:    { label: 'End-tidal CO2',     unit: 'mmHg',     min: 0,   max: 150 },
     temp:     { label: 'Temperature',       unit: '°C',       min: 20,  max: 46 },
+    glucose:  { label: 'Plasma glucose',    unit: 'mg/dL',    min: 1,   max: 1000 },
+    insulin:  { label: 'Plasma insulin',    unit: 'µU/mL',    min: 0,   max: 1000 },
     weight:   { label: 'Weight',            unit: 'kg',       min: 0.3, max: 500 },
     height:   { label: 'Height',            unit: 'cm',       min: 20,  max: 260 },
     bmi:      { label: 'BMI',               unit: 'kg/m²',    min: 5,   max: 150 },
@@ -34,6 +36,7 @@
   // Accepted unit spellings -> converter to canonical unit.
   const LB_PER_KG = 2.2046226218;
   const MMHG_PER_KPA = 7.500615758;
+  const MGDL_PER_MMOLL = 18.016; // glucose, molar mass 180.16 g/mol
   const CONVERTERS = {
     weight: { kg: v => v, g: v => v / 1000, lb: v => v / LB_PER_KG, lbs: v => v / LB_PER_KG },
     height: { cm: v => v, m: v => v * 100, mm: v => v / 10, in: v => v * 2.54, inch: v => v * 2.54 },
@@ -56,6 +59,8 @@
     bmi:    { 'kg/m²': v => v, 'kg/m2': v => v },
     bsa:    { 'm²': v => v, m2: v => v },
     steps:  { steps: v => v, count: v => v },
+    glucose: { 'mg/dl': v => v, 'mmol/l': v => v * MGDL_PER_MMOLL, mm: v => v * MGDL_PER_MMOLL },
+    insulin: { 'µu/ml': v => v, 'uu/ml': v => v, 'mu/l': v => v, 'miu/l': v => v, 'µiu/ml': v => v, 'uiu/ml': v => v },
   };
 
   function normUnit(u) {

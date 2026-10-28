@@ -53,8 +53,10 @@
     store.addMany(E.frameObservations(f));
     updateTiles(f);
     renderAlarms();
+    applySeverity();
     if (visible('alarms')) PM.panels.renderAlarmHistory($('#alarmHistory tbody'), alarms.history);
     if (visible('trends') && !trendPaused && Math.floor(f.t) % 2 === 0) drawTrendNow();
+    if (visible('glucose') && Math.floor(f.t) % 2 === 0) glucose.draw();
     $('#clock').textContent = 't = ' + f.t.toFixed(0) + ' s';
     if (Math.floor(f.t) % 5 === 0) refreshExt();
   };
@@ -75,19 +77,31 @@
     if (!L || !L.enabled) return 'alarm off';
     return (L.low === null ? '–' : L.low) + '…' + (L.high === null ? '–' : L.high);
   };
-  const alarming = param => alarmState.active.some(a => a.kind === 'physiological' && a.param === param);
   const setTxt = (id, t) => { const n = $(id); if (n.textContent !== t) n.textContent = t; };
+
+  /** Colours tiles and controls by the highest active alarm priority they concern. */
+  const TILE_IDS = ['tHr', 'tSpo2', 'tNibp', 'tArt', 'tCo2', 'tRr', 'tTemp', 'tGlu'];
+  function applySeverity() {
+    const g = PM.severity.grade(alarmState.active);
+    for (const id of TILE_IDS) {
+      const tile = $('#' + id), s = g.tiles[id];
+      for (const p of ['high', 'medium', 'low']) tile.classList.toggle('sev-' + p, !!s && s.sev === p);
+      let issue = tile.querySelector('.t-issue');
+      if (!issue) { issue = el('div.t-issue'); tile.append(issue); }
+      const text = s ? s.messages.join(' · ') : '';
+      if (issue.textContent !== text) issue.textContent = text;
+    }
+    controls.markSeverity(g.controls);
+  }
 
   function updateTiles(f) {
     const est = f.est, tr = f.truth;
     setTxt('#vHr', fmt(est.hr)); setTxt('#sHr', f.technical.ecgLeadsOff ? 'leads off' : 'set ' + tr.hr); setTxt('#lHr', limText('hr'));
     setTxt('#vRhythm', est.rhythmLabel || '--'); setTxt('#vPvc', fmt(est.pvcPerMin));
-    $('#tHr').classList.toggle('alarming', alarming('hr') || alarming('rhythm'));
 
     setTxt('#vSpo2', fmt(est.spo2)); setTxt('#vPr', fmt(est.pr)); setTxt('#vPi', fmt(est.pi, 1)); setTxt('#vSqi', fmt(est.sqi));
     setTxt('#sSpo2', est.spo2Status !== 'ok' ? est.spo2Status : 'set ' + tr.spo2); setTxt('#lSpo2', limText('spo2'));
     $('#sqiBar').style.width = (Number.isFinite(est.sqi) ? Math.max(0, Math.min(100, est.sqi)) : 0) + '%';
-    $('#tSpo2').classList.toggle('alarming', alarming('spo2'));
 
     const n = f.nibp;
     setTxt('#nibpState', n.state + (n.state === 'inflating' || n.state === 'deflating' ? ' ' + fmt(n.cuff) + ' mmHg' : '') + (n.msg && n.state === 'failed' ? ': ' + n.msg : ''));
@@ -100,24 +114,25 @@
       $('#tNibp .t-val').classList.toggle('stale', age > engine.p.nibp_interval * 60 + 60 || engine.p.nibp_interval === 0 && age > 900);
     }
     setTxt('#sNibp', 'set ' + tr.sbp + '/' + tr.dbp);
-    $('#tNibp').classList.toggle('alarming', ['sbp', 'dbp', 'map'].some(alarming));
 
     const a = est.art;
     setTxt('#vArt', a ? fmt(a.sys) + '/' + fmt(a.dia) : '--/--'); setTxt('#vArtMap', a ? fmt(a.map) : '--');
     setTxt('#sArt', f.technical.artNoPulse ? 'no pulse (line open?)' : 'set ' + tr.sbp + '/' + tr.dbp);
     setTxt('#lArt', 'SYS ' + limText('art_sys'));
-    $('#tArt').classList.toggle('alarming', ['art_sys', 'art_map'].some(alarming));
 
     setTxt('#vEtco2', fmt(est.etco2)); setTxt('#vFico2', fmt(est.fico2)); setTxt('#vAwrr', fmt(est.awrr));
     setTxt('#sEtco2', f.technical.capnoNoSignal ? 'no CO₂ signal' : tr.etco2 === null ? '' : 'set ' + Math.round(tr.etco2));
     setTxt('#lEtco2', limText('etco2'));
-    $('#tCo2').classList.toggle('alarming', alarming('etco2'));
 
     setTxt('#vRr', est.apnea ? 'APNEA' : fmt(est.rr)); setTxt('#sRr', 'set ' + tr.rr); setTxt('#lRr', limText('rr'));
-    $('#tRr').classList.toggle('alarming', alarming('rr') || alarmState.active.some(a => a.id === 'apnea'));
 
     setTxt('#vTemp', fmt(est.temp, 1)); setTxt('#sTemp', est.tempStatus !== 'ok' ? 'probe ' + est.tempStatus : 'set ' + tr.temp.toFixed(1)); setTxt('#lTemp', limText('temp'));
-    $('#tTemp').classList.toggle('alarming', alarming('temp'));
+
+    // Glucose is a model value (no sensor model): shown with its model clock.
+    setTxt('#vGlu', fmt(est.glucose)); setTxt('#vGluMmol', fmt(PM.glucose.toMmol(est.glucose), 1)); setTxt('#vIns', fmt(est.insulin, 1));
+    setTxt('#sGlu', engine.p.diabetes === 'none' ? 'no diabetes' : engine.p.diabetes.replace('type', 'type ')); setTxt('#lGlu', limText('glucose'));
+    const gm = est.gluMin;
+    setTxt('#vGluClock', 'model ' + Math.floor(gm / 60) + ' h ' + String(Math.floor(gm % 60)).padStart(2, '0') + ' min');
   }
 
   /** Latest value per external source and parameter. Never merged with simulated data. */
@@ -179,24 +194,39 @@
   }
 
   // ------------------------------------------------------------- controls & toolbar
+  let dataPanel = null; // set once the Data tab is built (below)
+  let profile = null;   // set once the Profile tab is built (below)
+  let glucose = { draw() {} }; // replaced once the Glucose tab is built (below)
   const controls = PM.panels.buildControls($('#controls'), $('#controlMsgs'), update => {
     const r = engine.setParams(update);
     afterParams();
     return r;
   });
+  // The scenario select names the preset the patient and sensor settings match, or
+  // "Custom" once any of them was edited by hand (display settings do not count).
+  function syncScenario() {
+    const sel = $('#selPreset');
+    sel.value = P.matchPreset(engine.p, sel.value);
+  }
   function afterParams() {
+    syncScenario();
+    if (profile) profile.refresh(engine.p);
     $('#selSpeed').value = String(engine.p.speed);
     $('#ecgScale').textContent = engine.p.sweep + ' mm/s · ' + engine.p.ecg_gain + ' mm/mV';
   }
   for (const s of P.SPEC.speed.options) $('#selSpeed').append(el('option', { value: String(s), text: s + '×' }));
   $('#selSpeed').addEventListener('change', e => { engine.setParams({ speed: e.target.value }); controls.sync(engine.p); afterParams(); });
   for (const p of P.PRESETS) $('#selPreset').append(el('option', { value: p.id, text: p.name }));
+  $('#selPreset').append(el('option', { value: 'custom', text: 'Custom (edited)', disabled: true }));
   $('#selPreset').addEventListener('change', e => {
+    if (e.target.value === 'custom') return;
     const r = P.applyPreset(e.target.value, engine.p);
     const s = engine.setParams(r.params);
-    controls.sync(engine.p, r.changed);
+    controls.sync(engine.p);
+    engine.startNibp(); // a fresh cuff reading for the new scenario
     controls.showMsgs({ errors: s.errors, warnings: s.warnings });
     $('#controlMsgs').prepend(el('div.ok', { text: 'Scenario "' + r.preset.name + '" applied' + (r.changed.length ? '. Changed: ' + r.changed.map(k => P.SPEC[k].label).join(', ') + '.' : ' (all patient and sensor settings at default).') }));
+    if (r.preset.note) $('#controlMsgs').prepend(el('div.ok', { text: r.preset.note + ' References: ' + r.preset.refs.map(n => '[' + n + ']').join(' ') + ' in REFERENCES.md. Illustrative pattern for education only; real presentations vary and values are not diagnostic.' }));
     afterParams();
   });
 
@@ -216,7 +246,8 @@
     nibpRows.length = 0;
     views.pleth.lo = views.resp.lo = null;
     $('#selPreset').value = 'baseline';
-    controls.sync(engine.p, []);
+    controls.sync(engine.p);
+    engine.startNibp();
     $('#controlMsgs').textContent = '';
     $('#controlMsgs').append(el('div.ok', { text: 'Reset: simulation, alarms, alarm limits and simulated data are back to defaults. Imported, device and manual data are kept.' }));
     limits.render();
@@ -224,7 +255,7 @@
     PM.panels.renderAlarmHistory($('#alarmHistory tbody'), alarms.history);
     renderAlarms(); drawOsc(); afterParams();
     for (const id of ['#vHr', '#vSpo2', '#vPr', '#vPi', '#vSqi', '#vMap', '#vMapOsc', '#vMapF', '#vPp', '#vRr', '#vTemp',
-      '#vRhythm', '#vPvc', '#vArtMap', '#vEtco2', '#vFico2', '#vAwrr']) $(id).textContent = '--';
+      '#vRhythm', '#vPvc', '#vArtMap', '#vEtco2', '#vFico2', '#vAwrr', '#vGlu', '#vGluMmol', '#vIns']) $(id).textContent = '--';
     $('#vNibp').textContent = '--/--'; $('#vArt').textContent = '--/--'; $('#nibpAge').textContent = '';
     setRunning(true);
   });
@@ -274,7 +305,7 @@
     applyPreset: id => { $('#selPreset').value = id; $('#selPreset').dispatchEvent(new Event('change')); },
     setParams: update => {
       const r = engine.setParams(update);
-      controls.sync(engine.p, Object.keys(update));
+      controls.sync(engine.p);
       controls.showMsgs({ errors: r.errors, warnings: r.warnings });
       afterParams();
     },
@@ -290,14 +321,15 @@
     if (name === 'nibp') drawOsc();
     if (name === 'trends') drawTrendNow();
     if (name === 'alarms') PM.panels.renderAlarmHistory($('#alarmHistory tbody'), alarms.history);
-    if (name === 'data') dataPanel.renderSummary();
+    if (name === 'data' && dataPanel) dataPanel.renderSummary();
     if (name === 'chain') chain.draw();
+    if (name === 'glucose') glucose.draw();
   }
   $$('#tabs [role=tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
   // ------------------------------------------------------------- trends
   let trendPaused = false, lastTrend = null;
-  const TREND_PARAMS = ['hr', 'pr', 'spo2', 'spo2_sqi', 'pi', 'sbp', 'dbp', 'map', 'pp', 'art_sys', 'art_dia', 'art_map', 'rr', 'etco2', 'temp', 'weight', 'bmi', 'bsa', 'steps'];
+  const TREND_PARAMS = ['hr', 'pr', 'spo2', 'spo2_sqi', 'pi', 'sbp', 'dbp', 'map', 'pp', 'art_sys', 'art_dia', 'art_map', 'rr', 'etco2', 'temp', 'glucose', 'insulin', 'weight', 'bmi', 'bsa', 'steps'];
   for (const p of TREND_PARAMS) $('#trParam').append(el('option', { value: p, text: U.PARAMS[p].label + ' (' + U.PARAMS[p].unit + ')' }));
   const trChecks = {};
   for (const s of Object.values(PM.observation.SOURCE)) {
@@ -337,18 +369,24 @@
   }
 
   // ------------------------------------------------------------- other panels
-  PM.panels.buildProfile(list => { store.addMany(list); refreshExt(); });
-  PM.dataPanel.init({ store, getEngine: () => engine, onChange: refreshExt });
+  profile = PM.panels.buildProfile({
+    apply: update => { const r = engine.setParams(update); controls.sync(engine.p); afterParams(); return r; },
+    onDerived: list => { store.addMany(list); refreshExt(); },
+  });
+  profile.refresh(engine.p);
+  dataPanel = PM.dataPanel.init({ store, getEngine: () => engine, onChange: refreshExt });
   PM.androidPanel.init({ store, onChange: refreshExt });
+  glucose = PM.glucosePanel.init({ getEngine: () => engine });
   $('#btnSelfTest').addEventListener('click', () => PM.selftest.run());
 
   // ------------------------------------------------------------- start
-  controls.sync(engine.p, []);
+  controls.sync(engine.p);
   $('#selPreset').value = 'baseline';
   afterParams();
+  engine.startNibp(); // first cuff reading at start-up; then every nibp_interval minutes
   renderAlarms();
   PM.panels.renderNibpTable($('#nibpTable tbody'), nibpRows);
-  root.PM.app = { engine, alarms, store, showTab, setRunning };
+  root.PM.app = { engine, alarms, store, showTab, setRunning, glucose: () => glucose };
   requestAnimationFrame(loop);
   if (/[?&]selftest=1\b/.test(root.location.search)) { showTab('tests'); PM.selftest.run(); }
 })(this);

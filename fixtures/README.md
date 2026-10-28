@@ -13,5 +13,5 @@ patient or user data. Expected results for each file are checked in `tests/unit/
 | `vitals_timezones.csv` | Same instant written as `Z`, `+03:00`, naive, epoch seconds, epoch ms and `DD.MM.YYYY` |
 | `vitals_malformed.csv` | Non-numeric value, impossible date, unparseable timestamp, out-of-range HR, extra field, unterminated quote |
 | `vitals_records.json` | `{records:[...]}` wide JSON with nested `{value, unit}` objects and `null` |
-| `vitals_long.json` | Array of long records including an unsupported parameter (glucose) |
+| `vitals_long.json` | Array of long records including an unsupported parameter (cholesterol) |
 | `vitals_malformed.json` | Truncated JSON (fatal error, nothing imported) |

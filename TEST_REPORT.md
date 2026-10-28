@@ -8,8 +8,8 @@ PM-SIM, Patient Monitor Simulator. Updated 2026-10-28 after the device integrati
 
 | Test level | Result |
 |---|---|
-| Node unit tests (`node --test tests/unit/*.test.js`) | **64 tests in 8 files, 64 pass, 0 fail** (run 2026-10-28 after the new features; it was 47 tests before them) |
-| Browser self-test (`index.html?selftest=1`) | **15 entries: 14 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-28: **14 pass, 0 fail, 1 not run** (section 3). |
+| Node unit tests (`node --test tests/unit/*.test.js`) | **78 tests in 10 files, 78 pass, 0 fail** (run 2026-10-28 after the glucose model; it was 64 tests before the scenario and glucose tests, and 47 before that) |
+| Browser self-test (`index.html?selftest=1`) | **16 entries: 15 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-28: **15 pass, 0 fail, 1 not run** (section 3). |
 | Manual interaction checks in a browser | 9 earlier checks (section 4.1) and 5 checks of the new features made on 2026-10-28 (section 4.2), all as expected. |
 | Hardware tests (watch data on Android through Health Connect, native BLE Heart Rate Service, export file) | **Not run.** No watch, heart-rate sensor or Health Connect store was used. |
 | Android app | Not tested on a device. An APK file (`release/PM-SIM-1.1.0-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
@@ -43,9 +43,10 @@ The self-test runs each scenario on a fresh engine instance with a fixed seed. T
 | 12 | Hypoventilation preset (RR 6, EtCO₂ set to 58 mmHg), 30 s | EtCO₂ within ±3 mmHg of 58; EtCO₂-high alarm active after its 10 s delay | EtCO₂ 58.8 mmHg, etco2:high active | pass |
 | 13 | Arterial line: optimal vs under-damped, 120/80 mmHg, 20 s each | Optimal SYS/DIA within ±5 of 120/80; under-damped SYS ≥ 8 mmHg higher with MAP within ±2 | optimal about 120/79 (90), under-damped about 133/74 (91) | pass |
 | 14 | Health Connect records (Android bridge logic): one valid heart-rate record and one SpO₂ record of 150 % | Valid record stored as source `device`; SpO₂ 150 % rejected, not clamped | 1 stored (hr 61, device), 1 rejected | pass |
-| 15 | Watch data on Android (Health Connect, BLE, export file): readings arrive with source `device` and the route in the provenance | Live readings from a real watch or sensor | **not run**: no hardware available | not run |
+| 15 | Glucose model (no diabetes: 50 g meal, 5 h; type 1: fasting 200 mg/dL, basal 0.8 U/h, 6 U bolus, 4 h; alarm engine at 60 mg/dL) | Meal peak above 120 mg/dL and back within ±15 of 90 by 5 h; bolus lowers the 4 h value by ≥ 10 mg/dL; glucose-low alarm active | peak 167, 5 h 84 mg/dL; type 1 at 4 h 200 → 159 mg/dL with bolus; glucose:low active | pass |
+| 16 | Watch data on Android (Health Connect, BLE, export file): readings arrive with source `device` and the route in the provenance | Live readings from a real watch or sensor | **not run**: no hardware available | not run |
 
-Entry 14 tests only the page-side conversion code with records written in the test. It does not involve Health Connect or a phone. Entry 15 is reported as "not run" by design. The code never marks a hardware test as passed without hardware. Earlier versions of the self-test also had scenarios for the BLE packet replay, HL7 v2, the HL7 bed filter and MLLP framing, and FHIR/SDC import (15 entries: 13 pass, 2 not run). They were removed together with those features.
+Entry 14 tests only the page-side conversion code with records written in the test. It does not involve Health Connect or a phone. Entry 16 is reported as "not run" by design. The code never marks a hardware test as passed without hardware. Earlier versions of the self-test also had scenarios for the BLE packet replay, HL7 v2, the HL7 bed filter and MLLP framing, and FHIR/SDC import (15 entries: 13 pass, 2 not run). They were removed together with those features.
 
 ## 4. Manual interaction checks
 
@@ -92,7 +93,7 @@ When served over `http://localhost`, the app made no network requests other than
 
 ## 6. Node unit and integration tests
 
-64 tests in 8 files (17 + 10 + 4 + 13 + 3 + 10 + 3 + 4). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
+78 tests in 10 files (17 + 10 + 4 + 13 + 3 + 10 + 3 + 4 + 6 + 8). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
 
 The first five files were already described before the new features were added. Their counts did not change.
 
@@ -184,11 +185,31 @@ These tests check the analyser only on the simulator's own waveforms. They are n
 ### `tests/unit/androidBridge.test.js` (4 tests)
 
 - Valid Health Connect records (heart rate, SpO₂, temperature, plus one duplicate) give 3 `device` observations with value, unit, time, route `health-connect` and data origin; the duplicate is dropped and an error message from the app is passed through.
-- Rejections: an unsupported type (glucose), a non-number value, SpO₂ 140 % (out of range) and a record without time are rejected with reasons. A systolic pressure of 16 kPa is converted to mmHg (× 7.50062). Empty input gives no observations.
+- Rejections: an unsupported type (cholesterol), a non-number value, SpO₂ 140 % (out of range) and a record without time are rejected with reasons. A systolic pressure of 16 kPa is converted to mmHg (× 7.50062). Empty input gives no observations.
 - A BLE packet built with the test encoder (HR 72, contact, one RR interval of 0.8 s) gives one `device` observation with route `ble-hrs` and the device name; a malformed packet throws.
 - The Base64 helper used for binary exports matches Node's `Buffer` for 70 000 bytes.
 
 These tests use records and packets written in the test. They do not involve a phone, Health Connect or a Bluetooth device.
+
+### `tests/unit/scenario.test.js` (6 tests)
+
+- Every preset matches itself; a manual edit of a patient, physiology or sensor value gives "custom". Display and processing settings do not make a scenario custom.
+- Loading a scenario sets every patient and sensor value, not only the scenario's own changes.
+- Alarm colouring: the highest priority wins per tile, all messages are kept, and a technical alarm maps to its sensor control. Every alarm parameter and technical flag the engine can raise is linked to a tile.
+- Literature scenarios: values in range without clamping, references that exist in `REFERENCES.md`, and no two scenarios with the same settings.
+
+### `tests/unit/glucose.test.js` (8 tests)
+
+- Without events the model holds its fasting value for 10 h in each diabetes status.
+- No diabetes, 50 g meal: the peak is above 120 mg/dL between 20 and 120 min, and glucose is back within ±15 of 90 mg/dL after 5 h.
+- Same meal: type 2 and type 1 (no insulin) peak more than 10 mg/dL higher and are more than 30 mg/dL higher at 2 h than no diabetes.
+- Type 1: a 6 U bolus lowers the 4 h value by more than 10 mg/dL and raises plasma insulin.
+- The projection reports the first crossing of 70, 54, 180 and 250 mg/dL, gives time in range between 0 and 100 %, and runs on a copy (the model is unchanged).
+- mmol/L and mg/dL conversion (× 18.016) in the model and in the import unit converter; mU/L equals µU/mL for insulin.
+- Engine: glucose follows the model clock, a meal raises it, observations are labelled `simulated` in mg/dL, and a change of diabetes status restarts the model at the new fasting value.
+- Alarms: medium priority below 70 or above 180 mg/dL; high-priority level 2 below 54 mg/dL only.
+
+These tests check the model against its own design targets and the published parameter values. They are not a validation against measured patient data.
 
 ## 7. Defects found and fixed during testing
 
@@ -215,4 +236,4 @@ Defects found in the removed device code are not listed here.
 node --test tests/unit/*.test.js
 ```
 
-Then open `index.html?selftest=1` (from a local server such as `python3 -m http.server 8766`, from the website, or directly) and compare the Tests tab with section 3. Expected: 14 pass, 0 fail, 1 not run. Values can differ slightly between browsers, but each must stay within the stated tolerance.
+Then open `index.html?selftest=1` (from a local server such as `python3 -m http.server 8766`, from the website, or directly) and compare the Tests tab with section 3. Expected: 15 pass, 0 fail, 1 not run. Values can differ slightly between browsers, but each must stay within the stated tolerance.

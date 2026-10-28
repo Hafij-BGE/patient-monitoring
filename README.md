@@ -37,7 +37,7 @@ Useful URL options:
 
 Keyboard: `Space` toggles run/pause.
 
-Tabs: Controls, NIBP, Alarms, Trends, Signal chain, Lessons, Data import/export, Profile, Science, Tests, References.
+Tabs: Controls, NIBP, Alarms, Trends, Glucose, Signal chain, Lessons, Data import/export, Profile, Science, Tests, References.
 
 ## Unit tests
 
@@ -47,25 +47,26 @@ Requires Node.js 18 or later. No packages to install.
 node --test tests/unit/*.test.js
 ```
 
-Current result: 64 tests, 64 pass. Details are in `TEST_REPORT.md`.
+Current result: 78 tests, 78 pass. Details are in `TEST_REPORT.md`.
 
 ## Features
 
 | Area | What it does |
 |---|---|
 | Monitor | Six sweeping waveforms (ECG, pleth, arterial pressure 0–200 mmHg, respiration, CO₂ 0–60 mmHg, cuff pressure) and numerics tiles for HR (with rhythm label and PVC/min), SpO₂ (with SQI and PI), pulse rate, ART (SYS/DIA and MAP), EtCO₂ (with FiCO₂ and airway RR), NIBP (SYS/DIA, oscillometric MAP, formula MAP, pulse pressure), RR and temperature. Each tile shows the set point and a source badge. The layout adapts to narrow screens and phones. |
-| Controls | 44 validated controls in three groups: physiology, sensor and processing. Each has a label, a unit, a range and a short explanation. Invalid input is rejected with a message, for example DIA ≥ SYS. |
-| Presets | 25 teaching scenarios: baseline, tachycardia, bradycardia, irregular timing, desaturation, low and high blood pressure, fast and slow breathing, temperature elevation, sensor disconnection, motion artifact, noisy ECG, missing observations, apnea, atrial fibrillation, PVCs, ventricular tachycardia, ventricular fibrillation, asystole, hypoventilation, bronchospasm, rebreathing, under-damped arterial line and transducer height error. |
+| Controls | 62 validated controls in five groups: patient profile, physiology, glucose and insulin, sensor and processing. Each has a label, a unit, a range and a short explanation. Invalid input is rejected with a message, for example DIA ≥ SYS. |
+| Presets | 40 teaching scenarios. A scenario sets every patient, physiology and sensor control (its own values, all others at default); editing any of them by hand shows **Custom (edited)**. 25 simple scenarios: baseline, tachycardia, bradycardia, irregular timing, desaturation, low and high blood pressure, fast and slow breathing, temperature elevation, sensor disconnection, motion artifact, noisy ECG, missing observations, apnea, atrial fibrillation, PVCs, ventricular tachycardia, ventricular fibrillation, asystole, hypoventilation, bronchospasm, rebreathing, under-damped arterial line and transducer height error. 15 combined-sign patterns from the literature, each with its sources (REFERENCES.md entries 28–44 and 51) and a note shown on load: blood loss ATLS class II and III, infection screening (SIRS/qSOFA), acute allergic reaction, hypoventilation masked by O₂, compensatory hyperventilation, dead-space (PE-type) pattern, hypothermia, early and late hypermetabolic (MH-type) pattern, obstructive hypercapnic (COPD-type) pattern, early and late raised-potassium ECG, the raised-ICP (Cushing) reflex and a hyperglycaemic-crisis (DKA-type) pattern. Illustrative patterns for education only; not diagnostic. |
 | Run control | Run/pause, playback speed (0.25–4×), freeze, reset (also restores default alarm limits) and a PNG snapshot that carries the educational notice. |
-| NIBP | Manual start and stop, or an automatic interval. The live cuff-pressure trace, the oscillogram with the detected points, and a results table. |
+| NIBP | Manual start and stop, or an automatic interval (default every 5 min; a reading also starts on load, scenario change and Reset). The live cuff-pressure trace, the oscillogram with the detected points, and a results table. |
 | Alarms | Limits and delays for the physiological parameters (including EtCO₂, arterial SYS and MAP) and rhythm alarms (for example V-tach, frequent PVCs), apnea, and 9 technical conditions. Physiological and technical alarms are kept apart, with priorities, acknowledge, a 2-minute audio pause with countdown, history and CSV export. Optional Web Audio tones. |
 | Trends | Any parameter from any source over a chosen window. Gaps and missing values are drawn as breaks, never as zeros. Pause, PNG, CSV and summary statistics. |
-| Patient profile | Age, sex, height and weight, with BMI and BSA (Mosteller). Adult BMI categories are applied only from age 20. Weight history with change. |
+| Glucose and insulin | A population glucose–insulin model: Bergman minimal model with meal absorption and subcutaneous insulin (Hovorka), parameters from published studies (REFERENCES.md 45–54). Diabetes status none, type 1 or type 2 changes insulin sensitivity and secretion. The GLU tile shows glucose (mg/dL and mmol/L) and insulin with a "model" badge; alarms below 70, above 180 and a high-priority level 2 below 54 mg/dL. The **Glucose** tab gives a meal or an insulin bolus now, and draws a 2–4 h **model projection** with a planned meal and bolus: the curve, the time to cross 70/54/180/250 mg/dL and the time in 70–180 mg/dL. It is a model projection, not a clinical prediction, and not dosing advice. |
+| Patient profile | Age, sex, height, weight and diabetes status are the same parameters as Controls → Patient profile (changing either sets the scenario to Custom). Shows BMI and BSA (Mosteller). Adult BMI categories are applied only from age 20. Weight history with change. |
 | Data import/export | CSV/JSON table import only (wide or long tables, unit conversion, time zones, missing tokens, duplicates and conflicts), manual entry, CSV/JSON export by source and a waveform CSV export. In the Android app an extra "On this phone" section reads Health Connect records and a Bluetooth heart-rate sensor after the user starts each one; out-of-range values are rejected with a reason, never clamped. |
 | Signal chain | Pick a channel (ECG, PPG, respiration, arterial line, capnography) and watch each processing stage as a live plot, with units and a note per stage: for example clean ECG, acquired ECG with noise, display filter, the QRS detector's integrated signal with its threshold and detections. Any stage can be saved as PNG. |
 | Lessons | 7 guided lessons (ECG chain, SpO₂, NIBP, rhythms, capnography, arterial line, alarms). Each has objectives, steps with buttons that set the controls, and a 3-question quiz graded in the page with explanations. |
 | Science and references | The models, assumptions and engineering limitations summarised in the app, and the reference list. |
-| Tests | Browser self-test: 14 automated scenarios (including V-tach, hypoventilation, arterial-line damping, the Bluetooth Heart Rate Measurement parser and the Health Connect record conversion used by the Android app) plus 1 hardware entry (watch data on Android: Health Connect, BLE, export file) that is always reported as "not run" when no hardware is present. |
+| Tests | Browser self-test: 15 automated scenarios (including V-tach, hypoventilation, arterial-line damping, the glucose model, the Bluetooth Heart Rate Measurement parser and the Health Connect record conversion used by the Android app) plus 1 hardware entry (watch data on Android: Health Connect, BLE, export file) that is always reported as "not run" when no hardware is present. |
 
 ## Data provenance
 
@@ -83,19 +84,19 @@ A missing value is stored as `null` with quality `missing`. It is never stored a
 index.html              single page, loads plain <script> files (no modules, works from file://)
 css/                    styles
 src/core/               observation model, units, patient profile, observation store
-src/sim/                parameters and presets, RNG, DSP, ECG, arrhythmias, pulse, sensors, NIBP, detectors, engine
-src/alarms/             alarm engine
+src/sim/                parameters and presets, RNG, DSP, ECG, arrhythmias, pulse, sensors, NIBP, detectors, glucose model, engine
+src/alarms/             alarm engine, alarm-to-tile/control links (severity)
 src/data/               CSV reader, importer (mapping, units, timestamps, validation)
 src/devices/
   gatt.js               Bluetooth Heart Rate Measurement (0x2A37) parser, used by the Android app's BLE route
   androidBridge.js      turns Health Connect records and BLE notifications from the Android app into observations
 src/lessons/            lesson content and quiz grading (no DOM)
-src/ui/                 canvas waveforms and trends, panels (signal chain, lessons, Android section), data tab, self-test, app wiring
+src/ui/                 canvas waveforms and trends, panels (signal chain, lessons, Android section, glucose), data tab, self-test, app wiring
 android/                Android WebView app (edu.deu.pmsim 1.1.0, in development): Health Connect and BLE bridge
 desktop/                Linux .deb: Electron shell (main.cjs), package config and build-deb.sh
 .github/workflows/
   pages.yml             runs the unit tests and deploys the site to GitHub Pages
-tests/unit/             Node unit tests (node --test): sim, arrhythmia, alarms, core, data, devices, androidBridge, lessons
+tests/unit/             Node unit tests (node --test): sim, arrhythmia, alarms, core, data, devices, androidBridge, lessons, scenario, glucose
 fixtures/               synthetic CSV/JSON import files (see fixtures/README.md)
 package.json            "test" and "start" scripts
 ```

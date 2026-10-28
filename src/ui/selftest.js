@@ -84,6 +84,16 @@
         const o = r.observations[0];
         return { pass: r.observations.length === 1 && o.source === 'device' && o.provenance.route === 'health-connect' && r.rejected.length === 1,
           observed: r.observations.length + ' stored (' + (o ? o.param + ' ' + o.value + ', ' + o.source : '-') + '), ' + r.rejected.length + ' rejected' }; } },
+    { name: 'Glucose model: meal and insulin bolus projection', expected: 'no diabetes: 50 g meal peaks above 120 mg/dL and returns within ±15 of 90 by 5 h; type 1: 6 U bolus lowers the 4 h value by ≥ 10 mg/dL; glucose low alarm below 70',
+      run() {
+        const base = { weight_kg: 70, diabetes: 'none', fasting_glucose: 90, fasting_insulin: 10, basal_insulin: 0 };
+        const m = PM.glucose.GlucoseModel, f = new m(base).forecast(300, [{ at: 0, carbs: 50 }]);
+        const t1 = new m(Object.assign({}, base, { diabetes: 'type1', fasting_glucose: 200, basal_insulin: 0.8 }));
+        const off = t1.forecast(240, []).G[240], on = t1.forecast(240, [{ at: 0, units: 6 }]).G[240];
+        const st = new PM.alarms.AlarmEngine().evaluate({ t: 1, est: { glucose: 60, rhythm: 'sinus' }, technical: {}, nibp: {} });
+        const low = st.active.some(a => a.id === 'glucose:low');
+        return { pass: f.maxG > 120 && near(f.G[300], 90, 15) && on < off - 10 && low,
+          observed: 'peak ' + fmt(f.maxG) + ', 5 h ' + fmt(f.G[300]) + ' mg/dL; type 1 at 4 h ' + fmt(off) + ' → ' + fmt(on) + ' mg/dL with bolus; glucose:low ' + (low ? 'active' : 'not active') }; } },
     { name: 'Watch data on Android (Health Connect / BLE / export file, hardware)', expected: 'readings arrive with source "device" and the route in the provenance', hardware: true },
   ];
 

@@ -25,7 +25,7 @@ test('health connect: valid records stored as device values with provenance', ()
 
 test('health connect: unknown, non-numeric, out-of-range and untimed records are rejected', () => {
   const r = AB.healthConnectToObservations({ records: [
-    { param: 'glucose', value: 5, unit: 'mmol/L', time: T },
+    { param: 'cholesterol', value: 5, unit: 'mmol/L', time: T },
     { param: 'hr', value: 'abc', unit: 'bpm', time: T },
     { param: 'spo2', value: 140, unit: '%', time: T },
     { param: 'hr', value: 70, unit: 'bpm' },

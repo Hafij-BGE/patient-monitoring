@@ -1,5 +1,5 @@
 [
   { "timestamp": "2026-10-20T05:00:00Z", "type": "hr", "value": 70, "unit": "bpm" },
   { "timestamp": "2026-10-20T05:00:00Z", "type": "sbp", "value": 122, "unit": "mmHg" },
-  { "timestamp": "2026-10-20T05:00:00Z", "type": "glucose", "value": 5.4, "unit": "mmol/L" }
+  { "timestamp": "2026-10-20T05:00:00Z", "type": "cholesterol", "value": 5.4, "unit": "mmol/L" }
 ]
