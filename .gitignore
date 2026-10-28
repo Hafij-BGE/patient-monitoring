@@ -4,3 +4,5 @@ release/
 *.keystore
 .env
 dist/
+# Homework reports (Word/PDF and build files), kept local
+report/
