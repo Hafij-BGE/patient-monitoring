@@ -49,3 +49,47 @@ test('age-typical blood pressure interpolates the NHANES group means', () => {
     assert.ok(c.sbp - c.dbp > a.sbp - a.dbp, sex + ' pulse pressure widens');
   }
 });
+
+test('selectable BSA formulas (70 kg, 172 cm)', () => {
+  assert.equal(profile.bsa(70, 172).toFixed(3), '1.829');            // Mosteller, the default
+  assert.equal(profile.bsa(70, 172, 'dubois').toFixed(3), '1.825');
+  assert.equal(profile.bsa(70, 172, 'haycock').toFixed(3), '1.834');
+  assert.equal(profile.bsa(0, 172, 'dubois'), null);
+});
+
+test('selectable maximal heart rate formulas (age 60)', () => {
+  assert.equal(profile.hrMax(60), 166);                               // Tanaka, the default
+  assert.equal(profile.hrMax(60, 'gellish'), 165);
+  assert.equal(profile.hrMax(60, 'fox'), 160);
+  assert.equal(profile.hrMax(-1, 'fox'), null);
+});
+
+test('QTc formulas agree at RR 1 s and diverge at fast rates', () => {
+  for (const m of ['framingham', 'fridericia', 'hodges', 'bazett']) assert.equal(profile.qtc(400, 1, m), 400);
+  assert.equal(profile.qtc(360, 0.64, 'bazett'), 450);
+  assert.equal(profile.qtc(400, 0.729, 'fridericia').toFixed(1), '444.4');
+  assert.equal(profile.qtc(360, 0.6).toFixed(1), '421.6');            // Framingham, the default
+  assert.equal(profile.qtc(360, 0.6, 'hodges'), 430);
+  assert.equal(profile.qtc(400, 0.2), null);
+  assert.equal(profile.qtc(400, 2.5), null);
+  for (const k of Object.keys(profile.FORMULAS)) assert.equal(profile.formulaInfo(k, 'nope').id, profile.FORMULAS[k][0].id);
+});
+
+test('engine exposes the model QT: Framingham QTc stays at 400 ms, Bazett rises with rate', () => {
+  const { Engine } = require('../../src/sim/engine.js');
+  for (const hr of [50, 72, 120]) {
+    const e = new Engine({ hr }); let f = null;
+    e.onFrame = x => { f = x; };
+    e.advance(10);
+    const q = f.truth.qt;
+    assert.ok(q && q.qt > 0.25 && q.qt < 0.5, 'QT ' + JSON.stringify(q));
+    assert.ok(Math.abs(profile.qtc(q.qt * 1000, q.rr) - 400) < 1, 'Framingham QTc at ' + hr);
+    if (hr === 120) assert.ok(profile.qtc(q.qt * 1000, q.rr, 'bazett') > 420, 'Bazett over-corrects at 120 bpm');
+  }
+  for (const arrhythmia of ['vf', 'asystole', 'vt']) {
+    const e = new Engine({ arrhythmia }); let f = null;
+    e.onFrame = x => { f = x; };
+    e.advance(5);
+    assert.equal(f.truth.qt, null, arrhythmia);
+  }
+});

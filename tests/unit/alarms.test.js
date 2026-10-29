@@ -117,12 +117,11 @@ test('history exports as CSV', () => {
 test('presets drive the expected alarms end to end (simulation → alarm engine)', () => {
   const expect = {
     baseline: [], tachy: ['hr:high'], brady: ['hr:low'], desat: ['spo2:low'], tachypnea: ['rr:high'],
-    bradypnea: ['rr:low'], fever: ['temp:high'], apnea: ['apnea'], // hypotension: set DBP 48 is estimated ≈ 50.7 by the oscillometric method, so the
-    // DBP-low alarm (limit 50) is missed — a deliberate teaching example of measurement error.
-    hypotension: ['sbp:low', 'map:low', 'art_sys:low', 'art_map:low'],
+    bradypnea: ['rr:low'], fever: ['temp:high'], apnea: ['apnea'],
+    hypotension: ['sbp:low', 'dbp:low', 'map:low', 'art_sys:low', 'art_map:low'],
     hypertension: ['sbp:high', 'dbp:high', 'map:high', 'art_sys:high', 'art_map:high'], disconnect: ['tech:ecgLeadsOff', 'tech:spo2NoSignal'],
     af: ['rhythm:irregular'], pvc: ['rhythm:pvc'], hypovent: ['etco2:high', 'rr:low'],
-    vt: ['rhythm:vtach', 'hr:high', 'sbp:low', 'map:low', 'art_sys:low', 'art_map:low'],
+    vt: ['rhythm:vtach', 'hr:high', 'sbp:low', 'dbp:low', 'map:low', 'art_sys:low', 'art_map:low'],
   };
   for (const [id, ids] of Object.entries(expect)) {
     const e = new Engine(params.applyPreset(id, params.DEFAULTS).params);

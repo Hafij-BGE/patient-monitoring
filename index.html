@@ -76,11 +76,20 @@
   </div>
 
   <div class="tiles" id="tiles">
+    <div class="pt-banner" id="ptBanner" aria-label="Patient profile summary">
+      <span class="pb-item"><span class="pb-k">Patient</span> <b id="bPt">--</b></span>
+      <span class="pb-item"><span class="pb-k">BMI</span> <b id="bBmi">--</b> <span class="pb-note" id="bBmiCat"></span></span>
+      <span class="pb-item"><span class="pb-k">BSA</span> <b id="bBsa">--</b> m² <span class="pb-note" id="bBsaF"></span></span>
+      <span class="pb-item" title="Mean resting SBP/DBP of US adults of this age and sex (NHANES 2001–2008), interpolated. Adults 18+ only."><span class="pb-k">Typical BP for age</span> <b id="bBpAge">--</b> <span class="pb-note">NHANES mean</span></span>
+      <span class="pb-item"><span class="pb-k">Max HR</span> <b id="bHrMax">--</b> <span class="pb-note" id="bHrMaxF"></span></span>
+      <span class="pb-item" id="siRow" hidden title="Shock index = displayed HR / last NIBP systolic. Healthy adult range 0.5–0.7. Age × SI has no validated cut-off in this simulator."><span class="pb-k">SI</span> <b id="vSi">--</b> · <span class="pb-k">Age×SI</span> <b id="vAgeSi">--</b></span>
+    </div>
     <div class="tile" data-ch="ecg" id="tHr">
       <div class="t-head"><span>HR</span><span class="unit">bpm</span></div>
       <div class="t-val" id="vHr">--</div>
       <div class="t-foot"><span id="sHr"></span><span class="lim" id="lHr"></span></div>
       <div class="t-sub">Rhythm <b id="vRhythm">--</b> · PVC <b id="vPvc">--</b>/min</div>
+      <div class="t-sub" title="QT of the ECG model for the last supraventricular beat (not measured from the trace). QTc uses the formula chosen in Profile → Formulas.">QT <b id="vQt">--</b> · QTc <b id="vQtc">--</b> ms <span id="vQtcF"></span></div>
     </div>
     <div class="tile" data-ch="pleth" id="tSpo2">
       <div class="t-head"><span>SpO₂</span><span class="unit">%</span></div>
@@ -94,7 +103,6 @@
       <div class="t-val"><span id="vNibp">--/--</span> <small>(<span id="vMap">--</span>)</small></div>
       <div class="t-foot"><span id="sNibp"></span><span class="lim" id="nibpAge"></span></div>
       <div class="t-sub">MAP osc. <b id="vMapOsc">--</b> · MAP formula <b id="vMapF">--</b> · PP <b id="vPp">--</b></div>
-      <div class="t-sub" id="siRow" hidden title="Shock index = displayed HR / last NIBP systolic. Healthy adult range 0.5–0.7. Age × SI has no validated cut-off in this simulator.">SI <b id="vSi">--</b> · Age×SI <b id="vAgeSi">--</b></div>
       <div class="row">
         <button id="btnNibp">Start NIBP</button>
         <button id="btnNibpStop">Stop</button>
@@ -304,9 +312,17 @@
       <fieldset class="usecases">
         <legend>Use the profile</legend>
         <label><input type="checkbox" id="ucCalc"> Bedside calculators</label>
-        <label><input type="checkbox" id="ucSi"> Shock index on the NIBP tile</label>
+        <label><input type="checkbox" id="ucSi"> Shock index on the monitor</label>
         <label><input type="checkbox" id="ucAgeBp"> Age and sex set typical blood pressure</label>
         <span id="ucMsg" class="msgs"></span>
+      </fieldset>
+      <fieldset class="usecases formulas">
+        <legend>Formulas</legend>
+        <label>QTc <select id="fQtc"></select></label>
+        <label>BSA <select id="fBsa"></select></label>
+        <label>Max HR <select id="fHrmax"></select></label>
+        <label>NIBP MAP shown <select id="fMap"></select></label>
+        <div id="fNote" class="hint"></div>
       </fieldset>
       <div class="derived" id="pCalc"></div>
       <h3>Weight history</h3>
@@ -319,7 +335,7 @@
       <div id="whList" class="table-wrap"></div>
     </div>
   </div>
-  <p class="hint">BMI = weight / height². BSA (Mosteller) = √(height[cm] × weight[kg] / 3600).
+  <p class="hint">BMI = weight / height². BSA uses the formula chosen under <b>Formulas</b> (default Mosteller = √(height[cm] × weight[kg] / 3600)).
     Adult BMI categories are shown only for ages 20 and over. Younger people need age- and sex-specific growth references.
     Age, sex, height, weight and diabetes status are the same values as Controls → Patient profile; changing them here or there sets the scenario to Custom.
     Weight sets the glucose model's distribution volumes and diabetes status selects its parameter set. The label and the weight history stay in this tab.</p>
@@ -332,6 +348,14 @@
     <b>Age and sex set typical blood pressure</b>: when you change age or sex by hand, SBP and DBP are set to the mean of US adults of that age and sex (NHANES 2001–2008, all participants) [78], interpolated between the published age groups 18–39, 40–59 and 60+.
     Systolic pressure rises with age while diastolic falls after about 50 [79]. Scenarios never trigger it, and you can still change SBP and DBP afterwards. Resting heart rate is not changed: it stays near 72 beats/min at all adult ages [80].
     These are teaching calculations, not prescriptions.</p>
+  <p class="hint"><b>Formulas</b> (each choice is kept in this browser; the first entry of each list is the default):
+    <b>QTc</b>: Framingham QT + 154·(1 − RR) [82] is the default because Framingham and Fridericia QT/RR<sup>⅓</sup> [89] corrected for rate best and Bazett QT/√RR corrected worst in 6 609 adults in sinus rhythm below 90 bpm [88]; Hodges QT + 1.75·(HR − 60) is also offered [88].
+    The QT shown on the HR tile is the QT the ECG model places for the last supraventricular beat, not a value measured from the trace; it is blank for ventricular beats, VF and asystole and outside RR 0.3–2 s.
+    The model's QT follows Framingham, so Framingham QTc stays near 400 ms at every rate while Bazett rises at fast rates: the over-correction reported in [88].
+    <b>BSA</b>: Mosteller [13], DuBois &amp; DuBois [90] or Haycock [91] (the last was also validated in infants and children).
+    <b>Max HR</b>: Tanaka 208 − 0.7 × age [75], Gellish 207 − 0.7 × age [92], or the older 220 − age, which Tanaka et al. showed underestimates maximal HR in older adults [75].
+    <b>NIBP MAP shown</b>: the oscillometric MAP (cuff pressure at the largest oscillation, what oscillometric monitors measure) or the one-third rule DBP + (SBP − DBP)/3 for comparison. Both stay on the NIBP tile; the choice sets the number in brackets. Alarms are not affected.
+    The banner above the monitor tiles repeats the profile numbers that matter at the bedside: BMI and its adult category, BSA, the NHANES mean blood pressure for this age and sex [78], the predicted maximal HR and, if switched on, the shock index.</p>
 </section>
 
 <section class="panel" data-panel="chain" hidden>
@@ -394,7 +418,7 @@
   <p>The monitor band-passes the acquired ECG (0.5–40 Hz) and measures each detected QRS width. It then applies simple rules every second:
     almost flat trace → asystole; no QRS for 4 s on a busy trace, or wide chaotic complexes → V-Fib; the last 4 complexes wide above 100 bpm → V-Tach; the last 8 narrow, very regular and above 150 bpm → SVT (P waves are not checked, so a fast sinus rhythm gets the same label);
     narrow-to-narrow RR coefficient of variation above 0.12 → irregular; any wide complex in the last 60 s → PVCs. The first 8 s are "learning".
-    The thresholds were tuned on this simulator's own waveforms. This is not a validated arrhythmia algorithm (IEC 60601-2-27 requires testing against annotated databases) and it gives no diagnosis.</p>
+    The thresholds were tuned on this simulator's own waveforms. This is not a validated arrhythmia algorithm (arrhythmia performance is tested per ANSI/AAMI EC57 on annotated databases such as MIT-BIH and AHA) and it gives no diagnosis.</p>
   <h3>Main components of a bedside monitor</h3>
   <p>This is a generic block diagram from the textbook literature (Webster, <i>Medical Instrumentation</i>; Webster, <i>Design of Pulse Oximeters</i>; Allen 2007; Forouzanfar et al. 2015). It describes no specific product and claims no device specifications.</p>
   <ul>
@@ -464,12 +488,22 @@
     <li>Babbs CF. Oscillometric measurement of systolic and diastolic blood pressures validated in a physiologic mathematical model. <i>BioMed Eng OnLine</i>. 2012;11:56.</li>
     <li>Mosteller RD. Simplified calculation of body-surface area. <i>N Engl J Med</i>. 1987;317(17):1098.</li>
     <li>World Health Organization. Body mass index (BMI) classification for adults.</li>
-    <li>IEC 60601-1-8: Medical electrical equipment, general requirements for alarm systems (vocabulary only; this app is not a compliant alarm system).</li>
+    <li>IEC 60601-1-8: Medical electrical equipment, general requirements for alarm systems (vocabulary and burst timing of the optional alarm tones; this app is not a compliant alarm system).</li>
     <li>Gardner RM. Direct blood pressure measurement: dynamic response requirements. <i>Anesthesiology</i>. 1981;54(3):227–236.</li>
     <li>Gravenstein JS, Jaffe MB, Gravenstein N, Paulus DA, eds. <i>Capnography</i>. 2nd ed. Cambridge University Press; 2011.</li>
     <li>IEC 60601-2-27: Particular requirements for electrocardiographic monitoring equipment (cited for what a validated arrhythmia algorithm needs; this app does not comply).</li>
     <li>Bluetooth SIG. Heart Rate Service 1.0 and GATT Specification Supplement (Heart Rate Measurement 0x2A37). Used by the Android app only.</li>
     <li>Regenstrief Institute. The Unified Code for Units of Measure (UCUM). https://ucum.org/</li>
+    <li>Westerhof N, Lankhaar JW, Westerhof BE. The arterial Windkessel. <i>Med Biol Eng Comput</i>. 2009;47(2):131–141.</li>
+    <li>Weissler AM, Harris WS, Schoenfeld CD. Systolic time intervals in heart failure in man. <i>Circulation</i>. 1968;37(2):149–159.</li>
+    <li>Brookes CI, White PA, Staples M, et al. Myocardial contractility is not constant during spontaneous atrial fibrillation in patients. <i>Circulation</i>. 1998;98(17):1762–1768.</li>
+    <li>Ramirez AH, Schildcrout JS, Blakemore DL, et al. Modulators of normal electrocardiographic intervals identified in a large electronic medical record. <i>Heart Rhythm</i>. 2011;8(2):271–277.</li>
+    <li>Palhares DMF, Marcolino MS, Santos TMM, et al. Normal limits of the electrocardiogram derived from a large database of Brazilian primary care patients. <i>BMC Cardiovasc Disord</i>. 2017;17(1):152.</li>
+    <li>Vandenberk B, Vandael E, Robyns T, et al. Which QT correction formulae to use for QT monitoring? <i>J Am Heart Assoc</i>. 2016;5(6):e003264.</li>
+    <li>Fridericia LS. The duration of systole in an electrocardiogram in normal humans and in patients with heart disease (1920, translation). <i>Ann Noninvasive Electrocardiol</i>. 2003;8(4):343–351.</li>
+    <li>Du Bois D, Du Bois EF. A formula to estimate the approximate surface area if height and weight be known (1916, reprint). <i>Nutrition</i>. 1989;5(5):303–311.</li>
+    <li>Haycock GB, Schwartz GJ, Wisotsky DH. Geometric method for measuring body surface area: a height-weight formula validated in infants, children, and adults. <i>J Pediatr</i>. 1978;93(1):62–66.</li>
+    <li>Gellish RL, Goslin BR, Olson RE, et al. Longitudinal modeling of the relationship between age and maximal heart rate. <i>Med Sci Sports Exerc</i>. 2007;39(5):822–829.</li>
   </ol>
   <p class="hint">The full list, with what each reference supports, is in <code>REFERENCES.md</code>.</p>
 </section>

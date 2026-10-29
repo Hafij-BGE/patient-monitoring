@@ -3,6 +3,7 @@
  *
  *   Glucose (Bergman minimal model [45]):
  *     dG/dt = −(SG + X)·G + SG·Gb + Ra                 G mg/dL
+ *     SG = 0.026 [46] (no diabetes, type 2); type 1: SG = GEZI + SI·Ib, the form of [47]
  *     dX/dt = −p2·X + p2·SI·(I − Ib)                    X min⁻¹ (insulin action, Kanderian form [47])
  *   Meal absorption (Hovorka 2004 [48], two-compartment gut):
  *     dD1/dt = −D1/tG   dD2/dt = (D1 − D2)/tG   Ra = D2/tG · MW/VG      a meal adds AG·carbs to D1
@@ -43,8 +44,8 @@
       note: 'SI of normal subjects, 4.1 × 10⁻⁴ [49].' },
     type2: { label: 'type 2 diabetes', SI: 0.61e-4, secretion: 0.5,
       note: 'SI of type 2 subjects, 0.61 × 10⁻⁴ (about 85 % lower) [49]. Secretion gain halved (illustrative; reduced β-cell compensation [50]).' },
-    type1: { label: 'type 1 diabetes', SI: 4.1e-4, secretion: 0,
-      note: 'No endogenous secretion (structural choice, as in [47]); insulin comes only from the basal rate and boluses. SI kept at the normal value, which lies inside the type 1 range of [47].' },
+    type1: { label: 'type 1 diabetes', SI: 4.4e-4, GEZI: 2.5e-3, secretion: 0,
+      note: 'No endogenous secretion (structural choice, as in [47]); insulin comes only from the basal rate and boluses. SI 4.4 × 10⁻⁴ and glucose effectiveness at zero insulin (GEZI) 2.5 × 10⁻³ min⁻¹ are the means of the 10 subjects in Table 1 of [47] (calculated here). Without insulin, glucose falls back only slowly.' },
   };
 
   /** Secretion gain σ above fasting glucose, µU/mL per min per mg/dL. Illustrative:
@@ -65,6 +66,9 @@
       const S = k.u * POP.tI;                        // S1 = S2 = u·tI at steady state
       const iExo = S / (POP.tI * POP.VI) / POP.ke;   // µU/mL from the basal rate
       this.Ib = iExo + (k.type.secretion > 0 ? k.Ifast : 0);
+      // Type 1: [47] writes dG/dt = −(GEZI + SI·I)·G + EGP + Ra with GEZI and EGP at zero insulin.
+      // With X = SI·(I − Ib) this is the same equation with SG = GEZI + SI·Ib and EGP = SG·Gb.
+      k.SG = k.type.GEZI !== undefined ? k.type.GEZI + k.SI * this.Ib : POP.SG;
       this.s = { G: k.Gb, X: 0, I: this.Ib, D1: 0, D2: 0, S1: S, S2: S };
       this.t = 0;
     }
@@ -72,7 +76,7 @@
     /** Updates rates and patient constants; keeps the state (a reset is the caller's choice). */
     setParams(p) {
       const type = TYPES[p.diabetes] || TYPES.none;
-      this.k = { type, kg: p.weight_kg, Gb: p.fasting_glucose, Ifast: p.fasting_insulin,
+      this.k = { type, SG: this.k ? this.k.SG : POP.SG, kg: p.weight_kg, Gb: p.fasting_glucose, Ifast: p.fasting_insulin,
         SI: type.SI, sigma: SECRETION * type.secretion, u: basalRate(p.basal_insulin, p.weight_kg) };
     }
 
@@ -85,9 +89,9 @@
     deriv(s) {
       const k = this.k;
       const secr = k.type.secretion > 0 ? POP.ke * k.Ifast + k.sigma * Math.max(0, s.G - k.Gb) : 0;
-      const uptake = Math.max(0, POP.SG + s.X); // keeps the system bounded (see section 3.13)
+      const uptake = Math.max(0, k.SG + s.X); // keeps the system bounded (see section 3.13)
       return {
-        G: -uptake * s.G + POP.SG * k.Gb + this.ra(s),
+        G: -uptake * s.G + k.SG * k.Gb + this.ra(s),
         X: -POP.p2 * s.X + POP.p2 * k.SI * (s.I - this.Ib),
         I: s.S2 / (POP.tI * POP.VI) - POP.ke * s.I + secr,
         D1: -s.D1 / POP.tG,

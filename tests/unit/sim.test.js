@@ -116,7 +116,7 @@ test('SpO2 estimator tracks the set point and reports SQI, PI and pulse rate', (
     const f = e.lastFrame.est;
     assert.ok(Math.abs(f.spo2 - s) < 1, 'SpO2 ' + f.spo2 + ' vs ' + s);
     assert.ok(f.sqi > 80);
-    assert.ok(Math.abs(f.pi - 3) < 0.5, 'PI ' + f.pi);
+    assert.ok(Math.abs(f.pi - 3) < 0.3, 'PI ' + f.pi);
     assert.ok(Math.abs(f.pr - 72) < 3, 'PR ' + f.pr);
   }
 });
@@ -127,6 +127,38 @@ test('motion biases SpO2 towards R ≈ 1 (≈ 85 %) and lowers SQI', () => {
   const f = e.lastFrame.est;
   assert.ok(f.spo2 < 92, 'SpO2 ' + f.spo2);
   assert.ok(f.sqi < 90, 'SQI ' + f.sqi);
+});
+
+test('no arterial pulse (VF, asystole): SpO2, PR and PI are blanked instead of reading noise', () => {
+  for (const arrhythmia of ['vf', 'asystole']) {
+    const e = new Engine({ arrhythmia });
+    e.advance(30);
+    const f = e.lastFrame.est;
+    assert.equal(f.spo2Status, 'no-pulse');
+    assert.equal(f.spo2, null); assert.equal(f.pr, null); assert.equal(f.pi, null);
+  }
+});
+
+test('irregular pulse (AF) is still accepted as pulsatile; low PI is measured, not rejected', () => {
+  for (const [ch, pi] of [[{ arrhythmia: 'af', hr: 110 }, null], [{ pi: 0.3 }, 0.3], [{ pi: 10 }, 10]]) {
+    const e = new Engine(ch);
+    e.advance(30);
+    const f = e.lastFrame.est;
+    assert.equal(f.spo2Status, 'ok', JSON.stringify(ch));
+    assert.ok(Math.abs(f.spo2 - 97) < 1);
+    if (pi) assert.ok(Math.abs(f.pi - pi) < 0.1 * pi, 'PI ' + f.pi + ' vs ' + pi);
+  }
+});
+
+test('temperature probe follows a step with the set time constant (63 % after τ)', () => {
+  const e = new Engine({ temp: 37, temp_tau: 20 });
+  e.advance(5);
+  e.setParams({ temp: 39 });
+  const t0 = e.lastFrame.t;
+  e.advance(20);
+  assert.ok(Math.abs(e.lastFrame.t - t0 - 20) < 0.2);
+  const T = e.temp.T;
+  assert.ok(Math.abs(T - (37 + 2 * (1 - Math.exp(-1)))) < 0.05, 'T ' + T);
 });
 
 test('sensor states give missing values and technical flags, never zeros', () => {

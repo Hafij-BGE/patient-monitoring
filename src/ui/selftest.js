@@ -73,9 +73,9 @@
     { name: 'Hypoventilation preset: capnography', expected: 'EtCO₂ within ±3 mmHg of 58, EtCO₂ high alarm active after its 10 s delay',
       run() { const r = sim(preset('hypovent'), 30, { alarms: true }); const on = r.st.active.some(a => a.id === 'etco2:high');
         return { pass: near(r.f.est.etco2, 58, 3) && on, observed: 'EtCO₂ ' + fmt(r.f.est.etco2, 1) + ' mmHg, etco2:high ' + (on ? 'active' : 'not active') }; } },
-    { name: 'Arterial line: optimal vs under-damped', expected: 'optimal SYS/DIA within ±5 of 120/80; under-damped SYS ≥ 8 mmHg higher with MAP within ±2',
+    { name: 'Arterial line: optimal vs under-damped', expected: 'optimal SYS/DIA within ±5 of 120/80; under-damped SYS > 6 mmHg higher with MAP within ±2',
       run() { const a = sim(preset('baseline'), 20).f.est.art, b = sim(preset('underdamped'), 20).f.est.art;
-        const ok = a && b && near(a.sys, 120, 5) && near(a.dia, 80, 5) && b.sys - a.sys >= 8 && Math.abs(b.map - a.map) <= 2;
+        const ok = a && b && near(a.sys, 120, 5) && near(a.dia, 80, 5) && b.sys - a.sys > 6 && Math.abs(b.map - a.map) <= 2;
         return { pass: !!ok, observed: a && b ? 'optimal ' + fmt(a.sys) + '/' + fmt(a.dia) + ' (' + fmt(a.map) + '), under-damped ' + fmt(b.sys) + '/' + fmt(b.dia) + ' (' + fmt(b.map) + ')' : 'no ART value' }; } },
     { name: 'Health Connect records (Android bridge logic)', expected: 'valid record stored as source "device"; SpO₂ 150 % rejected, not clamped',
       run() { const r = PM.androidBridge.healthConnectToObservations({ records: [

@@ -1,7 +1,7 @@
-/* Patient profile calculations: BMI, BSA (Mosteller), weight history, bedside
- * calculators (predicted body weight, weight-based volumes, age-predicted maximal
- * heart rate), shock index and age-typical blood pressure. Sources are listed in
- * REFERENCES.md (entries 72-80). */
+/* Patient profile calculations: BMI, BSA (Mosteller, DuBois, Haycock), weight
+ * history, bedside calculators (predicted body weight, weight-based volumes,
+ * age-predicted maximal heart rate), QTc formulas, shock index and age-typical
+ * blood pressure. Sources are listed in REFERENCES.md (entries 13, 72-82, 88-92). */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else (root.PM = root.PM || {}).profile = factory();
@@ -13,7 +13,7 @@
     heightCm: 172,
     weightKg: 70,
     ageYears: 40,
-    sex: '',                  // optional; not used by any calculation implemented here
+    sex: '',                  // optional; used by predictedBodyWeight and bpForAge
     notes: '',
     weightHistory: [],        // [{date:'YYYY-MM-DD', kg:number}]
   });
@@ -33,6 +33,14 @@
   function bsaMosteller(weightKg, heightCm) {
     if (!validNum(weightKg, 0.3, 500) || !validNum(heightCm, 20, 260)) return null;
     return Math.sqrt(heightCm * weightKg / 3600);
+  }
+
+  /** Body surface area (m²) by a selectable published formula (FORMULAS.bsa). */
+  function bsa(weightKg, heightCm, method) {
+    if (!validNum(weightKg, 0.3, 500) || !validNum(heightCm, 20, 260)) return null;
+    if (method === 'dubois') return 0.007184 * Math.pow(weightKg, 0.425) * Math.pow(heightCm, 0.725);
+    if (method === 'haycock') return 0.024265 * Math.pow(weightKg, 0.5378) * Math.pow(heightCm, 0.3964);
+    return bsaMosteller(weightKg, heightCm);
   }
 
   /** WHO adult category, only for age >= 20. Boundaries: <18.5, 18.5–<25, 25–<30, >=30. */
@@ -99,6 +107,56 @@
     return validNum(ageYears, 0, 120) ? 208 - 0.7 * ageYears : null;
   }
 
+  /** Age-predicted maximal heart rate (beats/min) by a selectable formula (FORMULAS.hrmax). */
+  function hrMax(ageYears, method) {
+    if (!validNum(ageYears, 0, 120)) return null;
+    if (method === 'fox') return 220 - ageYears;
+    if (method === 'gellish') return 207 - 0.7 * ageYears;
+    return hrMaxTanaka(ageYears);
+  }
+
+  // ------------------------------------------------------------- QT correction
+  /**
+   * Heart-rate-corrected QT (ms) from QT (ms) and the preceding R–R interval (s),
+   * by a selectable formula (FORMULAS.qtc). Null outside RR 0.3–2 s.
+   */
+  function qtc(qtMs, rrS, method) {
+    if (!Number.isFinite(qtMs) || !validNum(rrS, 0.3, 2)) return null;
+    if (method === 'bazett') return qtMs / Math.sqrt(rrS);
+    if (method === 'fridericia') return qtMs / Math.cbrt(rrS);
+    if (method === 'hodges') return qtMs + 1.75 * (60 / rrS - 60);
+    return qtMs + 154 * (1 - rrS); // Framingham (Sagie 1992)
+  }
+
+  /**
+   * Formula choices offered in the Profile tab. The first entry of each list is the
+   * default and the one with the strongest support for this use (see the notes).
+   * ref = entry number in REFERENCES.md.
+   */
+  const FORMULAS = Object.freeze({
+    qtc: [
+      { id: 'framingham', name: 'Framingham', eq: 'QT + 154·(1 − RR)', ref: 82 },
+      { id: 'fridericia', name: 'Fridericia', eq: 'QT / RR^⅓', ref: 89 },
+      { id: 'hodges', name: 'Hodges', eq: 'QT + 1.75·(HR − 60)', ref: 88 },
+      { id: 'bazett', name: 'Bazett', eq: 'QT / √RR', ref: 88 },
+    ],
+    bsa: [
+      { id: 'mosteller', name: 'Mosteller', eq: '√(H·W / 3600)', ref: 13 },
+      { id: 'dubois', name: 'DuBois & DuBois', eq: '0.007184·W^0.425·H^0.725', ref: 90 },
+      { id: 'haycock', name: 'Haycock', eq: '0.024265·W^0.5378·H^0.3964', ref: 91 },
+    ],
+    hrmax: [
+      { id: 'tanaka', name: 'Tanaka', eq: '208 − 0.7·age', ref: 75 },
+      { id: 'gellish', name: 'Gellish', eq: '207 − 0.7·age', ref: 92 },
+      { id: 'fox', name: 'Fox (220 − age)', eq: '220 − age', ref: 75 },
+    ],
+    map: [
+      { id: 'osc', name: 'Oscillometric (cuff peak)', eq: 'cuff pressure at the largest oscillation' },
+      { id: 'formula', name: 'DBP + (SBP − DBP)/3', eq: 'one-third rule' },
+    ],
+  });
+  const formulaInfo = (kind, id) => FORMULAS[kind].find(x => x.id === id) || FORMULAS[kind][0];
+
   // ------------------------------------------------------------- shock index
   const SI_NORMAL = Object.freeze({ lo: 0.5, hi: 0.7 }); // healthy adult range (Caputo et al. 2018)
 
@@ -148,6 +206,6 @@
              dbp: Math.round(interp(BP_NORMS.centres, row.dbp, ageYears)) };
   }
 
-  return { DEFAULT_PROFILE, ADULT_MIN_AGE, bmi, bsaMosteller, bmiCategory, normaliseHistory, weightChange,
+  return { DEFAULT_PROFILE, ADULT_MIN_AGE, bmi, bsaMosteller, bsa, hrMax, qtc, FORMULAS, formulaInfo, bmiCategory, normaliseHistory, weightChange,
     predictedBodyWeight, tidalVolume, weightDose, hrMaxTanaka, SI_NORMAL, shockIndex, ageShockIndex, BP_NORMS, bpForAge };
 });

@@ -88,6 +88,13 @@ test('V-Tach: wide complexes at the set rate; V-Fib and asystole: no HR, pressur
   }
 });
 
+test('low-voltage QRS (R 0.2 mV) is still sinus rhythm, not asystole', () => {
+  const { frames } = run('baseline', 40, { ecg_amp_mv: 0.2 });
+  const late = after(frames, 15);
+  assert.equal(share(late, 'asystole'), 0);
+  assert.ok(Math.abs(late[late.length - 1].est.hr - 72) < 3, 'HR ' + late[late.length - 1].est.hr);
+});
+
 test('lethal rhythms raise high-priority alarms with no delay', () => {
   for (const [id, alarm] of [['vt', 'rhythm:vtach'], ['vf', 'rhythm:vfib'], ['asystole', 'rhythm:asystole']]) {
     const e = new Engine(params.applyPreset(id, params.DEFAULTS).params);

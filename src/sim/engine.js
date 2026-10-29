@@ -46,7 +46,9 @@
       this.motion = new rngMod.MotionSource(mrng);
       this.k = 0; this.t = 0; this.carry = 0;
       this.startEpoch = Date.now();
-      this.pulseBeats = [];
+      this.pulseBeats = [];   // pulse onsets (s), for the NIBP beat trigger
+      this.art = new pulse.Arterial(); this.wk = null; this.artT = -1;
+      this.art.prime(this.windkessel(), this.p.dbp, 0);
       this.trueR = []; this.trueKinds = [];
       this.lastBeatT = 0; this.perf = 1;
       if (this.taps) this.taps = {}; // probes stay enabled across a reset
@@ -54,8 +56,12 @@
       this.ecg.onR = (tR, rr, beat) => {
         this.trueR.push(tR); if (this.trueR.length > 64) this.trueR.shift();
         this.trueKinds.push(beat.kind); if (this.trueKinds.length > 64) this.trueKinds.shift();
+        // stroke volume follows the filling time before this beat (PVC strength is set by arrhythmia.js)
+        const prevRR = this.trueR.length > 1 ? tR - this.lastBeatT : 60 / this.p.hr;
+        const sv = beat.kind === 'pvc' ? beat.amp : beat.amp * pulse.filling(prevRR, this.p.hr);
         this.lastBeatT = tR;
-        this.pulseBeats.push({ t0: tR + PAT, T: rr, amp: beat.amp }); if (this.pulseBeats.length > 6) this.pulseBeats.shift();
+        this.pulseBeats.push({ t0: tR + PAT }); if (this.pulseBeats.length > 6) this.pulseBeats.shift();
+        this.art.beat(tR + PAT, sv, this.windkessel());
       };
       this.ppg = new sensors.PpgSensor(new rngMod.Rng(seed + 3), new rngMod.MotionSource(new rngMod.Rng(seed + 4)));
       this.resp = new sensors.RespSensor(new rngMod.Rng(seed + 5), this.motion);
@@ -209,7 +215,7 @@
     }
 
     acquirePpg(t) {
-      const s = this.ppg.sample(t, 1 / PPG_FS, this.p, this.pulseBeats);
+      const s = this.ppg.sample(t, 1 / PPG_FS, this.p, this.pulseLevel(t));
       if (!Number.isFinite(s.ir)) this.lastNaN.ppg = t;
       const pleth = this.spo2Est.process(s.red, s.ir, t, this.p.spo2_avg);
       this.plethS.push(pleth);
@@ -217,24 +223,43 @@
     }
 
     acquireResp(t) {
-      const z = this.resp.sample(t, 1 / RESP_FS, this.p, this.pulseBeats);
+      const z = this.resp.sample(t, 1 / RESP_FS, this.p, this.pulseLevel(t));
       if (!Number.isFinite(z)) this.lastNaN.resp = t;
       this.breath.process(z, t, this.p.resp_thr);
       this.respS.push(z);
       if (this.taps) { this.tap('resp.raw', RESP_FS, z); this.tap('resp.bp', RESP_FS, Number.isFinite(z) ? this.breath.y : NaN); }
     }
 
-    /** Circulation state 0..1: relaxes to 1 (τ 0.8 s) while beats arrive, decays (τ 1.5 s)
-     *  when no beat has come for 2 expected intervals (VF, asystole). Illustrative. */
+    /** Circulation state 0..1 for the capnogram and the truth record: relaxes to 1 (τ 0.8 s)
+     *  while beats arrive, decays (τ 1.5 s) when no beat has come for 2 expected intervals
+     *  (VF, asystole). Illustrative; arterial pressure comes from the Windkessel instead. */
     updatePerfusion(t) {
       if (t - this.lastBeatT < 2 * 60 / this.p.hr + 0.5) this.perf += (1 - this.perf) * DT / 0.8;
       else this.perf -= this.perf * DT / 1.5;
     }
 
-    /** True arterial pressure (mmHg): diastolic level scaled by circulation + pulse train. */
+    /** Three-element Windkessel fitted to the set HR, SBP and DBP (see pulse.js). */
+    windkessel() {
+      const p = this.p, w = this.wk;
+      if (!w || w.hr !== p.hr || w.sbp !== p.sbp || w.dbp !== p.dbp) {
+        this.wk = { hr: p.hr, sbp: p.sbp, dbp: p.dbp, fit: pulse.fit(p.hr, p.sbp, p.dbp, PMSF) };
+      }
+      return this.wk.fit;
+    }
+
+    /** True arterial pressure (mmHg) from the Windkessel driven by the simulated beats:
+     *  irregular intervals change it beat to beat, weak beats (PVC, VT) eject less, and
+     *  without beats it falls towards PMSF with the fitted time constant. */
     arterialPressure(t) {
+      if (t !== this.artT) { this.artT = t; this.artTrue = this.art.value(this.windkessel(), t); }
+      return this.artTrue;
+    }
+
+    /** Arterial pulse normalised to the set pressures: 0 at DBP, 1 at SBP. Drives the
+     *  PPG absorbance and the cardiogenic impedance artifact. */
+    pulseLevel(t) {
       const p = this.p;
-      return PMSF + (p.dbp - PMSF) * this.perf + (p.sbp - p.dbp) * Math.min(1, pulse.train(this.pulseBeats, t));
+      return (this.arterialPressure(t) - p.dbp) / Math.max(1, p.sbp - p.dbp);
     }
 
     /** Fluid-filled line: x'' + 2ζωn x' + ωn² x = ωn² (P_art − hydrostatic offset), semi-implicit Euler at 1 kHz. */
@@ -288,9 +313,9 @@
       const capFi = p.fico2, capEt = capFi + Math.max(0, p.etco2 - capFi) * (0.15 + 0.85 * this.perf);
       const frame = {
         t, timestamp: this.startEpoch + t * 1000,
-        truth: { hr: p.hr, spo2: p.spo2, sbp: p.sbp, dbp: p.dbp, map: (p.sbp + 2 * p.dbp) / 3, rr: p.rr, temp: p.temp,
+        truth: { hr: p.hr, spo2: p.spo2, sbp: p.sbp, dbp: p.dbp, map: p.dbp + (p.sbp - p.dbp) * this.windkessel().meanFraction, rr: p.rr, temp: p.temp,
           etco2: p.capno_sensor === 'ok' ? capEt : null, arrhythmia: p.arrhythmia, perfusion: this.perf,
-          glucose: glu.glucose, insulin: glu.insulin },
+          glucose: glu.glucose, insulin: glu.insulin, qt: this.ecg.lastQt },
         est: {
           hr: leadsOff || rh.rhythm === 'vfib' || rh.rhythm === 'asystole' ? null : this.qrs.heartRate(t),
           rhythm: rh.rhythm, rhythmLabel: rh.label, pvcPerMin: rh.pvcPerMin, qrsWidthMs: rh.qrsWidthMs,

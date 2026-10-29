@@ -17,12 +17,22 @@
   const VIEW_KEY = 'pmsim.controls.v1';
 
   // Profile use-case switches (Profile tab), kept per browser. calc: bedside
-  // calculators; si: shock index on the NIBP tile; ageBp: a hand edit of age or
+  // calculators; si: shock index in the monitor banner; ageBp: a hand edit of age or
   // sex also sets SBP/DBP to the age-typical values (applied in app.js).
   const USECASE_KEY = 'pmsim.usecases.v1';
   const useCases = { calc: true, si: true, ageBp: false };
   try { Object.assign(useCases, JSON.parse(localStorage.getItem(USECASE_KEY)) || {}); } catch (e) { /* no storage */ }
   function saveUseCases() { try { localStorage.setItem(USECASE_KEY, JSON.stringify(useCases)); } catch (e) { /* no storage */ } }
+
+  // Formula choices (PM.profile.FORMULAS); the first entry of each list is the default.
+  const FORMULA_KEY = 'pmsim.formulas.v1';
+  const formulas = {};
+  for (const k of Object.keys(PM.profile.FORMULAS)) formulas[k] = PM.profile.FORMULAS[k][0].id;
+  try {
+    const saved = JSON.parse(localStorage.getItem(FORMULA_KEY)) || {};
+    for (const k of Object.keys(formulas)) if (PM.profile.FORMULAS[k].some(x => x.id === saved[k])) formulas[k] = saved[k];
+  } catch (e) { /* no storage */ }
+  function saveFormulas() { try { localStorage.setItem(FORMULA_KEY, JSON.stringify(formulas)); } catch (e) { /* no storage */ } }
 
   /**
    * Build one control per SPEC entry, grouped. `apply(update)` must return the
@@ -251,6 +261,21 @@
       });
     }
 
+    // Formula selectors. The monitor reads PM.panels.formulas on every frame.
+    const fSel = { qtc: $('#fQtc'), bsa: $('#fBsa'), hrmax: $('#fHrmax'), map: $('#fMap') };
+    function formulaNote() {
+      $('#fNote').textContent = Object.keys(fSel).map(k => {
+        const x = P.formulaInfo(k, formulas[k]);
+        return x.name + ': ' + x.eq + (x.ref ? ' [' + x.ref + ']' : '');
+      }).join(' · ');
+    }
+    for (const [k, sel] of Object.entries(fSel)) {
+      for (const x of P.FORMULAS[k]) sel.append(el('option', { value: x.id, text: x.name }));
+      sel.value = formulas[k];
+      sel.addEventListener('change', () => { formulas[k] = sel.value; saveFormulas(); formulaNote(); render(false); });
+    }
+    formulaNote();
+
     function num(id) { const s = $(id).value.trim().replace(',', '.'); return s === '' ? null : Number(s); }
     const range = k => S[k].min + '–' + S[k].max + ' ' + S[k].unit;
 
@@ -295,14 +320,14 @@
 
     function render(emit) {
       const hCm = cur.height_cm, wKg = cur.weight_kg;
-      const b = P.bmi(wKg, hCm), bsa = P.bsaMosteller(wKg, hCm);
+      const b = P.bmi(wKg, hCm), bsa = P.bsa(wKg, hCm, formulas.bsa), bsaF = P.formulaInfo('bsa', formulas.bsa);
       const cat = P.bmiCategory(b, cur.age_years);
       const ft = U.cmToFtIn(hCm);
       const card = (title, val, sub) => el('div.card', null, el('div.muted', { text: title }), el('b', { text: val }), sub ? el('div.hint', { text: sub }) : null);
       const box = $('#pDerived'); box.textContent = '';
       box.append(
         card('BMI', b === null ? '--' : b.toFixed(1) + ' kg/m²', cat.category ? cat.category + '. ' + cat.note : cat.note),
-        card('BSA (Mosteller)', bsa === null ? '--' : bsa.toFixed(2) + ' m²', 'Derived from height and weight'),
+        card('BSA (' + bsaF.name + ')', bsa === null ? '--' : bsa.toFixed(2) + ' m²', bsaF.eq + ', H in cm, W in kg'),
         card('Height', hCm.toFixed(1) + ' cm', ft.ft + ' ft ' + ft.in + ' in'),
         card('Weight', wKg.toFixed(1) + ' kg', U.kgToLb(wKg).toFixed(1) + ' lb'),
         card('Diabetes status', cur.diabetes, 'Selects the glucose model parameters'));
@@ -319,7 +344,7 @@
         const O = PM.observation, now = Date.now(), out = [];
         const prov = { formula: '', inputs: { heightCm: hCm, weightKg: wKg }, profile: local.label };
         if (b !== null) out.push(O.make({ param: 'bmi', value: b, source: O.SOURCE.DERIVED, timestamp: now, provenance: Object.assign({}, prov, { formula: 'weight / height²' }) }));
-        if (bsa !== null) out.push(O.make({ param: 'bsa', value: bsa, source: O.SOURCE.DERIVED, timestamp: now, provenance: Object.assign({}, prov, { formula: 'Mosteller √(h·w/3600)' }) }));
+        if (bsa !== null) out.push(O.make({ param: 'bsa', value: bsa, source: O.SOURCE.DERIVED, timestamp: now, provenance: Object.assign({}, prov, { formula: bsaF.name + ' ' + bsaF.eq }) }));
         opts.onDerived(out);
       }
     }
@@ -340,11 +365,11 @@
       }
       const pbwTxt = pbw === null ? '' : ' With predicted body weight: ' + ml(P.weightDose(pbw, 30)) + '.';
       const uo = P.weightDose(wKg, 0.5);
-      const hrMax = P.hrMaxTanaka(cur.age_years);
+      const hrMax = P.hrMax(cur.age_years, formulas.hrmax), hrF = P.formulaInfo('hrmax', formulas.hrmax);
       box.append(
         card('Sepsis fluid, 30 mL/kg', ml(P.weightDose(wKg, 30)), 'At least this much IV crystalloid within the first 3 h for sepsis-induced hypoperfusion (weak recommendation, low-quality evidence), using actual weight.' + pbwTxt),
         card('Urine output threshold', uo === null ? '--' : uo.toFixed(0) + ' mL/h', '0.5 mL/kg/h. Below this for 6 h (under ' + (uo * 6).toFixed(0) + ' mL in 6 h) meets the KDIGO stage 1 AKI urine criterion.'),
-        card('Age-predicted max HR', hrMax === null ? '--' : Math.round(hrMax) + ' /min', '208 − 0.7 × ' + cur.age_years + ' y. Set HR ' + cur.hr + ' /min = ' + (hrMax ? Math.round(cur.hr / hrMax * 100) : '--') + ' % of it. Population mean; individuals vary.'));
+        card('Age-predicted max HR', hrMax === null ? '--' : Math.round(hrMax) + ' /min', hrF.name + ': ' + hrF.eq + ', age ' + cur.age_years + ' y. Set HR ' + cur.hr + ' /min = ' + (hrMax ? Math.round(cur.hr / hrMax * 100) : '--') + ' % of it. Population mean; individuals vary.'));
     }
 
     function refresh(params) {
@@ -356,5 +381,5 @@
     return { refresh };
   }
 
-  PM.panels = { buildControls, renderAlarmBar, buildLimits, renderAlarmHistory, renderNibpTable, buildProfile, useCases };
+  PM.panels = { buildControls, renderAlarmBar, buildLimits, renderAlarmHistory, renderNibpTable, buildProfile, useCases, formulas };
 })(this);

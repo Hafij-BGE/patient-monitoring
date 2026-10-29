@@ -23,9 +23,9 @@
         'Explain what the display filter and the mains notch remove',
         'Follow the Pan–Tompkins steps that turn the ECG into a heart rate'],
       steps: [
-        { text: 'The scenario adds baseline wander, broadband noise and 80 µV of mains interference. Open the signal chain for the ECG and compare stage 1 (model) with stage 2 (acquired).', tab: 'chain' },
+        { text: 'The scenario adds baseline wander, broadband noise and 80 µV of mains interference (poor electrode contact raises the mains pickup further). Open the signal chain for the ECG and compare stage 1 (model) with stage 2 (acquired).', tab: 'chain' },
         { text: 'Turn the mains notch off. The 50 Hz interference now reaches the display trace (stage 3).', set: { notch: 'off' } },
-        { text: 'Turn the notch back on and switch the display filter to "diagnostic" (0.05–150 Hz). The baseline wander comes back on the display.', set: { notch: 'on', ecg_filter: 'diagnostic' } },
+        { text: 'Turn the notch back on and switch the display filter to "diagnostic" (0.05–150 Hz; the upper edge is capped below half the sample rate). The baseline wander comes back on the display.', set: { notch: 'on', ecg_filter: 'diagnostic' } },
         { text: 'Return to the monitor filter. Watch stage 4: each QRS becomes one bump that crosses the dashed adaptive threshold.', set: { ecg_filter: 'monitor' } },
       ],
       quiz: [
@@ -68,7 +68,7 @@
         { text: 'Open the NIBP tab and press "Start NIBP". Watch the cuff pressure wave on the monitor.', tab: 'nibp' },
         { text: 'When the measurement ends, look at the oscillogram: the amplitude rises to a maximum and falls again.' },
         { text: 'Change the systolic ratio Ks to 0.3 and measure again. The reported systolic pressure rises by a few mmHg although the patient did not change.', set: { nibp_ks: 0.3 } },
-        { text: 'Set Ks back to 0.5.', set: { nibp_ks: 0.5 } },
+        { text: 'Set Ks back to 0.55.', set: { nibp_ks: 0.55 } },
       ],
       quiz: [
         { q: 'In this oscillometric model, where is the mean arterial pressure read?',
@@ -170,8 +170,8 @@
           options: ['To avoid alarms from short artefacts', 'To save battery', 'Because the numbers update only once a minute', 'Delays are not used'],
           answer: 0, why: 'A condition must persist for the delay before the alarm activates, which filters brief spikes.' },
         { q: 'In this simulator, which alarms are high priority with no delay?',
-          options: ['Apnea, asystole, V-Fib and V-Tach', 'All limit alarms', 'Only temperature alarms', 'Technical alarms'],
-          answer: 0, why: 'These are configured as high priority with zero delay in the alarm engine.' },
+          options: ['Apnea, asystole, V-Fib and V-Tach (apnea is first detected after the apnea delay)', 'All limit alarms', 'Only temperature alarms', 'Technical alarms'],
+          answer: 0, why: 'These are configured as high priority with no extra alarm delay in the alarm engine. Apnea still needs the apnea detection delay (20 s) before the condition exists.' },
       ],
     },
     {
@@ -192,7 +192,7 @@
           answer: 0, why: 'With low cardiac output, CO₂ delivery to the lungs falls, so EtCO₂ falls even though arterial CO₂ rises.' },
         { q: 'Which arrest rhythm can this simulator not show?',
           options: ['Pulseless electrical activity (PEA)', 'Asystole', 'Ventricular fibrillation', 'Ventricular tachycardia'],
-          answer: 0, why: 'PEA needs an organised ECG with no output; the model always couples a QRS to a pulse.' },
+          answer: 0, why: 'PEA needs organised electrical activity with no palpable pulse; the model always couples a QRS to a pulse.' },
       ],
     },
   ];

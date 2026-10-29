@@ -158,7 +158,10 @@
       const wideCount = this.qrs.filter(q => q.wide).length;
       extra.pvcPerMin = Math.round(wideCount * 60 / Math.max(10, span));
 
-      if (ptp < 0.3) return set('asystole', extra);
+      // A flat trace is asystole only when no real QRS was found either: low-voltage complexes
+      // (obesity, effusion, emphysema; < 0.5 mV) still count as beats, while detector triggers
+      // on noise (filtered peak < 0.08 mV) do not.
+      if (ptp < 0.3 && !last4s.some(q => q.amp > 0.08)) return set('asystole', extra);
       if (!last4s.length) return set(flat < 0.5 ? 'vfib' : 'asystole', extra);
       if (widths.length >= 3 && median(widths) > RhythmAnalyzer.WIDE_S && (cv === null || cv > 0.3)) return set('vfib', extra);
       const tail = recent.slice(-4);

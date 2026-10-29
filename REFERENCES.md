@@ -81,7 +81,7 @@ These entries were added on 2026-10-28 with the capnography, arterial-line and a
 These entries were added on 2026-10-28 with the combined-sign scenarios in `src/sim/params.js` (preset field `refs`). Each scenario is an illustrative teaching pattern; real presentations vary and the values are not diagnostic. Where a source gives only a direction (for example "pulse pressure decreased"), the number in PM-SIM is an illustrative choice inside that direction.
 
 28. **Spahn DR, et al.** Management of bleeding and coagulopathy following major trauma: an updated European guideline. *Crit Care.* 2013;17:R76. doi:10.1186/cc12685. PMID 23601765.
-    Supports: ATLS class II (HR 100–120, SBP normal, pulse pressure decreased, RR 20–30) and class III (HR 120–140, SBP and pulse pressure decreased, RR 30–40) (`haem-2`, `haem-3`).
+    Supports: ATLS class II (HR 100–120, SBP normal, pulse pressure decreased, RR 20–30) and class III (HR 120–140, SBP and pulse pressure decreased, RR 30–40) (`haem-2`, `haem-3`). These ranges are the ATLS 9th-edition table quoted by this guideline; the 10th edition (2018) no longer gives numeric HR and RR ranges.
 29. **Mutschler M, et al.** A critical reappraisal of the ATLS classification of hypovolaemic shock. *Resuscitation.* 2013;84(3):309–313. doi:10.1016/j.resuscitation.2012.07.012. PMID 22835498.
     Supports: the caveat that only 9.3 % of 36,504 trauma patients matched an ATLS class.
 30. **Lima AP, Beelen P, Bakker J.** Use of a peripheral perfusion index derived from the pulse oximetry signal as a noninvasive indicator of perfusion. *Crit Care Med.* 2002;30(6):1210–1213. doi:10.1097/00003246-200206000-00006. PMID 12072670.
@@ -212,3 +212,30 @@ Used by `src/sim/glucose.js` (TECHNICAL_REPORT.md section 3.13). The model is a 
     Supports: SBP rises with age, DBP falls after age 50–60 and pulse pressure widens (unit test of `bpForAge`).
 80. **Ostchega Y, Porter KS, Hughes J, Dillon CF, Nwankwo T.** Resting pulse rate reference data for children, adolescents, and adults: United States, 1999–2008. *Natl Health Stat Report.* 2011;(41). PMID 21905522.
     Supports: adult resting pulse stays about 72 beats/min across age groups, so "age sets blood pressure" does not change HR.
+
+## Audit sources (2026-10-29)
+
+81. **Umpierrez GE, Davis GM, ElSayed NA, et al.** Hyperglycaemic crises in adults with diabetes: a consensus report. *Diabetologia.* 2024;67(8):1455–1479. doi:10.1007/s00125-024-06183-8. PMID 38907161.
+    Supports: DKA diagnosis with glucose ≥ 200 mg/dL (11.1 mmol/L) or known diabetes, ketonaemia and acidosis (`dka` scenario note).
+82. **Sagie A, Larson MG, Goldberg RJ, Bengtson JR, Levy D.** An improved method for adjusting the QT interval for heart rate (the Framingham Heart Study). *Am J Cardiol.* 1992;70(7):797–801. doi:10.1016/0002-9149(92)90562-D. PMID 1519533.
+    Supports: the linear QT–RR relation QT = QTc − 0.154 (1 − RR) used to place the T wave from the preceding R–R interval (`qtFor` in `src/sim/ecg.js`).
+83. **Westerhof N, Lankhaar JW, Westerhof BE.** The arterial Windkessel. *Med Biol Eng Comput.* 2009;47(2):131–141. doi:10.1007/s11517-008-0359-2. PMID 18543011.
+    Supports: the three-element Windkessel P = P∞ + Zc·Q + Pc, C·dPc/dt = Q − Pc/R, used for the arterial pressure pulse (`src/sim/pulse.js`).
+84. **Weissler AM, Harris WS, Schoenfeld CD.** Systolic time intervals in heart failure in man. *Circulation.* 1968;37(2):149–159. doi:10.1161/01.cir.37.2.149. PMID 5640345.
+    Supports: the left-ventricular ejection time regression LVET = 413 − 1.7·HR ms (men) that sets the ejection time of each simulated beat.
+85. **Brookes CI, White PA, Staples M, et al.** Myocardial contractility is not constant during spontaneous atrial fibrillation in patients. *Circulation.* 1998;98(17):1762–1768. doi:10.1161/01.cir.98.17.1762. PMID 9788831.
+    Supports: beat-to-beat stroke volume and pulse pressure vary with the preceding R–R interval in AF (modelled through diastolic filling time); the contractility changes this paper also reports are not modelled.
+86. **Ramirez AH, Schildcrout JS, Blakemore DL, et al.** Modulators of normal electrocardiographic intervals identified in a large electronic medical record. *Heart Rhythm.* 2011;8(2):271–277. doi:10.1016/j.hrthm.2010.10.034. PMID 21044898.
+    Supports: adult ECG reference ranges used to place the simulated P, Q, R, S events (95 % of 32 949 normal ECGs: PR 125–196 ms, QRS 69–103 ms).
+87. **Palhares DMF, Marcolino MS, Santos TMM, et al.** Normal limits of the electrocardiogram derived from a large database of Brazilian primary care patients. *BMC Cardiovasc Disord.* 2017;17(1):152. doi:10.1186/s12872-017-0572-8. PMID 28610624.
+    Supports: normal limits of P duration, PR, QRS and QTc (Bazett, Fridericia, Framingham, Hodges) from 486 014 ECGs; used as a second, more recent check of the simulated intervals.
+88. **Vandenberk B, Vandael E, Robyns T, et al.** Which QT correction formulae to use for QT monitoring? *J Am Heart Assoc.* 2016;5(6):e003264. doi:10.1161/JAHA.116.003264. PMID 27317349.
+    Supports: Fridericia and Framingham gave the best rate correction and mortality prediction; Bazett performed worst. Basis for Framingham as the default QTc formula and for the Bazett and Hodges options.
+89. **Fridericia LS.** The duration of systole in an electrocardiogram in normal humans and in patients with heart disease (1920, English translation). *Ann Noninvasive Electrocardiol.* 2003;8(4):343–351. doi:10.1046/j.1542-474x.2003.08413.x. PMID 14516292.
+    Supports: the cube-root correction QTc = QT / RR^(1/3).
+90. **Du Bois D, Du Bois EF.** A formula to estimate the approximate surface area if height and weight be known (1916, reprint). *Nutrition.* 1989;5(5):303–311. PMID 2520314.
+    Supports: BSA = 0.007184 · W^0.425 · H^0.725 (BSA option).
+91. **Haycock GB, Schwartz GJ, Wisotsky DH.** Geometric method for measuring body surface area: a height-weight formula validated in infants, children, and adults. *J Pediatr.* 1978;93(1):62–66. doi:10.1016/s0022-3476(78)80601-5. PMID 650346.
+    Supports: BSA = 0.024265 · W^0.5378 · H^0.3964 (BSA option).
+92. **Gellish RL, Goslin BR, Olson RE, et al.** Longitudinal modeling of the relationship between age and maximal heart rate. *Med Sci Sports Exerc.* 2007;39(5):822–829. doi:10.1097/mss.0b013e31803349c6. PMID 17468581.
+    Supports: HRmax = 207 − 0.7 · age (maximal heart rate option).

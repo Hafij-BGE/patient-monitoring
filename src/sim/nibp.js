@@ -2,14 +2,19 @@
  *
  * Forward model: the brachial artery under the cuff follows an arctangent
  * pressure–volume curve of transmural pressure P = p_art − P_cuff
- *   v(P) = 0.5 + atan(P / w)/π,  w = 3 mmHg (P < 0, collapse) or 15 mmHg (P ≥ 0),
+ *   v(P) = 0.5 + atan(P / w)/π,  w = 6 mmHg (P < 0, collapse) or 8 mmHg (P ≥ 0),
  * both scaled by the stiffness setting (shape after Langewouters 1984 / Drzewiecki
- * 1994; widths chosen so that the oscillation maximum sits at the mean arterial
- * pressure for the default 120/80 case). The cuff sees
+ * 1994). The widths were fitted so that the cuff pressure of the oscillation maximum
+ * matches the true (waveform-area) MAP of the Windkessel pulse over 10 pressure/rate
+ * cases (RMS error 0.8 mmHg in the analytic envelope); Ks = Kd = 0.55 are the ratios
+ * that then return the set SBP and DBP. Real devices use proprietary ratios that differ
+ * from these (reported Ks 0.45–0.73, Kd 0.69–0.83; Forouzanfar 2015), because a real
+ * artery's pressure–volume curve is not this arctangent. The cuff sees
  *   P_c + G·[v(p_art − P_c) − v(DBP − P_c)]
  * as it deflates linearly. The monitor side extracts one oscillation amplitude per
  * beat, takes MAP at the maximum and SBP/DBP where the envelope falls to Ks·max and
- * Kd·max (fixed-ratio method; Geddes 1982, Forouzanfar 2015).
+ * Kd·max (fixed-ratio method; Geddes 1982, Forouzanfar 2015). The displayed MAP is the
+ * cuff pressure at the maximum, as on real oscillometric monitors.
  *
  * Set-point change: an oscillogram that mixes beats from two pressure levels
  * gives a wrong reading that the envelope analysis can still accept. The
@@ -23,7 +28,7 @@
 })(this, function (dsp) {
   'use strict';
 
-  const W_COLLAPSE = 3, W_DISTEND = 15, GAIN = 3; // mmHg
+  const W_COLLAPSE = 6, W_DISTEND = 8, GAIN = 3; // mmHg
   const MIN_OSC = 0.5; // mmHg: oscillations below this are treated as noise when deciding to stop
   const INFLATE_RATE = 25, DUMP_RATE = 50, TIMEOUT = 120; // mmHg/s, mmHg/s, s
   const SETPOINT_TOL = 5; // mmHg: larger SBP/DBP changes during a measurement abort it
@@ -123,7 +128,7 @@
         const n = this.beats.length;
         let im = 0; this.beats.forEach((b, i) => { if (b.amp > this.beats[im].amp) im = i; });
         const after = n ? this.beats.slice(im + 1) : [];
-        const fallen = n >= 8 && im >= 2 && this.beats[im].amp > MIN_OSC && after.length >= 2 && after.slice(-2).every(b => b.amp < 0.6 * this.beats[im].amp);
+        const fallen = n >= 8 && im >= 2 && this.beats[im].amp > MIN_OSC && after.length >= 2 && after.slice(-2).every(b => b.amp < 0.45 * this.beats[im].amp);
         if ((fallen && this.cuff < this.beats[im].pc - 10) || this.cuff < 25 || t - this.t0 > TIMEOUT) {
           const res = t - this.t0 > TIMEOUT ? { error: 'timeout' } : analyse(this.beats, p.nibp_ks, p.nibp_kd);
           this.finish(t, res);

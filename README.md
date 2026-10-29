@@ -17,7 +17,8 @@ Every number on the screen sits next to the value that generated it, so measurem
 **[Open the live demo](https://hafij-bge.github.io/patient-monitoring/)** ·
 **[Download v1.4.0](https://github.com/Hafij-BGE/patient-monitoring/releases/tag/v1.4.0)** ·
 **[Watch the video](docs/media/demo.mp4)** ·
-**[Technical report](TECHNICAL_REPORT.md)**
+**[Technical report](TECHNICAL_REPORT.md)** ·
+**[Simulation audit](SIMULATION_AUDIT.md)**
 
 </div>
 
@@ -77,17 +78,17 @@ The design goal is scientific correctness and meaningful interaction, not decora
 
 | Channel | Simulated signal | Monitor estimator in the app |
 |---|---|---|
-| **ECG** | Dynamical ECG model (McSharry type) with teaching arrhythmias: AF, PVCs, VT, VF, asystole, SVT | Simplified Pan–Tompkins QRS detector with a rhythm classifier and PVC count |
+| **ECG** | Gaussian-event ECG after McSharry et al., QT by the Framingham formula, with teaching arrhythmias: AF, PVCs, VT, VF, asystole, SVT | Simplified Pan–Tompkins QRS detector with a rhythm classifier and PVC count; model QT/QTc on the HR tile |
 | **12-lead ECG** | Derived from the same beat as a moving heart vector (Dower transform) | Frontal QRS axis from leads I and aVF |
 | **SpO₂** | Red and infrared photoplethysmogram | Ratio-of-ratios R → SpO₂, signal-quality index, perfusion index |
-| **Arterial line (ART)** | Invasive pressure waveform, 0–200 mmHg, with damping and transducer height error | Beat-by-beat SYS / DIA / MAP |
+| **Arterial line (ART)** | Three-element Windkessel pressure (Weissler ejection time), with damping and transducer height error | Beat-by-beat SYS / DIA / MAP |
 | **Respiration** | Thoracic impedance | Breath detector, RR, apnea |
 | **Capnography (CO₂)** | Capnogram with rebreathing and bronchospasm shapes | EtCO₂, FiCO₂, airway RR |
 | **NIBP** | Oscillometric cuff deflation | Envelope method: MAP at maximum oscillation, SYS / DIA by fixed ratios |
 | **Temperature** | Core temperature | Direct reading |
 | **Glucose and insulin** | Bergman minimal model with meal absorption and subcutaneous insulin (Hovorka) | Model value with a "model" badge, projection 2–4 h ahead |
 
-The equations, parameters and their sources are in [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) and [`REFERENCES.md`](REFERENCES.md).
+The equations, parameters and their sources are in [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) and [`REFERENCES.md`](REFERENCES.md). [`SIMULATION_AUDIT.md`](SIMULATION_AUDIT.md) lists what was found wrong in each model after v1.4.0, what was changed, how it was tested and what is still not real.
 
 ## Features
 
@@ -111,7 +112,7 @@ Five groups: patient profile, physiology, glucose and insulin, sensor, processin
 <details>
 <summary><b>Alarms</b></summary>
 
-Limits and delays for the physiological parameters, rhythm alarms (for example V-tach, frequent PVCs), apnea, and 9 technical conditions. Physiological and technical alarms are kept apart, with priorities, acknowledge, a 2-minute audio pause with countdown, history and CSV export. Extra high-priority alarms below HR 40 bpm and SpO₂ 80 % (illustrative values). Optional Web Audio tones.
+Limits and delays for the physiological parameters, rhythm alarms (for example V-tach, frequent PVCs), apnea, and 11 technical conditions. Physiological and technical alarms are kept apart, with priorities, acknowledge, a 2-minute audio pause with countdown, history and CSV export. Extra high-priority alarms below HR 40 bpm and SpO₂ 80 % (illustrative values). Optional Web Audio tones.
 </details>
 
 <details>
@@ -127,12 +128,14 @@ Limits and delays for the physiological parameters, rhythm alarms (for example V
 <summary><b>Glucose model, patient profile, data import and export</b></summary>
 
 - **Glucose and insulin:** meal or bolus now, or a 2–4 h **model projection** with a planned meal and bolus: the curve, time to cross 70 / 54 / 180 / 250 mg/dL and time in 70–180 mg/dL. It is a model projection, not a clinical prediction, and not dosing advice.
-- **Patient profile:** age, sex, height, weight and diabetes status, BMI and BSA (Mosteller). Adult BMI categories only from age 20.
+- **Patient profile:** age, sex, height, weight and diabetes status, BMI and BSA. Adult BMI categories only from age 20.
+- **Formulas** (Profile tab): where the literature has more than one accepted formula you choose it: QTc (Framingham, Fridericia, Hodges, Bazett), BSA (Mosteller, Du Bois, Haycock), maximal heart rate (Tanaka, Gellish, Fox) and the NIBP MAP shown (oscillometric or the one-third rule). The defaults and the reasons are in TECHNICAL_REPORT section 5.2.
+- **Patient banner** above the monitor (hidden in bedside view): BMI and BSA, age-normal ranges, and shock index with Age × SI.
 - **Use the profile** (three switches in the Profile tab, kept in this browser):
   - *Bedside calculators* (on by default): predicted body weight (ARDS Network formula, needs sex), low tidal volume 6 mL/kg PBW, sepsis fluid bolus 30 mL/kg, urine output threshold 0.5 mL/kg/h and age-predicted maximal heart rate (Tanaka 208 − 0.7 × age).
   - *Shock index on the NIBP tile* (on by default): live SI = displayed HR / last NIBP systolic (healthy adults 0.5–0.7, values above 0.7 are highlighted) and Age × SI.
   - *Age and sex set typical blood pressure* (off by default): changing age or sex by hand sets SYS/DIA to the US adult mean for that age and sex (NHANES 2001–2008, interpolated between age groups). Scenarios are never changed.
-  - These are teaching calculations, not prescriptions. Sources: `REFERENCES.md` entries 72–80.
+  - These are teaching calculations, not prescriptions. Sources: `REFERENCES.md` entries 72–80; the formula choices also use 82 and 88–92.
 - **Data import / export:** CSV and JSON tables (wide or long, unit conversion, time zones, missing tokens, duplicates and conflicts), manual entry, CSV / JSON export by source and a waveform CSV export.
 - **Android only:** readings from a watch or other wearable through Android Health Connect, a Bluetooth LE heart-rate sensor (Heart Rate Service 0x180D) or a health-app export file. Real data is shown next to the simulation and never drives it.
 </details>
@@ -196,7 +199,7 @@ node --test tests/unit/*.test.js
 
 | Suite | Result |
 |---|---|
-| Node unit tests | **98 tests in 13 files, 98 pass** |
+| Node unit tests | **111 tests in 14 files, 111 pass** |
 | Browser self-test (`?selftest=1`, or the Tests tab) | 17 entries: **16 pass, 0 fail, 1 not run** |
 
 The entry that is not run is the Android watch-hardware check (Health Connect, BLE, export file). It is always reported as "not run" when no hardware is present, never as passed. Scenarios, expected and observed results, and what was not tested are in [`TEST_REPORT.md`](TEST_REPORT.md).
@@ -282,8 +285,9 @@ The full list is in section 9 of [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) an
 | File | Content |
 |---|---|
 | [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) | Models, equations, assumptions, architecture, alarms, limitations |
-| [`REFERENCES.md`](REFERENCES.md) | 71 sources and what each one supports |
+| [`REFERENCES.md`](REFERENCES.md) | 92 sources and what each one supports |
 | [`TEST_REPORT.md`](TEST_REPORT.md) | Test scenarios, expected and observed results, what was not tested |
+| [`SIMULATION_AUDIT.md`](SIMULATION_AUDIT.md) | Per-model audit after v1.4.0: what was wrong, the fix, equations and sources, tests, remaining limits |
 | [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) | Step-by-step demonstration (about 11 minutes) |
 | [`DEVICE_INTEGRATION_REPORT.md`](DEVICE_INTEGRATION_REPORT.md) | Device integration removed and why; the Android-only watch routes and their status |
 | [`VIBE_CODING_PROMPT.md`](VIBE_CODING_PROMPT.md) | The prompts used to build the app |

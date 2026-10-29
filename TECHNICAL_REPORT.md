@@ -56,25 +56,49 @@ Every random process uses its own seeded generator (seed + subsystem index), so 
 
 ## 3. Signal models
 
-### 3.1 ECG: McSharry dynamical model
+### 3.1 ECG: Gaussian-event model after McSharry et al.
 
-The ECG is generated with the three-dimensional dynamical model of McSharry et al. (2003), following the reference implementation `ecgsyn.m` (PhysioNet ECGSYN). A point moves on the unit limit cycle in the (x, y) plane with angular velocity ω = 2π / RRᵢ. Its vertical coordinate z is:
+The ECG follows the dynamical model of McSharry et al. (2003). A point moves on the unit limit cycle with angular velocity ω = 2π / RRᵢ, and the ECG z is driven by five Gaussian events P, Q, R, S, T:
 
-$$\dot z = -\sum_{i \in \{P,Q,R,S,T\}} a_i\,\Delta\theta_i\,\exp\!\left(-\frac{\Delta\theta_i^2}{2 b_i^2}\right) - (z - z_0),\qquad \Delta\theta_i = (\theta - \theta_i) \bmod 2\pi$$
+$$\dot z = -\sum_{i \in \{P,Q,R,S,T\}} a_i\,\Delta\theta_i\,\exp\!\left(-\frac{\Delta\theta_i^2}{2 b_i^2}\right),\qquad \Delta\theta_i = (\theta - \theta_i) \bmod 2\pi$$
 
-with z₀ = 0 (baseline wander is added later, at acquisition). Parameters are those of McSharry Table I:
+**Exact solution instead of numerical integration.** Without the original relaxation term −(z − z₀) this integrates exactly to a sum of Gaussians, which is what the code evaluates:
 
-| | P | Q | R | S | T |
-|---|---|---|---|---|---|
-| θᵢ (rad) | −π/3 | −π/12 | 0 | π/12 | π/2 |
-| aᵢ | 1.2 | −5.0 | 30.0 | −7.5 | 0.75 |
-| bᵢ | 0.25 | 0.1 | 0.1 | 0.1 | 0.4 |
+$$z(\theta) = \sum_i A_i \exp\!\left(-\frac{\Delta\theta_i^2}{2 b_i^2}\right),\qquad A_i = \frac{a_i b_i^2}{\omega}$$
 
-**Heart-rate scaling** follows `ecgsyn.m`: with h = √(HR/60), the angles are multiplied by [√h, h, 1, h, √h] and the widths bᵢ by h. This shortens the QT interval at high rates.
+The relaxation term was removed on purpose. With τ = 1 s it pulled the T–P baseline 0.05–0.3 mV below zero depending on heart rate, while a real T–P segment is isoelectric. The earlier Runge–Kutta integration is no longer needed.
 
-**Teaching controls.** `qrs_width` multiplies b_Q, b_R and b_S and divides a_Q, a_R and a_S by the square of the factor. `p_scale` and `t_scale` multiply a_P and a_T (a negative `t_scale` inverts the T wave). These are illustrative deformations, not models of specific conduction disorders.
+**Events in seconds, not radians.** Each event is defined by its time from the R peak tᵢ, its width σᵢ and its height Aᵢ. They are converted to phase with the ω of the interval they sit in (θᵢ = ω·tᵢ, bᵢ = ω·σᵢ, aᵢ = Aᵢ·ω/bᵢ²). P, QRS and T therefore keep their durations and heights when the R–R interval changes. The `ecgsyn` θ and b scaling (h = √(HR/60)) made QRS width and height change with each cycle's length, which mattered for irregular rhythms; it is no longer used.
 
-**Integration and amplitude.** The ODE is integrated with fourth-order Runge–Kutta at 1 kHz. The output is scaled so that the R peak equals `ecg_amp_mv` (default 1.0 mV).
+| Event | t from R (s) | σ (s) | A (model units) |
+|---|---|---|---|
+| P | −0.165 | 0.020 | 0.0119 |
+| Q | −0.024 | 0.009 | −0.0080 |
+| R | 0 | 0.009 | 0.0477 |
+| S | 0.024 | 0.009 | −0.0119 |
+| T | set from QT (below) | 0.05 · QT / 0.40 | 0.0191 |
+
+The heights are those of McSharry Table I at 60 bpm (A = a·b²/ω), so the P:Q:R:S:T ratios are unchanged. The output is scaled so that the R peak equals `ecg_amp_mv` (default 1.0 mV); T is then 0.41 mV.
+
+**QT follows the preceding R–R interval.** QT = 0.40 − 0.154·(1 − RR) s, the Framingham linear formula (Sagie et al. 1992, REFERENCES [82]), with RR limited to 0.25–2 s. Framingham and Fridericia gave the best rate correction in 6 609 adults in sinus rhythm below 90 bpm [88]. The T peak is placed so that the T wave falls to 25 µV exactly QT after the QRS onset: T end = peak + σ·√(2 ln(0.41 mV / 25 µV)) ≈ peak + 2.37 σ. The QRS onset is where the Q wave (0.17 mV) crosses 25 µV, about 2.05 σ before the Q peak.
+
+**Measured intervals.** The intervals below were measured on the clean simulated signal with `node tests/tools/ecg-intervals.js`. Each boundary is where that wave's own share of the signal crosses 25 µV, so T and P can be measured even where they overlap. Reference ranges are 95 % ranges of normal adult ECGs: PR 125–196 ms and QRS 69–103 ms in 32 949 ECGs [86], with similar limits in 486 014 primary-care ECGs [87].
+
+| HR (bpm) | P (ms) | PR (ms) | QRS (ms) | QT measured (ms) | QT Framingham (ms) | TP segment |
+|---|---|---|---|---|---|---|
+| 50 | 86 | 167 | 84 | 428 | 431 | isoelectric |
+| 60 | 86 | 167 | 84 | 398 | 400 | isoelectric |
+| 72 | 86 | 167 | 84 | 372 | 374 | isoelectric |
+| 100 | 86 | 167 | 84 | 336 | 338 | isoelectric |
+| 150 | 86 | 167 | 84 | 305 | 308 | none: T and next P overlap (lowest point between them 0.37 mV) |
+
+The measured QT is 2–3 ms shorter than the formula at every rate because the 25 µV level is reached slightly inside the Gaussian tails. This is well below the 10–20 ms spread between QT measurements by different readers or algorithms.
+
+At 150 bpm the cycle is 400 ms, so T and the next P wave run together. This also happens in real sinus tachycardia, but the exact overlap here is a property of the Gaussian shapes, not a validated model.
+
+**Teaching controls.** `qrs_width` stretches Q, R and S in time with their heights kept. QRS onset moves earlier and P moves with it, so PR stays the same. QT grows by the QRS widening, so the JT interval is unchanged. At `qrs_width` 1.5 the measured QRS is 127 ms, PR stays 167 ms and QT is 46 ms longer at every rate (444 ms at 60 bpm). `p_scale` and `t_scale` multiply the P and T heights (a negative `t_scale` inverts the T wave). These are illustrative deformations, not models of specific conduction disorders. In a real bundle-branch block the R peak sits late in a wide QRS; here the QRS widens symmetrically.
+
+**QT and QTc on the monitor.** The HR tile shows the model's QT for the last supraventricular beat and its QTc by the formula chosen in Profile → Formulas (section 5.2). This QT is the value the model placed, not a value measured from the noisy trace. It is blank for ventricular beats, VF and asystole and outside RR 0.3–2 s. Because the model's QT follows Framingham, Framingham QTc stays at 400 ms at every rate, while Bazett QTc rises at fast rates (for example 411 ms at 72 bpm and above 420 ms at 120 bpm). This is the over-correction reported in [88].
 
 **Beat timing.** Each RR interval is drawn when a beat starts:
 
@@ -93,23 +117,26 @@ where A_w is the baseline-wander amplitude, φ_resp the respiration phase, n(t) 
 
 **Important.** The ECG is generated only from the simulator's own heart-rate setting. It is never generated from a heart rate imported from a file, typed in, or received from a device or watch. A heart-rate number does not contain the information needed to produce an ECG.
 
-### 3.2 Arterial pulse
+### 3.2 Arterial pulse (three-element Windkessel)
 
-The arterial pulse is a shape function triggered by each simulated beat, delayed by a fixed pulse arrival time of **0.20 s** after the R peak. Over one beat, with u = time since pulse onset divided by the beat interval:
+The true arterial pressure is produced by a three-element Windkessel (Westerhof et al. 2009, REFERENCES [83]) driven by one ejection per simulated beat. The code is in `src/sim/pulse.js`.
 
-$$s(u) = g(u; 0.18, 0.07) + 0.45\, g(u; 0.45, 0.09),\qquad g(u;\mu,\sigma) = \exp\!\left(-\frac{(u-\mu)^2}{2\sigma^2}\right)$$
+$$p_{art}(t) = P_\infty + Z_c\,Q(t) + P_c(t),\qquad C\,\frac{dP_c}{dt} = Q(t) - \frac{P_c}{R},\qquad \tau = RC$$
 
-The sum is detrended and normalised to 0…1. The first Gaussian stands for the systolic wave and the second for a late reflected or diastolic component. The shape and the 0.20 s delay are **illustrative teaching choices**, not values fitted to measured data.
+- **Ejection flow Q(t).** Each beat ejects a skewed half-sine, sin(πu)·(1 − 0.7u), lasting the ejection time T_e and scaled to unit area (one stroke volume). The skew puts peak flow in early systole. The shape is illustrative.
+- **Ejection time.** T_e follows Weissler's regression for men, LVET = 413 − 1.7·HR ms (Weissler 1968, [84]), limited to 0.16 s … 0.6·RR. At 72 bpm T_e = 0.291 s.
+- **Fitting.** For the set HR, SBP and DBP, the time constant τ is solved by bisection so that the steady state of a regular rhythm has exactly the set systolic and diastolic pressures. The characteristic impedance is Z_c = 0.06·R. A narrow pulse pressure (tamponade, cardiogenic shock) cannot be reached with that Z_c and a physiological τ. In that case τ is held at 4 s and Z_c/R is lowered, and only with Z_c = 0 is τ allowed to rise further (up to 60 s). A gain in mmHg per unit stroke volume then scales the result. A unit test checks the fit for seven rate/pressure cases (40–180 bpm, pulse pressures 10–100 mmHg): the simulated extremes are within 1 mmHg of the set values.
+- **Floor pressure.** P∞ = 10 mmHg stands for the mean systemic filling pressure: without beats the pressure falls exponentially toward it with time constant τ (V-Fib, asystole). The value is illustrative.
+- **Superposition.** Pressure is the sum of the responses of all past beats. A long R–R interval therefore gives a lower diastolic pressure and a short one a higher pressure, as in a real circulation.
+- **Stroke volume per beat.** Each beat's stroke volume is multiplied by a filling factor that depends on the preceding R–R interval:
+  $$f(RR) = \frac{1 - e^{-(RR - T_e)/0.25\,\mathrm{s}}}{1 - e^{-(60/HR - T_e)/0.25\,\mathrm{s}}}$$
+  A beat after a short interval ejects less (pulse deficit in atrial fibrillation). A beat after a long pause ejects more. The 0.25 s filling time constant is illustrative. Beat-to-beat changes of contractility, which Brookes et al. (1998, [85]) measured in AF, are not modelled. A PVC ejects 0.4 of a normal beat and a V-Tach beat 0.5 (teaching choices).
+- **Pulse arrival.** The ejection starts a fixed pulse arrival time of 0.20 s after the R peak. Real PAT varies with distance, pressure and stiffness.
+- **True MAP.** The reference MAP is the time average of the waveform, DBP + (SBP − DBP)·m, where m (the form factor) comes from the fit. Over the tested cases m lies between 0.33 and 0.55, so the true MAP is not always (SBP + 2·DBP)/3.
 
-**True arterial pressure.** The pressure in the artery, used by the cuff model (section 3.6) and the arterial line (section 3.9), is
+**What is not modelled:** wave reflection, the dicrotic notch, pressure amplification from aorta to periphery, and baroreflex control. The PPG (section 3.3) and the cardiogenic impedance artifact (section 3.4) use the same pressure, normalised so that DBP = 0 and SBP = 1.
 
-$$p_{art}(t) = P_{MSF} + (DBP - P_{MSF})\cdot perf + (SBP - DBP)\cdot\min(1, s(t))$$
-
-- P_MSF = 10 mmHg is an illustrative mean systemic filling pressure: the level the arteries settle to without heartbeats.
-- perf (0–1) is a perfusion state. It relaxes toward 1 with a time constant of 0.8 s while beats arrive. When no beat has come for 2 × 60/HR + 0.5 s (V-Fib, asystole), it decays with a time constant of 1.5 s. Both time constants are illustrative.
-- Each beat in the pulse train has an amplitude: 1 for a normal beat, 0.4 for a PVC and 0.5 for a V-Tach beat (teaching choices). A weak beat therefore gives a smaller pulse in the pleth, the ART trace and the cuff oscillations.
-
-With regular beats, perf stays at 1 and the formula reduces to DBP + (SBP − DBP) · s(t).
+**Perfusion state.** A separate variable perf (0–1) relaxes toward 1 with time constant 0.8 s while beats arrive. When no beat has come for 2 × 60/HR + 0.5 s it decays with time constant 1.5 s. It is used only for the capnogram plateau (section 3.8) and is reported in the truth frame. Both time constants are illustrative.
 
 ### 3.3 Pulse oximetry (red/IR photoplethysmogram)
 
@@ -139,12 +166,13 @@ Detector noise is added to both channels. The sensor states are:
    Working on ln(I) makes this equal to (AC/DC)_red / (AC/DC)_IR for small pulsations.
 3. Convert with the linear example calibration **SpO₂ = 110 − 25 R** (TI application note SLAA655). Real oximeters use empirical, device-specific calibration curves.
 4. Average over the selected time (2, 4, 8 or 16 s).
-5. **Signal quality index.** R is also computed in four 1 s sub-windows. With CV their coefficient of variation:
-   $$SQI = 100\,(1 - CV/0.2)$$
+5. **Pulse gate.** The Pearson correlation r between the red and IR AC components over the same 4 s is computed. A real arterial pulse changes both channels together (r ≈ 0.99 in the simulation). Uncorrelated detector noise gives r between about −0.3 and 0. If r < 0.6, or the IR AC component is practically zero, the status is *no-pulse* and SpO₂, pulse rate and PI are blank. Without this gate the estimator turned noise into SpO₂ readings of 86–97 % and pulse rates of 101–171 bpm during V-Fib and asystole. An earlier gate based on autocorrelation (periodicity) failed for atrial fibrillation, because AF pulses are irregular.
+6. **Signal quality index.** R is also computed in four 1 s sub-windows. With CV their coefficient of variation:
+   $$SQI = 100\cdot\min\left(1 - \frac{CV}{0.2},\ \frac{r - 0.6}{0.3}\right)$$
    clamped to 0–100.
-6. **Perfusion index.** PI = 100 × peak-to-peak of the IR AC component.
-7. **Pulse rate** from intervals between pleth peaks.
-8. If the DC level exceeds 1.5, the status is *probe-off*. If the signal is NaN, the status is *no signal*.
+7. **Perfusion index.** PI = 100 × peak-to-peak of ln(I_IR) band-passed at 0.1–10 Hz, over 4 s. The narrower 0.5–5 Hz band used for R removed about 12 % of the pulse amplitude (PI 2.63 for a set 3.0), so PI uses its own wider band. With an irregular rhythm the window extremes include the strongest beat, so PI reads above the mean (4.2 for a set 3.0 in AF).
+8. **Pulse rate** from intervals between pleth peaks.
+9. If the DC level exceeds 1.5, the status is *probe-off*. If the signal is NaN, the status is *no signal*.
 
 SpO₂ readings with SQI < 50 are stored with quality `low-quality`. SQI < 40 raises a technical alarm.
 
@@ -166,15 +194,15 @@ The probe is a first-order lag:
 
 $$\frac{dT_{probe}}{dt} = \frac{T_{true} - T_{probe}}{\tau}$$
 
-with Gaussian noise of 0.02 °C and τ = `temp_tau` (default 20 s). The state *unavailable* gives a missing value. The state *error* produces a raw reading of −40 °C. The monitor rejects it as implausible, stores it with quality `invalid` and raises a technical alarm.
+integrated exactly over each step, T += (T_true − T)(1 − e^{−Δt/τ}), with Gaussian noise of 0.02 °C and τ = `temp_tau` (default 20 s). A unit test checks that a 37 → 39 °C step reaches 63 % of the change after one τ. The state *unavailable* gives a missing value. The state *error* produces a raw reading of −40 °C. The monitor rejects it as implausible, stores it with quality `invalid` and raises a technical alarm.
 
 ### 3.6 Oscillometric NIBP
 
 **Forward model.** The brachial artery under the cuff follows an arctangent pressure–volume relation of transmural pressure P = p_art − P_cuff (shape after Langewouters 1984 and Drzewiecki 1994):
 
-$$v(P) = \frac{1}{2} + \frac{1}{\pi}\arctan\frac{P}{w},\qquad w = \begin{cases} 3\ \text{mmHg} & P < 0\ \text{(collapse)} \\ 15\ \text{mmHg} & P \ge 0\ \text{(distension)} \end{cases}$$
+$$v(P) = \frac{1}{2} + \frac{1}{\pi}\arctan\frac{P}{w},\qquad w = \begin{cases} 6\ \text{mmHg} & P < 0\ \text{(collapse)} \\ 8\ \text{mmHg} & P \ge 0\ \text{(distension)} \end{cases}$$
 
-Both widths are multiplied by the stiffness setting. They were chosen so that the oscillation maximum falls at the mean arterial pressure for the default 120/80 case. They are not fitted to measured arteries. The cuff pressure seen by the sensor is
+Both widths are multiplied by the stiffness setting. They were fitted so that the cuff pressure at the oscillation maximum matches the true (waveform-average) MAP of the Windkessel pulse over 10 rate/pressure cases (RMS error 0.8 mmHg in the analytic envelope). They are not fitted to measured arteries. The cuff pressure seen by the sensor is
 
 $$P_{sensor}(t) = P_c(t) + G\,[v(p_{art} - P_c) - v(DBP - P_c)],\qquad G = 3\ \text{mmHg}$$
 
@@ -183,7 +211,7 @@ $$P_{sensor}(t) = P_c(t) + G\,[v(p_{art} - P_c) - v(DBP - P_c)],\qquad G = 3\ \t
 1. Inflate at 25 mmHg/s to max(160, last SBP + 30) mmHg, capped at 280 mmHg.
 2. Deflate linearly at `nibp_deflate` (default 3 mmHg/s).
 3. Record one oscillation amplitude per beat.
-4. Stop when the oscillations have passed their maximum and fallen away, or the cuff is below 25 mmHg. Then dump at 50 mmHg/s.
+4. Stop when at least 8 beats are recorded, the maximum has passed, and the last 2 beats are below 0.45 of the maximum, or the cuff is below 25 mmHg. Then dump at 50 mmHg/s.
 5. The whole measurement times out after 120 s.
 6. **Set-point change.** If the simulated SBP or DBP moves more than 5 mmHg from its value at the start of the measurement, or the stiffness setting changes, the measurement is aborted with "patient pressure changed during measurement; repeat". Without this rule an oscillogram that mixes beats from two pressure levels can still pass the analysis below and give a wrong reading (before the fix, a switch from 120/80 to 78/42 during deflation gave 121/112 mmHg flagged `ok`). The rule uses the known set point, which a real monitor does not have (see section 9).
 
@@ -193,7 +221,7 @@ $$P_{sensor}(t) = P_c(t) + G\,[v(p_{art} - P_c) - v(DBP - P_c)],\qquad G = 3\ \t
 2. **Artifact screening.** A beat is rejected if its amplitude exceeds 2 × the median of its 5-beat neighbourhood + 0.2 mmHg. If more than 30 % of beats are rejected, or the mean relative deviation from the local median exceeds 0.15, the measurement fails with "motion artifact (irregular oscillations)".
 3. Smooth the remaining amplitudes over 3 beats.
 4. MAP_osc is the cuff pressure at the maximum amplitude A_m.
-5. **Fixed-ratio method** (Geddes 1982; Forouzanfar 2015): SBP is the cuff pressure above the maximum where the envelope falls to K_s·A_m. DBP is the pressure below the maximum where it falls to K_d·A_m. Defaults are K_s = 0.50 and K_d = 0.80, adjustable. Crossings are linearly interpolated.
+5. **Fixed-ratio method** (Geddes 1982; Forouzanfar 2015): SBP is the cuff pressure above the maximum where the envelope falls to K_s·A_m. DBP is the pressure below the maximum where it falls to K_d·A_m. Defaults are K_s = K_d = 0.55, adjustable. These are the ratios that return the set SBP and DBP for this arctangent artery. Real devices use proprietary ratios, reported as K_s 0.45–0.73 and K_d 0.69–0.83 (Forouzanfar 2015), because a real artery's pressure–volume curve differs from this one. Crossings are linearly interpolated.
 6. If the systolic point is not found (cuff not inflated high enough), the cuff re-inflates once to 50 mmHg higher.
 
 **Derived values.** The app also reports two values calculated from SBP and DBP. Their source is marked `derived`:
@@ -201,6 +229,20 @@ $$P_{sensor}(t) = P_c(t) + G\,[v(p_{art} - P_c) - v(DBP - P_c)],\qquad G = 3\ \t
 $$MAP_{formula} = \frac{SBP + 2\,DBP}{3},\qquad PP = SBP - DBP$$
 
 MAP_osc (measured at the oscillation maximum) and MAP_formula (calculated) are shown side by side. Their difference is itself a teaching point.
+
+**Accuracy against the simulated truth** (default K_s = K_d = 0.55, deflation 3 mmHg/s, one measurement each, error = reading − set value; MAP error against the waveform-average MAP):
+
+| Set SBP/DBP @ HR | SBP error | DBP error | MAP_osc error |
+|---|---|---|---|
+| 120/80 @ 72 | −0.8 | +0.5 | −1.7 |
+| 82/48 @ 72 | −0.3 | −0.4 | −3.1 |
+| 175/105 @ 72 | −1.8 | +2.1 | +3.0 |
+| 140/90 @ 72 | −1.1 | +0.5 | +1.0 |
+| 100/60 @ 110 | +0.1 | −0.4 | −0.8 |
+| 160/70 @ 60 | −2.3 | +1.9 | −7.0 |
+| 90/70 @ 120 | +1.2 | −0.9 | +3.0 |
+
+SBP and DBP stay within 2.3 mmHg. MAP_osc is within 3.1 mmHg except for the wide pulse pressure at a slow rate (160/70 @ 60 bpm), where the long diastole lowers the waveform average and the oscillation maximum misses it by 7 mmHg. This error is a property of the model artery, not of a measured device.
 
 ### 3.7 QRS detector (simplified Pan–Tompkins)
 
@@ -218,9 +260,9 @@ Following Pan & Tompkins (1985), simplified:
 
 **Omitted:** the search-back for missed beats and the second (filtered-signal) threshold set of the original algorithm.
 
-### 3.8 Capnography (sidestream CO₂)
+### 3.8 Capnography (mainstream-style CO₂)
 
-**Forward model.** The CO₂ partial pressure c (mmHg) at the sampling line follows the respiration phase φ of section 3.4. FiCO₂ is the inspired level (`fico2`, 0 by default) and the plateau is
+**Forward model.** The CO₂ partial pressure c (mmHg) at the airway follows the respiration phase φ of section 3.4. FiCO₂ is the inspired level (`fico2`, 0 by default) and the plateau is
 
 $$c_{plateau} = FiCO_2 + \max(0,\ EtCO_2 - FiCO_2)\cdot(0.15 + 0.85\,perf)$$
 
@@ -233,7 +275,7 @@ where EtCO₂ is the alveolar set point (`etco2`, default 38 mmHg) and perf is t
     $$c = Fi + (c_{plateau} - Fi)\,\frac{1 - e^{-v/\tau}}{1 - e^{-1/\tau}}\,(0.94 + 0.06\,v),\qquad v = \frac{u - 0.06}{0.94}$$
   - τ = 0.035 + 0.35 · `airway_obstr`/100. Expiratory obstruction slows the rise and gives a sloped, "shark-fin" upstroke.
 - **Apnea** (RR = 0): c = FiCO₂.
-- Gaussian noise with SD 0.25 mmHg is added and the result is clipped at 0. A disconnected sampling line (`capno_sensor`) gives NaN.
+- Gaussian noise with SD 0.25 mmHg is added and the result is clipped at 0. A disconnected CO₂ sensor or sampling line (`capno_sensor`) gives NaN.
 
 The phase constants, the time constants and the 15 %/85 % split are **illustrative teaching choices**.
 
@@ -245,7 +287,7 @@ The phase constants, the time constants and the 15 %/85 % split are **illustrati
 - All three are null if no breath was detected within the apnea delay.
 - A NaN sample within the last 1 s raises the technical condition "CO₂ no signal".
 
-Presets: *Hypoventilation (high EtCO2)* (RR 6, EtCO₂ 58 mmHg), *Obstructed expiration* (obstruction 80 %, RR 22) and *CO2 rebreathing* (FiCO₂ 6 mmHg).
+Presets: *Hypoventilation on room air (high EtCO2)* (RR 6, EtCO₂ 58 mmHg, SpO₂ 92 %: by the alveolar gas equation PAO₂ ≈ 150 − 58/0.8 ≈ 78 mmHg), *Obstructed expiration* (obstruction 80 %, RR 22) and *CO2 rebreathing* (FiCO₂ 6 mmHg).
 
 ### 3.9 Invasive arterial pressure (fluid-filled line)
 
@@ -275,7 +317,7 @@ Presets: *Under-damped arterial line* and *Transducer too high* (20 cm).
 
 **Patient side** (`src/sim/arrhythmia.js`, `ecg.js`). The `arrhythmia` control selects one teaching pattern: none, AF, SVT, PVC, VT, VF or asystole. The patterns are simplified shapes for teaching. They are not models of the electrophysiology.
 
-- **Ventricular (wide) beats** reuse the McSharry ODE of section 3.1 with a different event set: no P wave, Q at −35 ms (SD 30 ms, −0.08), R at 0 (SD 40 ms, 1), S at +75 ms (SD 40 ms, −0.45) and a discordant T wave at min(0.3 s, 0.42 · RR) (SD 75 ms, −0.35). Times and widths are converted to angles, and amplitudes to aᵢ = Aᵢ · ω / bᵢ². The wide beat is scaled to 1.3 × `ecg_amp_mv`. These values are teaching choices.
+- **Ventricular (wide) beats** reuse the Gaussian-event model of section 3.1 with a different event set: no P wave, Q at −35 ms (SD 30 ms, −0.08), R at 0 (SD 40 ms, 1), S at +75 ms (SD 40 ms, −0.45) and a discordant T wave at min(0.3 s, 0.42 · RR) (SD 75 ms, −0.35). Times and widths are converted to angles, and amplitudes to aᵢ = Aᵢ · ω / bᵢ². The wide beat is scaled to 1.3 × `ecg_amp_mv`. These values are teaching choices.
 - **AF:** no P waves. RRᵢ = mean · (0.55 + 0.9 U), U ~ uniform(0, 1). A fibrillatory baseline of 6–9 Hz (sum of 4 sines with a random-walk frequency and a slow amplitude envelope) with amplitude 0.07 × `ecg_amp_mv` is added.
 - **SVT:** a normal narrow beat without the P wave (hidden in the QRS, as in typical AV-nodal re-entry [55, 56]), at the set heart rate and beat-to-beat variability. Fast, regular timing comes from the scenario (HR 180, variability SD 3 ms).
 - **PVC:** each normal cycle is followed by an early wide beat with probability min(0.5, `pvc_per_min`/HR), never two in a row. The early beat comes at about 0.6 × the mean interval and is followed by a compensatory pause.
@@ -283,15 +325,15 @@ Presets: *Under-damped arterial line* and *Transducer too high* (20 cm).
 - **VF:** no beats. The ECG is a fibrillatory signal of 3–7 Hz with amplitude 0.5 × `ecg_amp_mv`.
 - **Asystole:** no beats and a flat ECG (noise and wander are still added at acquisition).
 
-Without beats, perf falls (section 3.2), so ART, pleth and the CO₂ plateau fall as well. Presets: *AF pattern*, *SVT pattern* (HR 180, 106/72 mmHg), *Frequent PVCs* (14/min), *V-Tach pattern* (HR 170, 85/55 mmHg), *V-Fib pattern (no output)* and *Asystole pattern*.
+Without beats the Windkessel pressure decays toward P∞ with its time constant (section 3.2), so ART and pleth fall; perf falls too and lowers the CO₂ plateau. Presets: *AF pattern*, *SVT pattern* (HR 180, 106/72 mmHg), *Frequent PVCs* (14/min), *V-Tach pattern* (HR 170, 85/55 mmHg), *V-Fib pattern (no output)* and *Asystole pattern*.
 
-**Monitor side** (`RhythmAnalyzer` in `src/sim/detectors.js`). The analyser works on a 0.5–40 Hz band-passed copy of the ECG, keeps 6 s of it and uses the QRS times of section 3.7.
+**Monitor side** (`RhythmAnalyzer` in `src/sim/arrhythmia.js`). The analyser works on a 0.5–40 Hz band-passed copy of the ECG, keeps 6 s of it and uses the QRS times of section 3.7.
 
 - **QRS width** is measured around the largest deflection near each detected QRS (last 0.32 s), as the span where the signal stays above 15 % of the peak, relative to the median of the last 2 s. A complex is *wide* above 75 ms. This threshold was tuned on the simulator's own waveforms; the measured width reads lower than a clinical QRS duration.
 - Once per second the rules below are checked in order. The first match gives the label:
   1. leads off, or a signal loss within the last 2 s → *Not analysed*,
   2. first 8 s → *Learning*,
-  3. peak-to-peak below 0.3 mV over 4 s → *Asystole*,
+  3. peak-to-peak below 0.3 mV over 4 s and no detected QRS above 0.08 mV (filtered) in that time → *Asystole*. The second condition keeps low-voltage QRS complexes (below 0.5 mV, as in obesity, pericardial effusion or emphysema) from being called asystole, while detector triggers on noise stay below it,
   4. no QRS for 4 s → *V-Fib* if the signal is mostly not flat, else *Asystole*,
   5. median width wide and RR coefficient of variation > 0.3 (at least 3 widths) → *V-Fib*,
   6. last 4 complexes wide and rate > 100 bpm → *V-Tach*,
@@ -354,7 +396,7 @@ There are 50 scenarios. The first 25 change one or two signs, or one sensor sett
 | Acute stroke pattern (high blood pressure) | 192/104 mmHg, HR 84, SpO₂ 96 % | 61, 62 |
 | Heart failure, acute pulmonary oedema (warm-wet) | 178/102 mmHg, HR 118, RR 32, SpO₂ 86 %, EtCO₂ 32 | 63, 64 |
 | Heart failure, low output with congestion (cold-wet) | 92/74 mmHg, HR 112, RR 26, SpO₂ 90 %, PI 0.5 % | 63, 64 |
-| Heart failure, cardiogenic shock (SCAI stage C) | 78/54 mmHg, HR 118, RR 28, SpO₂ 88 %, EtCO₂ 28, PI 0.3 % | 63, 65 |
+| Heart failure, cardiogenic shock (SCAI stage C) | 76/50 mmHg, HR 118, RR 28, SpO₂ 88 %, EtCO₂ 28, PI 0.3 % | 63, 65 |
 | Post-operative opioid respiratory depression (ward, room air) | RR 6, SpO₂ 86 %, EtCO₂ 62, HR 58, 104/62 mmHg | 66, 34, 35 |
 | Post-operative hypothermia with shivering | 35.2 °C, HR 96, motion 35 %, PI 0.8 % | 67 |
 | Post-operative pulmonary complication (atelectasis type) | SpO₂ 89 %, RR 26, HR 104, EtCO₂ 34 | 68 |
@@ -391,7 +433,8 @@ The model starts in steady state at the set fasting glucose Gb and the set basal
 | SG, glucose effectiveness | 0.026 /min (normal subjects, regular FSIGT) | [46] |
 | SI, no diabetes | 4.1 × 10⁻⁴ /min per µU/mL | [49] |
 | SI, type 2 | 0.61 × 10⁻⁴ /min per µU/mL | [49] |
-| SI, type 1 | 4.1 × 10⁻⁴ (inside the type 1 range of [47]) | [47], [49] |
+| SI, type 1 | 4.4 × 10⁻⁴ /min per µU/mL (mean of the 10 subjects in Table 1 of [47], calculated here) | [47] |
+| GEZI, type 1 glucose effectiveness at zero insulin | 2.5 × 10⁻³ /min (same source); type 1 uses SG = GEZI + SI·Ib | [47] |
 | Secretion, type 1 | none (structural choice, as in [47]) | [47] |
 | σ, secretion gain above fasting | 0.1 µU/mL per min per mg/dL | **illustrative** |
 | Secretion gain, type 2 | 0.5 × σ | **illustrative**, direction from [50] |
@@ -405,11 +448,11 @@ The model starts in steady state at the set fasting glucose Gb and the set basal
 
 **Monitor and alarms.** The GLU tile shows glucose in mg/dL and mmol/L, insulin in µU/mL and the model clock, with a "model" badge. There is no glucose sensor or CGM model, so the value shown is the model value. Glucose and insulin are stored as `simulated` observations with the method text "(model value, no sensor)". Alarm defaults: glucose < 70 or > 180 mg/dL (medium priority), and < 54 mg/dL (level 2, high priority).
 
-**Measured behaviour** (`tests/unit/glucose.test.js`). Fasting 90 mg/dL, 50 g meal, no basal insulin. Peak / 2 h / 4 h values: no diabetes 167 / 120 / 83 mg/dL; type 2 183 / 162 / 100; type 1 without insulin 185 / 167 / 105. In type 1 (fasting 200 mg/dL, basal 0.8 U/h) a 6 U bolus lowers the 4 h value by more than 10 mg/dL.
+**Measured behaviour** (`tests/unit/glucose.test.js`). Fasting 90 mg/dL, 50 g meal, no basal insulin. Peak (time) / 2 h / 4 h values: no diabetes 167 mg/dL (61 min) / 120 / 83; type 2 183 (76 min) / 162 / 100; type 1 without any insulin 349 (160 min) / 336 / 325. The type 1 curve stays high because, with no insulin, only GEZI clears glucose, and GEZI is about one tenth of SG; this matches the direction of [47], where glucose effectiveness at zero insulin is small. The rise of about 5 mg/dL per gram of carbohydrate is at the upper end of clinical rules of thumb for an adult. In type 1 (fasting 200 mg/dL, basal 0.8 U/h) a 6 U bolus lowers the 4 h value from 200 to 104 mg/dL, about 16 mg/dL per unit. That is lower than the insulin sensitivity factor given by the common 1800 rule for an adult on about 40 U/day (about 45 mg/dL per unit), so the bolus effect of this model is weaker than typical clinical practice; it is shown for direction only. Numbers measured with the model code on 2026-10-29.
 
 ### 3.14 Derived 12-lead ECG
 
-**Model** (`src/sim/ecg12.js`). The McSharry equation for z is linear in z, so its solution is the sum of five parts z_i(t), one per event (P, Q, R, S, T), each driven by its own Gaussian term. `ecg.js` integrates every z_i with RK4 using the same forcing values as the sum, so the monitor ECG is unchanged. Each event is given a fixed spatial direction d_i in Frank coordinates (X left, Y feet, Z back), and the heart vector is
+**Model** (`src/sim/ecg12.js`). The McSharry equation for z is linear in z, so its solution is the sum of five parts z_i(t), one per event (P, Q, R, S, T), each driven by its own Gaussian term. Because `ecg.js` evaluates the exact solution (section 3.1), each z_i is simply the Gaussian of event i, and their sum is the monitor ECG. Each event is given a fixed spatial direction d_i in Frank coordinates (X left, Y feet, Z back), and the heart vector is
 
   VCG(t) = g · Σ_i z_i(t) · d_i / (h_II · d_i)
 
@@ -456,7 +499,7 @@ The store keeps one series per (source, parameter). Series are never merged acro
 Age, sex, height, weight and diabetes status are simulation parameters (group *Patient profile* at the top of the Controls tab). The Profile tab shows and edits the same values, so both always agree, and a change in either sets the scenario selector to Custom. Ranges: age 18–100 years (the vital-sign models are adult), height 120–220 cm, weight 30–250 kg. The label and the weight history stay in the Profile tab only.
 
 - **BMI** = weight (kg) / height (m)².
-- **BSA** (Mosteller 1987) = √(height (cm) × weight (kg) / 3600) m².
+- **BSA** by the formula chosen in Profile → Formulas (section 5.2); the default is Mosteller (1987) = √(height (cm) × weight (kg) / 3600) m².
 - The WHO adult BMI categories (< 18.5, 18.5–24.9, 25.0–29.9, ≥ 30) are shown **only from age 20**. Below that the app explains that BMI-for-age references are needed and shows no category.
 - Weight history records dated weights and shows the absolute and percentage change.
 
@@ -472,13 +515,47 @@ The box *Use the profile* in the Profile tab has three switches. Their state is 
 - Low tidal volume 6 mL/kg PBW, with the 4–8 mL/kg range [72].
 - Sepsis crystalloid bolus 30 mL/kg on actual weight [73]; the PBW value is shown as well.
 - Urine output threshold 0.5 mL/kg/h and its 6-hour total (KDIGO oliguria criterion) [74].
-- Age-predicted maximal heart rate 208 − 0.7 × age [75], and the set heart rate as a percentage of it.
+- Age-predicted maximal heart rate by the formula chosen in section 5.2 (default Tanaka, 208 − 0.7 × age [75]), and the set heart rate as a percentage of it.
 
-**Shock index.** When the switch is on, the NIBP tile shows SI = displayed heart rate / systolic pressure of the last successful NIBP measurement, and Age × SI. The healthy adult SI range is 0.5–0.7 [76]; values above 0.7 are coloured. Age × SI has been studied in older trauma patients [77]; this simulator applies no cut-off to it. When the ECG leads are off or no NIBP has been measured the row shows `--`. Example (tested): the hypotension scenario (HR 72, BP 82/48, age 40) gives NIBP 82/51, SI 0.88 (highlighted) and Age × SI 35.
+**Shock index.** When the switch is on, the patient banner on the monitor (section 5.2) shows SI = displayed heart rate / systolic pressure of the last successful NIBP measurement, and Age × SI. The healthy adult SI range is 0.5–0.7 [76]; values above 0.7 are coloured. Age × SI has been studied in older trauma patients [77]; this simulator applies no cut-off to it. When the ECG leads are off or no NIBP has been measured the row shows `--`. Example (tested in the browser): the hypotension scenario (age 40) gives NIBP 80/46 (61), SI 0.90 (highlighted) and Age × SI 36.
 
 **Age-typical blood pressure.** When the switch is on and age or sex is changed by hand (Controls or Profile tab), SYS and DIA are set to the mean for that age and sex from NHANES 2001–2008 [78]: age groups 18–39, 40–59 and ≥ 60 years, placed at 28.5, 49.5 and 70 years, linearly interpolated between them and held constant outside them. With sex unspecified the all-adult values are used. The curve reproduces the known pattern that systolic pressure rises with age while diastolic pressure falls after about 50, so pulse pressure widens [79, 80]. A message names the values set. Blood pressure can still be changed by hand afterwards, and loading a scenario never applies this rule. Examples (tested): age 40 male 122/74, age 75 male 133/69, age 30 male 119/71.
 
 These calculations are for teaching. They are not prescriptions and not dosing advice.
+
+### 5.2 Formula choices and the patient banner
+
+Where the literature offers more than one accepted formula, the Profile tab has a *Formulas* box with one selector each. The first option is the default and is the best-supported one; the choice is stored in `localStorage` (`pmsim.formulas.v1`) and changes only displayed numbers, never a simulated signal or an alarm. The equations are in `FORMULAS` in `src/core/profile.js`, and the note under the selectors shows the active equations with their reference numbers.
+
+| Quantity | Options (default first) | Equation | Why the default |
+|---|---|---|---|
+| QTc | Framingham [82] | QT + 0.154 (1 − RR) | Best rate correction in 6 609 adults [88] |
+| | Fridericia [89] | QT / RR^(1/3) | Also good in [88] |
+| | Hodges [88] | QT + 1.75 (HR − 60) ms | |
+| | Bazett [88] | QT / √RR | Worst in [88]: over-corrects at fast rates; kept because it is still widely printed |
+| BSA | Mosteller [13] | √(H · W / 3600) | Simple; within 0.3 % of Du Bois and Haycock at 172 cm, 70 kg (unit test) |
+| | Du Bois [90] | 0.007184 · W^0.425 · H^0.725 | Original 1916 formula |
+| | Haycock [91] | 0.024265 · W^0.5378 · H^0.3964 | Validated from infants to adults |
+| Max HR | Tanaka [75] | 208 − 0.7 · age | Meta-analysis of 351 studies plus a lab study |
+| | Gellish [92] | 207 − 0.7 · age | Longitudinal cohort |
+| | Fox [75] | 220 − age | Historic; over-estimates in young and under-estimates in old adults [75] |
+| MAP shown | Oscillometric | MAP measured by the NIBP algorithm | What a monitor displays |
+| | Formula | DIA + (SYS − DIA)/3 | Textbook estimate; shown in brackets |
+
+(H in cm, W in kg, RR in s.) QTc is computed only for RR 0.3–2 s; outside that range it is blank, because all four formulas were fitted inside it.
+
+**QT and QTc on the HR tile.** See section 3.1. The QT is the model's QT for the last supraventricular beat, not a measurement from the trace.
+
+**Patient banner.** A line above the parameter tiles shows the profile values a clinician would want at a glance, all derived from section 5:
+
+- age, sex, height and weight;
+- BMI with its WHO category (or "no adult category under 20 y");
+- BSA and the formula used;
+- the typical blood pressure for the age and sex (NHANES mean [78]);
+- the predicted maximal heart rate and the formula used;
+- shock index and Age × SI (when the shock-index switch is on).
+
+The banner is hidden in the full-screen bedside view, which keeps only the waveforms and the numbers.
 
 ## 6. Alarm system
 
@@ -526,6 +603,7 @@ These defaults are illustrative and editable. They are not clinical recommendati
 
 - *Acknowledge* silences one alarm. It stays listed until its condition ends.
 - *Audio paused* silences all tones for a 120 s countdown. Visual indication continues.
+- **Tones** (Web Audio, off until the user turns sound on). The burst timing follows the tables of IEC 60601-1-8: high priority 10 pulses (groups 3 + 2, pause, 3 + 2; pulse 150 ms, spacing 100 ms, 350 ms after pulses 3 and 8, 600 ms after pulse 5), followed by a 3.1 s pause; medium priority 3 pulses of 200 ms every 7.5 s; low priority 2 pulses every 16 s. The high-priority burst lasts 3.4 s and starts again 6.5 s after the previous start (pitches 523, 440 and 330 Hz for high, medium and low). Each pulse has 15 % rise and fall ramps and a fundamental with four harmonics, because the standard asks for at least four harmonics in the 300–4000 Hz range. Loudness, harmonic levels and the exact pitch were not measured against the standard, so the sound is not claimed to comply.
 - Alarms are non-latching: an alarm ends when its condition ends.
 - Every alarm is written to the history with condition start, activation, end and acknowledge times. The history can be exported as CSV.
 
@@ -578,15 +656,15 @@ The WebView page is served from the app's own assets and has no network access; 
 
 ## 8. Assumptions
 
-1. A single ECG lead with a fixed morphology, scaled by heart rate. The arrhythmia patterns (AF, SVT, PVC, VT, VF, asystole) are simplified teaching shapes. No other conduction disorders are modelled.
-2. The arterial pulse has a fixed shape and a fixed 0.20 s arrival time. Pressure, PPG, capnogram and respiration share the same beat and breath times. Circulation is reduced to one perfusion state (section 3.2).
+1. A single ECG lead with fixed P, QRS and T shapes (durations in seconds, independent of rate) and a QT that follows the Framingham formula (section 3.1). Real QT also lags rate changes by 1–2 minutes (QT hysteresis); the model QT follows the previous R–R interval at once. The arrhythmia patterns (AF, SVT, PVC, VT, VF, asystole) are simplified teaching shapes. No other conduction disorders are modelled.
+2. Arterial pressure comes from a three-element Windkessel with a fixed ejection-flow shape and a fixed 0.20 s arrival time (section 3.2). There are no reflected waves and no dicrotic notch. Pressure, PPG, capnogram and respiration share the same beat and breath times.
 3. The PPG is two-wavelength transmission with a linear R-to-SpO₂ calibration. No venous pulsation, no ambient light, no dyshaemoglobins.
 4. Respiration is a regular oscillator with I:E = 1:2. No sighs. Expiratory obstruction is shown only in the capnogram shape, not in the impedance signal.
-5. The capnogram is a phase-driven shape, not a gas-exchange model. The sampling delay of a sidestream line is not modelled.
+5. The capnogram is a phase-driven shape, not a gas-exchange model. It behaves like a mainstream sensor: there is no transit delay and no rise-time filtering of a sidestream sampling line.
 6. The arterial line is a linear second-order system with fixed f_n and ζ per damping setting. There is no flush test and no air bubble or clot model.
 7. NIBP uses an arctangent artery model, a linear deflation, one amplitude per beat and fixed ratios. The cuff and limb tissue are not modelled.
 8. Temperature is a first-order lag with no site differences.
-9. Set points change instantly. There is no physiological coupling between parameters; for example, changing SpO₂ does not change HR. The only coupling is through the perfusion state: when beats stop, ART, pleth and the CO₂ plateau fall.
+9. Set points change instantly. There is no physiological coupling between parameters; for example, changing SpO₂ does not change HR, and EtCO₂ does not follow the respiratory rate (each scenario sets both). The couplings that exist are mechanical: the beat sequence drives the Windkessel, so irregular beats change the pressure beat to beat and stopped beats let ART and pleth fall; the perfusion state lowers the CO₂ plateau when beats stop.
 10. Default alarm limits and delays are illustrative.
 11. Glucose and insulin follow the population model of section 3.13. They are not coupled to the cardiovascular or respiratory signals; the DKA-type scenario sets those signs separately.
 
@@ -596,11 +674,12 @@ These were observed or are known from the model design:
 
 - **NIBP under motion.** At motion ≥ 20 % the oscillometric measurement usually fails with a motion-artifact message. This is intended behaviour, but the threshold is a teaching choice.
 - **NIBP set-point change.** A measurement is aborted when the simulated SBP or DBP changes by more than 5 mmHg while it runs (section 3.6). The simulator can do this because it knows the set point. A real monitor has to detect an unstable patient from the oscillations themselves, and the oscillogram analysis here does not test for a two-level envelope. Gradual changes of up to 5 mmHg are accepted and can bias the reading by a similar amount.
-- **SpO₂ under motion** is biased toward about 85 % (R → 1). The value is not corrected. SQI (consistency of R across four 1-s windows) drops for mild motion (mean 43 at motion 15, 60 s run) but rises again under strong motion (mean 75 at motion 70), because then the artefact itself sets a steady R ≈ 1. The low-SQI flag (SQI < 40) therefore catches only some mild-motion windows and misses strong motion (`motion` and `postop-hypothermia` scenarios: 0 flagged frames in 90 s).
-- **Hypotension preset.** At 82/48 mmHg the oscillometric DBP estimate can land just above the 50 mmHg limit, so the DIA-low alarm may not fire. This is a real-world limitation of fixed-ratio estimation and is left visible as a teaching example.
+- **SpO₂ under motion** is biased toward about 85 % (R → 1). The value is not corrected. SQI (the lower of the consistency of R across four 1-s windows and the red/IR correlation) drops for mild motion (mean 40 at motion 15, 60 s run) but rises again under strong motion (mean 72 at motion 70), because then the artefact itself sets a steady R ≈ 1. The low-SQI flag (SQI < 40) therefore catches only some mild-motion windows and misses strong motion (`motion` and `postop-hypothermia` scenarios: 0 flagged frames in 90 s).
+- **Fixed-ratio NIBP.** SBP and DBP come from fixed amplitude ratios (Ks = Kd = 0.55, fitted to this simulator's cuff model). Real devices use proprietary ratios or other rules, and the error grows when the pulse pressure is wide at a low heart rate (160/70 at 60 bpm: MAP −7 mmHg, section 3.6). Real oscillometric devices show similar errors of several mmHg against intra-arterial pressure.
 - **12-lead ECG** is derived from one moving dipole with fixed directions per wave. It shows textbook normal and ventricular patterns only. It cannot show regional ST changes, infarct Q waves, bundle-branch blocks other than the VT shape, a biphasic P in V1 or electrode misplacement. Scenarios that change a wave (for example the raised-potassium T wave) change it in every lead in the same proportion. It is not a diagnostic ECG.
 - **QRS detector** has no search-back, so dropouts and very noisy ECG can cause missed beats and HR errors.
-- **HR in the AF pattern reads low.** With a set HR of 110 the displayed HR is about 75–85 bpm. The ECG model scales the QRS amplitude with the beat interval, so the short beats of AF have a small QRS that does not cross the detection threshold. The irregular-rhythm alarm still fires. Not fixed.
+- **HR in the AF pattern** varies with the irregular intervals (set 110: mean 112.7, range 91–140 bpm over 40 s after an 8-beat average). Earlier versions read 75–85 bpm because short beats had a small QRS; that was fixed in the ECG audit.
+- **Pulse oximeter PI in AF** reads above the set value (4.2 for a set 3.0), because the peak-to-peak window includes the strongest beat after a long interval.
 - **RR estimate** is null for the first breaths after a start or reset.
 - **SpO₂ calibration** is the linear example line, not a device calibration.
 - **Imported timestamps without a time zone** are read in the zone chosen in the import panel. Device clocks that carry no zone information cannot be corrected automatically.

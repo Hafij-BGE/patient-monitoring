@@ -115,7 +115,8 @@
     // header: settings, axis and the notice (it travels with a saved PNG)
     const axis = PM.ecg.qrsAxis(p), f = engine.lastFrame;
     const hr = f && Number.isFinite(f.est.hr) ? Math.round(f.est.hr) + ' bpm (monitor)' : '-- bpm';
-    const filt = p.ecg_filter === 'monitor' ? 'monitor 0.5–40 Hz' : p.ecg_filter === 'diagnostic' ? 'diagnostic 0.05–150 Hz' : 'no filter';
+    // the low-pass corner is capped at 0.49·fs (dsp.rbj), e.g. 122.5 Hz at 250 Hz sampling
+    const filt = p.ecg_filter === 'monitor' ? 'monitor 0.5–40 Hz' : p.ecg_filter === 'diagnostic' ? 'diagnostic 0.05–' + +Math.min(150, 0.49 * p.ecg_fs).toFixed(1) + ' Hz' : 'no filter';
     g.fillStyle = '#1d2330'; g.font = '600 ' + Math.max(10, 3.4 * mm) + 'px system-ui, sans-serif'; g.textBaseline = 'alphabetic';
     g.fillText('PM-SIM derived 12-lead ECG  ·  HR ' + hr + '  ·  ' + (Number.isFinite(axis) ? 'QRS axis ' + axisText(axis) : 'no QRS complexes'), 2 * mm, 6 * mm);
     g.font = Math.max(9, 2.8 * mm) + 'px system-ui, sans-serif'; g.fillStyle = '#5d6677';

@@ -18,7 +18,7 @@
         { tap: 'ecg.acq', name: 'Electrodes, amplifier, ADC', unit: 'mV',
           note: 'Baseline wander from breathing, broadband noise and mains interference are added, then the signal is sampled at the ECG sample rate. Leads off or dropouts leave a gap.' },
         { tap: 'ecg.disp', name: 'Display filter', unit: 'mV',
-          note: 'Monitor (0.5–40 Hz) or diagnostic (0.05–150 Hz) band-pass and the optional mains notch. This is the trace on the main screen.' },
+          note: 'Monitor (0.5–40 Hz) or diagnostic (0.05–150 Hz) band-pass and the optional mains notch. The low-pass corner is capped at 0.49 × the sampling rate (122.5 Hz at 250 Hz, 61 Hz at 125 Hz). This is the trace on the main screen.' },
         { tap: 'ecg.mwi', name: 'Pan–Tompkins detector feature', unit: 'a.u.', floor0: true, line: 'ecg.thr', marks: e => e.qrsTimes,
           note: '5–15 Hz band-pass → derivative → square → 150 ms moving-window integral. Dashed line: adaptive threshold. Ticks: detected QRS complexes. HR = 60 / mean of the last 8 RR intervals.' },
       ],

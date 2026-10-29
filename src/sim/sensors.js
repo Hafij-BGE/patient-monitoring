@@ -2,9 +2,9 @@
  * and a temperature probe, plus random signal dropouts. Each model turns the
  * simulated physiology into what a sensor would deliver, including artifacts. */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./pulse.js'));
-  else (root.PM = root.PM || {}).sensors = factory(root.PM.pulse);
-})(this, function (pulse) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else (root.PM = root.PM || {}).sensors = factory();
+})(this, function () {
   'use strict';
 
   /** Poisson-timed signal losses: rate (events/min), each lasting 0.3–1.5 s. */
@@ -20,7 +20,8 @@
   /**
    * Two-wavelength transmission PPG (normalised so the tissue DC level = 1).
    *   I_ir  = exp(−k·s(t) − m(t)),   I_red = exp(−R·k·s(t) − m(t))
-   * s(t) = pulse train (0..1), k = PI/100 (pulsatile absorbance of the IR channel),
+   * s(t) = arterial pulse normalised to the set pressures (0 at DBP, 1 at SBP; it falls
+   * below 0 when the pressure drops, e.g. after cardiac arrest), k = PI/100 (pulsatile absorbance of the IR channel),
    * R = (110 − SpO2)/25 — the inverse of the linear calibration used by the estimator,
    * m(t) = common-mode motion absorbance. Ratio-of-ratios background: Webster 1997,
    * Allen 2007. Probe-off: light reaches the detector directly (DC ≈ 3, no pulse).
@@ -28,12 +29,11 @@
   class PpgSensor {
     constructor(rng, motion) { this.rng = rng; this.motion = motion; this.drop = new Dropouts(rng); }
     static ratioFor(spo2) { return (110 - spo2) / 25; }
-    sample(t, dt, p, beats) {
+    sample(t, dt, p, s) {
       if (p.spo2_sensor === 'disconnected' || this.drop.active(t, p.ppg_dropout, dt)) return { red: NaN, ir: NaN };
       const n = () => this.rng.gauss() * p.ppg_noise / 1000;
       if (p.spo2_sensor === 'probe-off') return { red: 3 + n(), ir: 3 + n() };
       const k = p.pi / 100, R = PpgSensor.ratioFor(p.spo2);
-      const s = pulse.train(beats, t);
       const m = p.motion / 100 * 0.05 * this.motion.at(t); // up to ±5 % absorbance at 100 %
       return { red: Math.exp(-R * k * s - m) + n(), ir: Math.exp(-k * s - m) + n() };
     }
@@ -60,10 +60,11 @@
       return false;
     }
     volume() { return this.holding ? 0 : RespSensor.shape(this.phase); }
-    sample(t, dt, p, beats) {
+    /** s = normalised arterial pulse (0 at DBP, 1 at SBP). */
+    sample(t, dt, p, s) {
       if (this.drop.active(t, p.resp_dropout, dt)) return NaN;
       const breath = p.resp_amp * this.volume();
-      const cardio = p.cardiogenic / 100 * p.resp_amp * 0.5 * pulse.train(beats, t);
+      const cardio = p.cardiogenic / 100 * p.resp_amp * 0.5 * s;
       const mot = p.motion / 100 * 0.5 * this.motion.at(t * 0.7);
       return breath + cardio + mot + this.rng.gauss() * p.resp_noise;
     }
@@ -97,11 +98,12 @@
     }
   }
 
-  /** Temperature probe: first-order lag dT/dt = (T_true − T)/τ plus 0.02 °C noise. */
+  /** Temperature probe: first-order lag dT/dt = (T_true − T)/τ, integrated exactly over each
+   *  step (T += (T_true − T)·(1 − e^(−dt/τ))), plus 0.02 °C noise. */
   class TempSensor {
     constructor(rng, initial) { this.rng = rng; this.T = initial; }
     sample(dt, p) {
-      this.T += (p.temp - this.T) * Math.min(1, dt / p.temp_tau);
+      this.T += (p.temp - this.T) * (1 - Math.exp(-dt / p.temp_tau));
       if (p.temp_sensor === 'unavailable') return { value: null, status: 'unavailable' };
       if (p.temp_sensor === 'error') return { value: null, raw: -40, status: 'error' }; // implausible raw value, rejected
       return { value: this.T + this.rng.gauss() * 0.02, status: 'ok' };

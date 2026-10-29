@@ -34,13 +34,20 @@
     return { observations: out, rejected, errors: (detail && detail.errors) || [] };
   }
 
-  /** detail of a 'ble-hr' event {raw, time, device} → {parsed, observations} (throws on a malformed packet) */
+  /** detail of a 'ble-hr' event {raw, time, device} → {parsed, observations, rejected} (throws on a malformed packet) */
   function bleHeartRateToObservations(detail) {
     const bytes = gatt.fromHex(detail.raw);
     const parsed = gatt.parseHeartRate(bytes);
-    const observations = gatt.toObservations(parsed, { route: 'ble-hrs', deviceName: detail.device || null,
+    const all = gatt.toObservations(parsed, { route: 'ble-hrs', deviceName: detail.device || null,
       receivedAt: Number.isFinite(detail.time) ? detail.time : Date.now(), rawHex: gatt.toHex(bytes) });
-    return { parsed, observations };
+    const observations = [], rejected = [];
+    for (const o of all) {
+      if (units.PARAMS[o.param] && !units.inRange(o.param, o.value)) {
+        const r = units.PARAMS[o.param];
+        rejected.push({ param: o.param, value: o.value, unit: r.unit, reason: 'outside ' + r.min + '–' + r.max + ' ' + r.unit });
+      } else observations.push(o);
+    }
+    return { parsed, observations, rejected };
   }
 
   /** Base64 of a Uint8Array / ArrayBuffer, for PMAndroid.saveBase64. */

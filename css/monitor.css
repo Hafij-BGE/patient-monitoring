@@ -62,8 +62,8 @@ code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 12.5
 .alarm.high { background: var(--hi); color: #fff; }
 .alarm.medium { background: var(--med); color: #231800; }
 .alarm.low { background: transparent; color: var(--lo); border-color: var(--lo); }
-.alarm.unack.high { animation: blink 0.7s steps(1) infinite; }
-.alarm.unack.medium { animation: blink 1.6s steps(1) infinite; }
+.alarm.unack.high { animation: blink 0.5s steps(1) infinite; } /* 2 Hz, IEC 60601-1-8 band 1.4–2.8 Hz */
+.alarm.unack.medium { animation: blink 1.6s steps(1) infinite; } /* 0.625 Hz, band 0.4–0.8 Hz */
 .alarm.acked { opacity: .65; text-decoration: line-through dotted; }
 .alarm .tag { font-weight: 400; font-size: 11px; opacity: .85; margin-left: 4px; }
 @keyframes blink { 50% { filter: brightness(.55); } }
@@ -227,6 +227,12 @@ td code { word-break: break-all; }
 #pCalc { margin-bottom: 10px; }
 #pCalc[hidden], #siRow[hidden] { display: none; }
 .t-sub b.si-high { color: var(--med); }
+.pt-banner { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 14px; border: 1px solid var(--screen-line); border-radius: 10px;
+  padding: 5px 9px; font-size: 12px; color: var(--screen-text); }
+.pt-banner .pb-k { color: var(--screen-muted); }
+.pt-banner b { font-variant-numeric: tabular-nums; }
+.pt-banner .pb-note { color: var(--screen-muted); font-size: 11px; }
+.pt-banner b.si-high { color: var(--med); }
 .checks { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
 .devcard { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; font-size: 12.5px; }
 .devcard .state { font-weight: 600; }

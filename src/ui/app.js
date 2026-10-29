@@ -94,10 +94,29 @@
     controls.markSeverity(g.controls);
   }
 
+  // Patient banner on the monitor: profile numbers that matter at the bedside.
+  function updateBanner() {
+    const p = engine.p, P = PM.profile, fm = PM.panels.formulas;
+    setTxt('#bPt', p.age_years + ' y' + (p.sex ? ' ' + p.sex : '') + ' · ' + p.height_cm + ' cm · ' + p.weight_kg + ' kg');
+    const b = P.bmi(p.weight_kg, p.height_cm), cat = P.bmiCategory(b, p.age_years);
+    setTxt('#bBmi', b === null ? '--' : b.toFixed(1)); setTxt('#bBmiCat', cat.category || 'no adult category under 20 y');
+    const bsa = P.bsa(p.weight_kg, p.height_cm, fm.bsa);
+    setTxt('#bBsa', bsa === null ? '--' : bsa.toFixed(2)); setTxt('#bBsaF', P.formulaInfo('bsa', fm.bsa).name);
+    const bp = P.bpForAge(p.age_years, p.sex);
+    setTxt('#bBpAge', bp ? bp.sbp + '/' + bp.dbp : 'adults only');
+    const hm = P.hrMax(p.age_years, fm.hrmax);
+    setTxt('#bHrMax', hm === null ? '--' : Math.round(hm) + ' /min'); setTxt('#bHrMaxF', P.formulaInfo('hrmax', fm.hrmax).name);
+  }
+
   function updateTiles(f) {
     const est = f.est, tr = f.truth;
     setTxt('#vHr', fmt(est.hr)); setTxt('#sHr', f.technical.ecgLeadsOff ? 'leads off' : 'set ' + tr.hr); setTxt('#lHr', limText('hr'));
     setTxt('#vRhythm', est.rhythmLabel || '--'); setTxt('#vPvc', fmt(est.pvcPerMin));
+    // QT of the model's last supraventricular beat and its QTc by the chosen formula
+    const fm = PM.panels.formulas, q = f.technical.ecgLeadsOff ? null : tr.qt;
+    const qtc = q ? PM.profile.qtc(q.qt * 1000, q.rr, fm.qtc) : null;
+    setTxt('#vQt', q ? String(Math.round(q.qt * 1000)) : '--'); setTxt('#vQtc', qtc === null ? '--' : String(Math.round(qtc)));
+    setTxt('#vQtcF', PM.profile.formulaInfo('qtc', fm.qtc).name);
 
     setTxt('#vSpo2', fmt(est.spo2)); setTxt('#vPr', fmt(est.pr)); setTxt('#vPi', fmt(est.pi, 1)); setTxt('#vSqi', fmt(est.sqi));
     setTxt('#sSpo2', est.spo2Status !== 'ok' ? est.spo2Status : 'set ' + tr.spo2); setTxt('#lSpo2', limText('spo2'));
@@ -108,12 +127,13 @@
     const lastOk = nibpRows.slice().reverse().find(r => !r.res.error);
     if (lastOk) {
       const x = lastOk.res, age = f.t - lastOk.t;
-      setTxt('#vNibp', fmt(x.sbp) + '/' + fmt(x.dbp)); setTxt('#vMap', fmt(x.mapOsc));
+      setTxt('#vNibp', fmt(x.sbp) + '/' + fmt(x.dbp)); setTxt('#vMap', fmt(fm.map === 'formula' ? x.map : x.mapOsc));
       setTxt('#vMapOsc', fmt(x.mapOsc)); setTxt('#vMapF', fmt(x.map)); setTxt('#vPp', fmt(x.pp));
       setTxt('#nibpAge', age < 60 ? Math.round(age) + ' s ago' : Math.round(age / 60) + ' min ago');
       $('#tNibp .t-val').classList.toggle('stale', age > engine.p.nibp_interval * 60 + 60 || engine.p.nibp_interval === 0 && age > 900);
     }
     setTxt('#sNibp', 'set ' + tr.sbp + '/' + tr.dbp);
+    updateBanner();
     // Shock index from the displayed HR and the last good NIBP systolic.
     const siRow = $('#siRow');
     siRow.hidden = !PM.panels.useCases.si;
@@ -183,22 +203,36 @@
   $('#btnAlarmCsv').addEventListener('click', () => download('pm-sim-alarm-history-' + stamp() + '.csv', PM.alarms.historyCSV(alarms.history), 'text/csv'));
   $('#btnAlarmClear').addEventListener('click', () => { alarms.history.length = 0; PM.panels.renderAlarmHistory($('#alarmHistory tbody'), alarms.history); });
 
-  // Illustrative tones (Web Audio). Off by default; not a standards-compliant alarm sound.
-  let actx = null, nextBeep = 0;
+  // Alarm tones (Web Audio), off by default. Burst patterns follow the IEC 60601-1-8
+  // timing tables: high = 10 pulses (3+2, pause, 3+2), pulse 150 ms, spacing 100 ms,
+  // 350 ms after pulses 3 and 8, 600 ms after pulse 5, then 3.1 s until the next burst;
+  // medium = 3 pulses of 200 ms (spacing 200 ms) every 7.5 s; low = 2 pulses every 16 s. Each
+  // pulse has a 10–20 % rise/fall and a fundamental plus four harmonics (the standard asks
+  // for ≥ 4 harmonics within ±15 dB). Timing approximates the standard; the sound is not
+  // a certified alarm signal (loudness, masking and acoustic tests are not covered).
+  let actx = null, nextBeep = 0, wave = null;
   $('#chkSound').addEventListener('change', e => {
     if (e.target.checked && !actx && root.AudioContext) actx = new root.AudioContext();
     if (actx && e.target.checked) actx.resume();
   });
-  function beep(freq, at) {
-    const o = actx.createOscillator(), g = actx.createGain();
-    o.frequency.value = freq; o.type = 'sine';
-    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.12, at + 0.02); g.gain.linearRampToValueAtTime(0, at + 0.14);
-    o.connect(g).connect(actx.destination); o.start(at); o.stop(at + 0.16);
+  function beep(freq, at, dur) {
+    if (!wave) wave = actx.createPeriodicWave(new Float32Array([0, 0, 0, 0, 0, 0]), new Float32Array([0, 1, 0.7, 0.55, 0.45, 0.35]));
+    const o = actx.createOscillator(), g = actx.createGain(), edge = 0.15 * dur;
+    o.setPeriodicWave(wave); o.frequency.value = freq;
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.1, at + edge);
+    g.gain.setValueAtTime(0.1, at + dur - edge); g.gain.linearRampToValueAtTime(0, at + dur);
+    o.connect(g).connect(actx.destination); o.start(at); o.stop(at + dur + 0.01);
   }
+  // pulse onsets (s) within one burst, pulse duration (s), burst repeat interval (ms)
+  const BURSTS = {
+    high: [[0, 0.25, 0.5, 1.0, 1.25, 2.0, 2.25, 2.5, 3.0, 3.25], 0.15, 523, 6500],
+    medium: [[0, 0.4, 0.8], 0.2, 440, 7500],
+    low: [[0, 0.4], 0.2, 330, 16000],
+  };
   function sound(ts) {
     if (!actx || !$('#chkSound').checked || !running || !alarmState.audio || ts < nextBeep) return;
-    const [freq, n, gap] = { high: [880, 3, 1500], medium: [660, 2, 3000], low: [440, 1, 8000] }[alarmState.audio];
-    for (let i = 0; i < n; i++) beep(freq, actx.currentTime + i * 0.2);
+    const [onsets, dur, freq, gap] = BURSTS[alarmState.audio];
+    for (const o of onsets) beep(freq, actx.currentTime + o, dur);
     nextBeep = ts + gap;
   }
 

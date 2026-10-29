@@ -116,20 +116,39 @@
    * 0.5–5 Hz; R = RMS(red AC)/RMS(IR AC) over a 4 s window, updated every 1 s.
    * SpO2 = 110 − 25·R: an empirical straight-line calibration given as an example in
    * TI application report SLAA655 (real devices use device-specific calibration
-   * curves from desaturation studies). SQI = consistency of R across four 1-s
-   * sub-windows. Pulse rate from peaks of the inverted, filtered IR signal.
+   * curves from desaturation studies). A pulse is accepted only when the band-passed
+   * red and IR signals are correlated (Pearson r ≥ 0.6 over the 4 s window): the
+   * arterial volume change is common to both wavelengths, while detector noise is
+   * independent. Otherwise status is 'no-pulse' and SpO2/PR are blanked, as oximeters
+   * do when no pulsatile component is found (noise alone gives a ratio near 1 and a
+   * spurious ~85 %). Unlike a periodicity test this also accepts irregular rhythms
+   * such as AF; common-mode motion passes it too, as it fools real oximeters.
+   * SQI = min(consistency of R across four 1-s sub-windows, red/IR correlation). PI = peak-to-peak of ln(IR)
+   * band-passed 0.1–10 Hz over the 4 s window × 100, i.e. AC/DC in % (the narrower
+   * 0.5–5 Hz SpO2 band trims ~12 % of the pulse amplitude). Pulse rate from peaks of the
+   * inverted, filtered IR signal.
    */
+  const PULSE_CORR_MIN = 0.6;
+  /** Pearson correlation of two equal-length arrays. */
+  function corr(a, b) {
+    const ma = dsp.mean(a), mb = dsp.mean(b);
+    let ab = 0, aa = 0, bb = 0;
+    for (let n = 0; n < a.length; n++) { const x = a[n] - ma, y = b[n] - mb; ab += x * y; aa += x * x; bb += y * y; }
+    return ab / Math.sqrt(Math.max(aa * bb, 1e-30));
+  }
+
   class SpO2Estimator {
     constructor(fs) {
       this.fs = fs;
       this.bpR = dsp.bandpass(0.5, 5, fs); this.bpI = dsp.bandpass(0.5, 5, fs);
       this.lpDC = dsp.rbj('lowpass', 0.3, fs);
+      this.hpPI = dsp.bandpass(0.1, 10, fs); // wider band for PI: keeps the pulse amplitude
       const n = 4 * fs;
-      this.acR = new dsp.Ring(n); this.acI = new dsp.Ring(n);
+      this.acR = new dsp.Ring(n); this.acI = new dsp.Ring(n); this.piI = new dsp.Ring(n);
       this.reset();
     }
     reset() {
-      this.bpR.reset(); this.bpI.reset(); this.lpDC.reset(); this.acR.clear(); this.acI.clear();
+      this.bpR.reset(); this.bpI.reset(); this.lpDC.reset(); this.hpPI.reset(); this.acR.clear(); this.acI.clear(); this.piI.clear();
       this.k = 0; this.inst = []; this.dc = null; this.warm = 0;
       this.pk = { y1: 0, y2: 0, last: null, intervals: [], max: 0 };
       this.out = { spo2: null, sqi: null, pi: null, pr: null, status: 'searching' };
@@ -137,17 +156,18 @@
     /** Feed one sample pair (normalised intensities). Returns the pleth display value (or NaN). */
     process(red, ir, t, avgN) {
       if (!Number.isFinite(red) || !Number.isFinite(ir)) {
-        this.bpR.reset(); this.bpI.reset(); this.acR.clear(); this.acI.clear(); this.warm = 0;
+        this.bpR.reset(); this.bpI.reset(); this.hpPI.reset(); this.acR.clear(); this.acI.clear(); this.piI.clear(); this.warm = 0;
         this.pk.last = null; this.pk.max = 0; // do not measure a pulse interval across a gap
         this.out = { spo2: null, sqi: null, pi: null, pr: null, status: 'no-signal' };
         return NaN;
       }
       this.dc = this.lpDC.process(ir);
       const r = this.bpR.process(Math.log(Math.max(red, 1e-6)));
-      const i = this.bpI.process(Math.log(Math.max(ir, 1e-6)));
+      const lnIr = Math.log(Math.max(ir, 1e-6));
+      const i = this.bpI.process(lnIr), w = this.hpPI.process(lnIr);
       this.warm++;
       const pleth = -i; // absorbance rises with blood volume
-      if (this.warm > this.fs) { this.acR.push(r); this.acI.push(i); this.detectPulse(pleth, t); }
+      if (this.warm > this.fs) { this.acR.push(r); this.acI.push(i); this.piI.push(w); this.detectPulse(pleth, t); }
       if (++this.k >= this.fs) { this.k = 0; this.update(t, avgN); }
       return pleth;
     }
@@ -172,14 +192,16 @@
         subs.push(dsp.rms(a) / Math.max(dsp.rms(b), 1e-12));
       }
       const cv = dsp.std(subs) / Math.max(dsp.mean(subs), 1e-9);
-      const sqi = dsp.clamp(1 - cv / 0.2, 0, 1) * 100;
+      const rc = corr(R, I);
+      const sqi = Math.min(dsp.clamp(1 - cv / 0.2, 0, 1), dsp.clamp((rc - PULSE_CORR_MIN) / 0.3, 0, 1)) * 100;
       const inst = dsp.clamp(110 - 25 * ratio, 0, 100);
       this.inst.push(inst); while (this.inst.length > (avgN || 8)) this.inst.shift();
-      const pi = (Math.max(...I) - Math.min(...I)) * 100;
+      const W = this.piI.last(4 * this.fs), pi = (Math.max(...W) - Math.min(...W)) * 100;
       const p = this.pk;
       const pr = (p.intervals.length >= 2 && p.last !== null && t - p.last < 3) ? 60 / meanOfLast(p.intervals, 8) : null;
-      this.out = { spo2: dsp.mean(this.inst), spo2Inst: inst, ratio, sqi, pi, pr, status: rmsI < 1e-5 ? 'no-pulse' : 'ok' };
-      if (this.out.status === 'no-pulse') Object.assign(this.out, { spo2: null, pr: null, sqi: 0 });
+      const pulsatile = rmsI >= 1e-5 && rc >= PULSE_CORR_MIN;
+      this.out = { spo2: dsp.mean(this.inst), spo2Inst: inst, ratio, sqi, pi, pr, redIrCorr: rc, status: pulsatile ? 'ok' : 'no-pulse' };
+      if (!pulsatile) { Object.assign(this.out, { spo2: null, pr: null, pi: null, sqi: 0 }); this.inst = []; }
     }
   }
 
