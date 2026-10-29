@@ -2,7 +2,7 @@
 
 Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.
 
-## Unreleased (after v1.4.0)
+## v1.5.0 (2026-10-29)
 
 ### Shock index, 2026-10-29
 

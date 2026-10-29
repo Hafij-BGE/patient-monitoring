@@ -57,8 +57,8 @@ android {
         applicationId = "edu.deu.pmsim"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.4.0"
+        versionCode = 8
+        versionName = "1.5.0"
     }
 
     signingConfigs {
@@ -119,7 +119,7 @@ val copyReleaseApk by tasks.registering(Copy::class) {
     description = "Copies the release APK to <project>/release/PM-SIM-<version>-android.apk"
     from(layout.buildDirectory.dir("outputs/apk/release")) {
         include("*.apk")
-        rename { "PM-SIM-1.4.0-android.apk" }
+        rename { "PM-SIM-1.5.0-android.apk" }
     }
     into(File(webRoot, "release"))
     doFirst {

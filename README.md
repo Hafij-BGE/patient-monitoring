@@ -15,7 +15,7 @@ Every number on the screen sits next to the value that generated it, so measurem
 ![Platforms](https://img.shields.io/badge/runs%20on-web%20%7C%20Linux%20%7C%20Windows%20%7C%20Android-informational)
 
 **[Open the live demo](https://hafij-bge.github.io/patient-monitoring/)** ·
-**[Download v1.4.0](https://github.com/Hafij-BGE/patient-monitoring/releases/tag/v1.4.0)** ·
+**[Download v1.5.0](https://github.com/Hafij-BGE/patient-monitoring/releases/tag/v1.5.0)** ·
 **[Watch the video](docs/media/demo.mp4)** ·
 **[Technical report](TECHNICAL_REPORT.md)** ·
 **[Simulation audit](SIMULATION_AUDIT.md)**
@@ -169,11 +169,11 @@ No installation, no build step, no backend and no network access after loading. 
 | Platform | How | Status |
 |---|---|---|
 | 🌐 **Web** | Open <https://hafij-bge.github.io/patient-monitoring/> in a current Chrome, Edge, Firefox or Safari | Tested |
-| 🐧 **Linux** (.deb) | [`PM-SIM-1.4.0-amd64.deb`](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.4.0/PM-SIM-1.4.0-amd64.deb), then `sudo apt install ./PM-SIM-1.4.0-amd64.deb` and start **PM-SIM** from the menu | Installed on the author's Linux PC |
-| 🪟 **Windows** | [Setup](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.4.0/PM-SIM-1.4.0-setup-x64.exe), [portable .exe](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.4.0/PM-SIM-1.4.0-portable-x64.exe) or [.zip](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.4.0/PM-SIM-1.4.0-win-x64.zip). Not code-signed, so SmartScreen shows a warning | Built on a GitHub Windows runner; **not yet run on a real Windows PC** |
-| 🤖 **Android** | [`PM-SIM-1.4.0-android.apk`](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.4.0/PM-SIM-1.4.0-android.apk) (package `edu.deu.pmsim`) | In development; watch routes **not tested with real hardware** |
+| 🐧 **Linux** (.deb) | [`PM-SIM-1.5.0-amd64.deb`](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.5.0/PM-SIM-1.5.0-amd64.deb), then `sudo apt install ./PM-SIM-1.5.0-amd64.deb` and start **PM-SIM** from the menu | Installed on the author's Linux PC |
+| 🪟 **Windows** | [Setup](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.5.0/PM-SIM-1.5.0-setup-x64.exe), [portable .exe](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.5.0/PM-SIM-1.5.0-portable-x64.exe) or [.zip](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.5.0/PM-SIM-1.5.0-win-x64.zip). Not code-signed, so SmartScreen shows a warning | Built on a GitHub Windows runner; **not yet run on a real Windows PC** |
+| 🤖 **Android** | [`PM-SIM-1.5.0-android.apk`](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.5.0/PM-SIM-1.5.0-android.apk) (package `edu.deu.pmsim`) | In development; watch routes **not tested with real hardware** |
 
-Checksums for every file are in `SHA256SUMS` on the [release page](https://github.com/Hafij-BGE/patient-monitoring/releases/tag/v1.4.0).
+Checksums for every file are in `SHA256SUMS` on the [release page](https://github.com/Hafij-BGE/patient-monitoring/releases/tag/v1.5.0).
 
 **Run from source:**
 

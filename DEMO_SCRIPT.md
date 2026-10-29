@@ -24,7 +24,7 @@ A demonstration of PM-SIM in about 11 minutes. Each step names what to click, wh
 
 ## 2. Changing inputs and seeing the effect (0:45–2:15)
 
-**Click:** the **Controls** tab. Show the three groups: physiology, sensor and processing. Every control has a unit, a range and an explanation.
+**Click:** the **Controls** tab. Show the five groups: patient profile, physiology, glucose and insulin, sensor and processing. Every control has a unit, a range and an explanation. *Simple* view shows the 16 main controls plus any control a scenario changed or an alarm points to; *Advanced* shows all 64.
 
 1. Set **Heart rate** to 110 bpm.
    - *Expected:* the ECG beats come closer together. The HR tile moves toward 110 within a few beats. The pleth pulses follow, delayed by the pulse arrival time.
@@ -59,11 +59,14 @@ Return to **Baseline adult**.
 1. Choose the **V-Tach pattern** preset.
    - *Expected:* wide QRS complexes at about 170 bpm. Within a few seconds the rhythm label reads *V-Tach* and a **high-priority** V-TACH alarm appears. The ART pulses become smaller.
    - *Say:* the rhythm label comes from simple rules on QRS width and timing. It is a teaching analyser, not a validated arrhythmia algorithm.
-2. Return to **Baseline adult**, then choose **Hypoventilation (high EtCO2)**.
+2. Return to **Baseline adult**, then choose **Hypoventilation on room air (high EtCO2)**.
    - *Expected:* fewer, longer breaths on the CO₂ trace. EtCO₂ rises toward 58 mmHg. After the 10 s delay the EtCO₂-high alarm appears and the EtCO₂ tile is highlighted.
 3. Return to **Baseline adult**, then choose **Under-damped arterial line**.
    - *Expected:* ringing on the ART trace and a higher systolic value, while MAP stays about the same.
-   - *Say:* the catheter and transducer act like a spring–mass system. Its natural frequency and damping decide how faithfully the trace follows the true pressure. The values used here are illustrative.
+   - *Say:* the catheter and transducer act like a spring–mass system. Its natural frequency and damping decide how faithfully the trace follows the true pressure. The values used here are illustrative. The ART sweep uses an "optimum" scale that snaps to 20 mmHg steps around the pulse, so the ringing and the dicrotic notch stay readable; the range is printed in the label.
+4. Return to **Baseline adult** and click the **12-lead** button on the ECG sweep (or the ECG trace itself).
+   - *Expected:* a dialog with the last 10 s in the standard 3 × 4 layout and a lead II rhythm strip, on grid paper at 25 mm/s and 10 mm/mV, with a frontal QRS axis of about +49°.
+   - *Say:* the 12 leads are derived from one moving heart vector through the Dower transform. Lead II is the monitor ECG itself. It shows textbook normal and ventricular patterns only and is not a diagnostic ECG.
 
 Return to **Baseline adult**.
 
@@ -71,13 +74,17 @@ Return to **Baseline adult**.
 
 **Click:** **Start NIBP** in the NIBP tile, then open the **NIBP** tab.
 
-**Say while it runs (about 40 s):**
+**Say while it runs (about 35 s):**
 
 - The cuff inflates above the expected systolic pressure, then deflates at 3 mmHg/s (the cuff trace).
 - Small oscillations ride on the cuff pressure. Their size depends on the cuff pressure, because the artery under the cuff is most compliant near zero transmural pressure.
-- The oscillogram plots the oscillation amplitude against cuff pressure. Its maximum gives the mean arterial pressure (MAP). Systolic and diastolic are read where the envelope crosses 50 % and 80 % of the maximum (fixed-ratio method).
+- The oscillogram plots the oscillation amplitude against cuff pressure. Its maximum gives the mean arterial pressure (MAP). Systolic and diastolic are read where the envelope falls to 55 % of the maximum above and below it (fixed-ratio method, K_s = K_d = 0.55 for this model artery).
 
 **Expected result:** around 120/80 mmHg, with two MAP values: the oscillometric MAP and the formula MAP, (SYS + 2·DIA)/3, plus pulse pressure. Explain that they differ, and that real monitors also report the oscillometric value.
+
+**Show:** after the measurement the cuff strip keeps the last cycle: the cuff pressure with mmHg and time axes, dashed SYS, MAP and DIA markers, the oscillations magnified in their own band with a mmHg scale bar, and the reading next to the arterial-line value and the set point.
+
+**Optional:** start another measurement and press **Stop** while the cuff deflates. The history lists the attempt as "cancelled by user", no NIBP-failed alarm appears and the last valid reading stays on the tile.
 
 **Optional:** set **Motion artifact** to 70 % and start again. The measurement fails with "motion artifact" and reports no numbers. Reset afterwards.
 
@@ -85,7 +92,7 @@ Return to **Baseline adult**.
 
 **Click:** the **Alarms** tab.
 
-1. Show the limits table: 10 parameters, each with a low limit, a high limit and a delay.
+1. Show the limits table: 11 parameters (including the model glucose), each with a low limit, a high limit and a delay.
 2. Choose the **Tachycardia (fast rate)** preset. After the 5 s delay a HR-high alarm appears in the alarm bar.
 3. Click **Acknowledge**. The alarm stays listed while the condition lasts, but it is marked acknowledged.
 4. Click **Audio pause 2 min**. Show the countdown.
@@ -149,7 +156,7 @@ This part is a short spoken note, or an optional demonstration if a phone is ava
 - Watch readings are consumer wearable values. In the app they are meant to be shown next to the simulation with their source, and they are never used to generate the ECG.
 - The app has no internet permission, and the data stays on the phone.
 
-**Optional, only if a phone is available:** install the APK (`release/PM-SIM-1.4.0-android.apk`) and open the **Data import/export** tab. The "On this phone" panel appears there.
+**Optional, only if a phone is available:** install the APK (`release/PM-SIM-1.5.0-android.apk`) and open the **Data import/export** tab. The "On this phone" panel appears there.
 
 1. Under **Health Connect**, tap **Allow reading…**, choose a period and tap **Read records**. The message lists the stored and rejected values. The values appear in **Trends** as a separate `device` series.
 2. Under **Bluetooth heart-rate sensor**, tap **Scan**, then **Connect** on a heart-rate device. The last heart rate is shown.
@@ -161,9 +168,9 @@ This has not been done on a real device yet. Until it has, report it as planned,
 
 **Click:** the **Tests** tab, then **Run browser self-test** (or open `index.html?selftest=1`).
 
-**Expected:** 15 pass, 0 fail, 1 not run. Each row shows the input, the expected result and the observed result.
+**Expected:** 16 pass, 0 fail, 1 not run. Each row shows the input, the expected result and the observed result.
 
-**Say:** the one hardware entry (watch data on Android through Health Connect, BLE or an export file) is reported as "not run" because no watch was connected. The app never marks a hardware test as passed without hardware. The same models and parsers are also checked by 86 Node unit tests (`node --test tests/unit/*.test.js`).
+**Say:** the one hardware entry (watch data on Android through Health Connect, BLE or an export file) is reported as "not run" because no watch was connected. The app never marks a hardware test as passed without hardware. The same models and parsers are also checked by 133 Node unit tests (`node --test tests/unit/*.test.js`).
 
 ## 12. Closing (10:30–10:45)
 

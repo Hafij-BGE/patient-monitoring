@@ -600,7 +600,7 @@ What was done in response:
 - `src/devices/gatt.js` stayed, trimmed to the Bluetooth Heart Rate Measurement parser (0x2A37) for the Android app. The unit tests dropped from 71 to 47, and the browser self-test from 15 to 11 entries (10 automated, 1 hardware entry reported as not run).
 - The Electron desktop app, its build configuration, the Windows workflow and the local release builds were removed. The published GitHub release v1.0.0 stays online as an old version that is no longer built.
 - The app is published as a static website on GitHub Pages (https://hafij-bge.github.io/patient-monitoring/) by `.github/workflows/pages.yml`. It works the same way as the app.
-- An Android app (`edu.deu.pmsim`, 1.4.0, in `android/`) wraps the same page and is the only place where real watch data enters: Android Health Connect, native BLE Heart Rate Service, or a health-app export file. It is still being built and nothing has been tested with real hardware. HONOR's own protocol is proprietary and is not used.
+- An Android app (`edu.deu.pmsim`, 1.5.0, in `android/`) wraps the same page and is the only place where real watch data enters: Android Health Connect, native BLE Heart Rate Service, or a health-app export file. It is still being built and nothing has been tested with real hardware. HONOR's own protocol is proprietary and is not used.
 - Which of the simulator-side choices (signal-chain view, more waveforms, guided lessons and quiz, modern UI refresh) are finished is not recorded in these documents; the Tests tab, README and TECHNICAL_REPORT describe only what exists in the code. Revision note 3 records them.
 
 ## Revision note 3 (2026-10-28, simulator upgrades)
