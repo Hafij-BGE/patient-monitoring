@@ -126,7 +126,7 @@
    * SQI = min(consistency of R across four 1-s sub-windows, red/IR correlation). PI = peak-to-peak of ln(IR)
    * band-passed 0.1–10 Hz over the 4 s window × 100, i.e. AC/DC in % (the narrower
    * 0.5–5 Hz SpO2 band trims ~12 % of the pulse amplitude). Pulse rate from peaks of the
-   * inverted, filtered IR signal.
+   * inverted 0.5–5 Hz IR signal. The displayed pleth is the inverted 0.1–10 Hz IR signal.
    */
   const PULSE_CORR_MIN = 0.6;
   /** Pearson correlation of two equal-length arrays. */
@@ -166,10 +166,12 @@
       const lnIr = Math.log(Math.max(ir, 1e-6));
       const i = this.bpI.process(lnIr), w = this.hpPI.process(lnIr);
       this.warm++;
-      const pleth = -i; // absorbance rises with blood volume
-      if (this.warm > this.fs) { this.acR.push(r); this.acI.push(i); this.piI.push(w); this.detectPulse(pleth, t); }
+      // Absorbance rises with blood volume, so both are inverted. Pulse peaks are found in
+      // the 0.5–5 Hz band; the displayed pleth uses the 0.1–10 Hz band, which keeps the
+      // diastolic decay, the dicrotic notch and the diastolic wave of the volume pulse.
+      if (this.warm > this.fs) { this.acR.push(r); this.acI.push(i); this.piI.push(w); this.detectPulse(-i, t); }
       if (++this.k >= this.fs) { this.k = 0; this.update(t, avgN); }
-      return pleth;
+      return -w;
     }
     detectPulse(y, t) {
       const p = this.pk;
@@ -209,15 +211,20 @@
    *  minimum by half of the last end-tidal swing (≥ 2 mmHg; the threshold relaxes over
    *  ~6 s so a falling EtCO2 is still followed) and ends when it falls back through the
    *  midpoint. EtCO2 = peak of the last expiration, FiCO2 = minimum before it,
-   *  awRR = 60 / mean of the last 4 breath intervals. All null after `delay` s without a breath. */
+   *  awRR = 60 / mean of the last 4 breath intervals. All null after `delay` s without a breath.
+   *  The input is first smoothed by a 5-sample moving average (100 ms at 50 Hz): the peak of
+   *  the raw samples picks the largest noise excursion on the plateau and read EtCO2
+   *  0.3–0.4 mmHg high; the averaged peak is within 0.1 mmHg of the plateau. */
   class CapnoDetector {
     constructor() { this.reset(); }
     reset() {
       this.high = false; this.min = Infinity; this.max = -Infinity; this.fiCycle = 0;
-      this.lastEt = null; this.lastFi = null; this.lastEnd = null; this.intervals = [];
+      this.lastEt = null; this.lastFi = null; this.lastEnd = null; this.intervals = []; this.win = [];
     }
-    process(c, t) {
-      if (!Number.isFinite(c)) { this.high = false; this.min = Infinity; return null; }
+    process(raw, t) {
+      if (!Number.isFinite(raw)) { this.high = false; this.min = Infinity; this.win = []; return null; }
+      this.win.push(raw); if (this.win.length > 5) this.win.shift();
+      const c = dsp.mean(this.win);
       let out = null;
       if (!this.high) {
         this.min = Math.min(this.min, c);

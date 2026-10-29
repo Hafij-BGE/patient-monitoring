@@ -222,7 +222,7 @@
         el('td.num', { text: x.error ? '--' : fmt(x.sbp) }), el('td.num', { text: x.error ? '--' : fmt(x.dbp) }),
         el('td.num', { text: x.error ? '--' : fmt(x.mapOsc) }), el('td.num', { text: x.error ? '--' : fmt(x.map) }),
         el('td.num', { text: r.set.sbp + '/' + r.set.dbp }),
-        el('td', { class: x.error ? 'err' : 'ok', text: x.error ? 'failed: ' + x.error : 'ok' })));
+        el('td', { class: x.cancelled ? 'muted' : x.error ? 'err' : 'ok', text: x.cancelled ? 'cancelled by user' : x.error ? 'failed: ' + x.error : 'ok' })));
     }
     if (!rows.length) tbody.append(el('tr', null, el('td.muted', { colspan: 7, text: 'No measurements yet' })));
   }

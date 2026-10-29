@@ -20,7 +20,7 @@
 
   const DT = 1e-3;
   const PPG_FS = 125, RESP_FS = 50, CUFF_FS = 100, CAP_FS = 50, ART_FS = 125;
-  const PAT = 0.20;       // s, R peak → peripheral pulse foot (pulse arrival time, illustrative)
+  const PAT = 0.20;       // s, default R peak → pulse foot delay (pulse arrival time); the pat_ms parameter sets it
   const BUFFER_S = 60;    // seconds of waveform kept for display
   const TAP_S = 12;       // seconds kept per signal-chain probe point
   const LEAD12_S = 12;    // seconds kept per lead of the derived 12-lead ECG
@@ -60,10 +60,12 @@
         const prevRR = this.trueR.length > 1 ? tR - this.lastBeatT : 60 / this.p.hr;
         const sv = beat.kind === 'pvc' ? beat.amp : beat.amp * pulse.filling(prevRR, this.p.hr);
         this.lastBeatT = tR;
-        this.pulseBeats.push({ t0: tR + PAT }); if (this.pulseBeats.length > 6) this.pulseBeats.shift();
-        this.art.beat(tR + PAT, sv, this.windkessel());
+        const pat = this.p.pat_ms / 1000;
+        this.pulseBeats.push({ t0: tR + pat }); if (this.pulseBeats.length > 6) this.pulseBeats.shift();
+        this.art.beat(tR + pat, sv, this.windkessel());
       };
       this.ppg = new sensors.PpgSensor(new rngMod.Rng(seed + 3), new rngMod.MotionSource(new rngMod.Rng(seed + 4)));
+      this.finger = new pulse.FingerVolume(PPG_FS);
       this.resp = new sensors.RespSensor(new rngMod.Rng(seed + 5), this.motion);
       this.temp = new sensors.TempSensor(new rngMod.Rng(seed + 6), this.p.temp);
       this.capno = new sensors.CapnoSensor(new rngMod.Rng(seed + 11));
@@ -214,8 +216,16 @@
       for (let j = 0; j < 12; j++) this.lead12[j].push(this.lead12Filter[j].process(v[j]));
     }
 
+    /** Finger volume pulse (0 at trough, 1 at peak): arterial pulse plus the wave reflected
+     *  from the lower body, delayed by height / SI (Millasseau 2002), see pulse.js. */
+    fingerVolume(t) {
+      const p = this.p, w = this.windkessel(), map = p.dbp + (p.sbp - p.dbp) * w.meanFraction;
+      const dT = pulse.reflectionDelay(p.age_years, map, p.height_cm);
+      return this.finger.process(this.pulseLevel(t), w, p.hr, dT, p.ppg_reflection);
+    }
+
     acquirePpg(t) {
-      const s = this.ppg.sample(t, 1 / PPG_FS, this.p, this.pulseLevel(t));
+      const s = this.ppg.sample(t, 1 / PPG_FS, this.p, this.fingerVolume(t));
       if (!Number.isFinite(s.ir)) this.lastNaN.ppg = t;
       const pleth = this.spo2Est.process(s.red, s.ir, t, this.p.spo2_avg);
       this.plethS.push(pleth);

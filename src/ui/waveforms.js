@@ -8,14 +8,44 @@
   const PX_PER_MM = 96 / 25.4;
   const ERASE_PX = 14; // blank bar ahead of the write cursor
 
+  /** Dashed, labelled reference lines at fixed values, so absolute levels can be read off a strip. */
+  function refLines(ctx, w, map, vals) {
+    ctx.strokeStyle = 'rgba(200,210,225,0.18)'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    for (const v of vals) { const y = Math.round(map(v)) + 0.5; ctx.moveTo(0, y); ctx.lineTo(w, y); }
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(200,210,225,0.6)'; ctx.font = '10px system-ui, sans-serif'; ctx.textAlign = 'right';
+    for (const v of vals) { const y = map(v); ctx.fillText(String(v), w - 4, y - 3 < 12 ? y + 11 : y - 3); }
+    ctx.textAlign = 'start';
+  }
+
   class SweepView {
     /**
      * @param {HTMLCanvasElement} canvas
-     * @param {object} o  ring(): Ring, fs(): Hz, color, scale: 'ecg' | 'auto' | [lo, hi], grid: bool
+     * @param {object} o  ring(): Ring, fs(): Hz, color, scale: 'ecg' | 'auto' | 'optimum' | [lo, hi], grid: bool,
+     *   label: element whose text shows the current 'optimum' range, unit: its unit,
+ *   ticks: values drawn as labelled reference lines on a fixed [lo, hi] scale
+     * 'optimum' snaps the range to multiples of 20 around the trace (at least 40 wide) and
+     * keeps it until the trace leaves it or fills less than half of it; the limits are
+     * drawn as labelled reference lines so absolute values can still be read.
      */
     constructor(canvas, o) {
       this.cv = canvas; this.o = o;
       this.lo = null; this.hi = null; // smoothed auto-scale range
+      this.range = null;              // current 'optimum' range [lo, hi]
+    }
+
+    optimum(arr) {
+      let lo = Infinity, hi = -Infinity;
+      for (const v of arr) if (Number.isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; }
+      if (lo === Infinity) return this.range || [0, 200];
+      const r = this.range;
+      if (r && lo >= r[0] + 3 && hi <= r[1] - 3 && (hi - lo) > 0.5 * (r[1] - r[0]) - 20) return r;
+      let a = Math.floor((lo - 5) / 20) * 20, b = Math.ceil((hi + 5) / 20) * 20;
+      if (b - a < 40) { a = Math.max(-20, Math.floor(((lo + hi) / 2 - 20) / 20) * 20); b = a + 40; }
+      this.range = [a, b];
+      if (this.o.label) this.o.label.textContent = a + '–' + b + ' ' + (this.o.unit || '') + ' (optimum)';
+      return this.range;
     }
 
     draw(tNow, sweep, gain) {
@@ -38,6 +68,17 @@
       } else if (Array.isArray(this.o.scale)) {
         const [lo, hi] = this.o.scale;
         map = v => h - 4 - (v - lo) / (hi - lo) * (h - 18);
+        if (this.o.ticks) refLines(ctx, w, map, this.o.ticks);
+      } else if (this.o.scale === 'optimum') {
+        const [lo, hi] = this.optimum(arr);
+        map = v => h - 4 - (v - lo) / (hi - lo) * (h - 18);
+        ctx.strokeStyle = 'rgba(200,210,225,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        for (const v of [lo, hi]) { const y = Math.round(map(v)) + 0.5; ctx.moveTo(0, y); ctx.lineTo(w, y); }
+        ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(200,210,225,0.6)'; ctx.font = '10px system-ui, sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText(String(hi), w - 4, map(hi) + 11); ctx.fillText(String(lo), w - 4, map(lo) - 3);
+        ctx.textAlign = 'start';
       } else {
         let lo = Infinity, hi = -Infinity;
         for (const v of arr) if (Number.isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; }
@@ -52,7 +93,7 @@
       const xOf = j => (((tNow - (n - 1 - j) / fs) % Tw) + Tw) % Tw * pxPerSec;
       const spp = fs / pxPerSec;                    // samples per pixel
       const stride = spp > 3 ? Math.floor(spp / 2) : 1;
-      ctx.strokeStyle = this.o.color; ctx.lineWidth = 1.6; ctx.lineJoin = 'round';
+      ctx.strokeStyle = this.o.color; ctx.lineWidth = 1.5; ctx.lineJoin = 'miter'; ctx.miterLimit = 3; // sharp corners (QRS, systolic peak, notch)
       ctx.beginPath();
       let started = false, prevX = -1, nanX = null;
       const gaps = [];
@@ -116,5 +157,5 @@
     }
   }
 
-  root.PM.waveforms = { SweepView, PX_PER_MM };
+  root.PM.waveforms = { SweepView, PX_PER_MM, refLines };
 })(this);

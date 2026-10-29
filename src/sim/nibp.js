@@ -2,12 +2,14 @@
  *
  * Forward model: the brachial artery under the cuff follows an arctangent
  * pressure–volume curve of transmural pressure P = p_art − P_cuff
- *   v(P) = 0.5 + atan(P / w)/π,  w = 6 mmHg (P < 0, collapse) or 8 mmHg (P ≥ 0),
+ *   v(P) = 0.5 + atan(P / w)/π,  w = 4 mmHg (P < 0, collapse) or 7.5 mmHg (P ≥ 0),
  * both scaled by the stiffness setting (shape after Langewouters 1984 / Drzewiecki
- * 1994). The widths were fitted so that the cuff pressure of the oscillation maximum
- * matches the true (waveform-area) MAP of the Windkessel pulse over 10 pressure/rate
- * cases (RMS error 0.8 mmHg in the analytic envelope); Ks = Kd = 0.55 are the ratios
- * that then return the set SBP and DBP. Real devices use proprietary ratios that differ
+ * 1994). The widths were fitted (tests/tools/nibp-fit.js) so that the cuff pressure of
+ * the oscillation maximum matches the true (waveform-area) MAP of the Windkessel pulse
+ * over 10 pressure/rate cases (RMS error 1.8 mmHg in the analytic envelope; the error
+ * surface is flat along w_collapse/w_distend ≈ 0.53); the analytic ratios that return
+ * the set SBP and DBP are then Ks ≈ 0.56 and Kd ≈ 0.53, and the default 0.55 for both
+ * stays within about 1 mmHg of them. Real devices use proprietary ratios that differ
  * from these (reported Ks 0.45–0.73, Kd 0.69–0.83; Forouzanfar 2015), because a real
  * artery's pressure–volume curve is not this arctangent. The cuff sees
  *   P_c + G·[v(p_art − P_c) − v(DBP − P_c)]
@@ -28,7 +30,7 @@
 })(this, function (dsp) {
   'use strict';
 
-  const W_COLLAPSE = 6, W_DISTEND = 8, GAIN = 3; // mmHg
+  const W_COLLAPSE = 4, W_DISTEND = 7.5, GAIN = 3; // mmHg
   const MIN_OSC = 0.5; // mmHg: oscillations below this are treated as noise when deciding to stop
   const INFLATE_RATE = 25, DUMP_RATE = 50, TIMEOUT = 120; // mmHg/s, mmHg/s, s
   const SETPOINT_TOL = 5; // mmHg: larger SBP/DBP changes during a measurement abort it
@@ -81,10 +83,18 @@
       const lastS = this.last && this.last.sbp ? this.last.sbp : 0;
       this.target = Math.min(280, Math.max(160, lastS + 30) + this.extra);
       this.state = 'inflating'; this.t0 = t; this.seg = []; this.beats = []; this.msg = 'inflating'; this.retried = false;
+      this.trace = []; this.traceT0 = t; // sensor readings of this cycle, kept on the result for the cuff strip
       this.ref = null; // set point, taken on the first step
       return true;
     }
-    cancel(t) { if (this.state === 'inflating' || this.state === 'deflating') this.finish(t, { error: 'cancelled by user' }); }
+    /** User stop: the cuff is dumped and the attempt is logged, but it is not a measurement
+     *  failure (no technical alarm) and the last valid result stays the current one. */
+    cancel(t) {
+      if (this.state !== 'inflating' && this.state !== 'deflating') return;
+      const res = { t, target: this.target, error: 'cancelled by user', cancelled: true };
+      this.state = 'cancelled'; this.msg = res.error; this.history.push(res);
+      if (this.onDone) this.onDone(res);
+    }
     finish(t, res) {
       if (res.retryHigher && !this.retried && this.target < 280) {
         // pulsations still present at the inflation pressure: re-inflate 50 mmHg higher once
@@ -93,6 +103,9 @@
         return;
       }
       res.t = t; res.target = this.target;
+      // only the newest result keeps its trace, so the history stays small
+      if (this.last) delete this.last.trace;
+      if (this.trace) res.trace = { t0: this.traceT0, fs: Math.round(1 / this.dt), samples: Float32Array.from(this.trace), defl: this.traceDefl || 0 };
       if (res.error) { this.state = 'failed'; this.msg = res.error; this.extra = res.retryHigher ? Math.min(100, this.extra + 50) : 0; }
       else { this.state = 'completed'; this.msg = 'completed'; this.extra = 0; }
       this.last = res; this.history.push(res);
@@ -100,6 +113,7 @@
     }
     /** Called at 100 Hz. art = true arterial pressure, beatStart = a pulse onset occurred since the last call. */
     step(t, dt, p, art, beatStart) {
+      this.dt = dt;
       if (this.state === 'inflating' || this.state === 'deflating') {
         if (!this.ref) this.ref = { sbp: p.sbp, dbp: p.dbp, stiffness: p.stiffness };
         else if (Math.abs(p.sbp - this.ref.sbp) > SETPOINT_TOL || Math.abs(p.dbp - this.ref.dbp) > SETPOINT_TOL || p.stiffness !== this.ref.stiffness)
@@ -107,7 +121,7 @@
       }
       if (this.state === 'inflating') {
         this.cuff = Math.min(this.target, this.cuff + INFLATE_RATE * dt);
-        if (this.cuff >= this.target) { this.state = 'deflating'; this.msg = 'deflating'; this.seg = []; this.segOk = false; }
+        if (this.cuff >= this.target) { this.state = 'deflating'; this.msg = 'deflating'; this.seg = []; this.segOk = false; this.traceDefl = this.trace.length; }
       } else if (this.state === 'deflating') {
         this.cuff -= p.nibp_deflate * dt;
       } else if (this.cuff > 0) this.cuff = Math.max(0, this.cuff - DUMP_RATE * dt);
@@ -116,6 +130,7 @@
         : GAIN * (volume(art - this.cuff, p.stiffness) - volume(p.dbp - this.cuff, p.stiffness));
       const mot = p.motion / 100 * 2 * this.motion.at(t * 1.3);
       const reading = this.cuff + osc + mot + this.rng.gauss() * 0.05;
+      if (this.state === 'inflating' || this.state === 'deflating') this.trace.push(reading);
 
       if (this.state === 'deflating') {
         if (beatStart && this.segOk && this.seg.length > 3) this.closeBeat();

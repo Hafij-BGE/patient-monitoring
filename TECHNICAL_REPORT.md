@@ -123,18 +123,29 @@ The true arterial pressure is produced by a three-element Windkessel (Westerhof 
 
 $$p_{art}(t) = P_\infty + Z_c\,Q(t) + P_c(t),\qquad C\,\frac{dP_c}{dt} = Q(t) - \frac{P_c}{R},\qquad \tau = RC$$
 
-- **Ejection flow Q(t).** Each beat ejects a skewed half-sine, sin(πu)·(1 − 0.7u), lasting the ejection time T_e and scaled to unit area (one stroke volume). The skew puts peak flow in early systole. The shape is illustrative.
+- **Ejection flow Q(t).** Each beat ejects a skewed half-sine, sin(πu)·(1 − u), lasting the ejection time T_e and scaled to unit area (one stroke volume). The skew puts peak flow in early systole, which gives a steep upstroke and an early systolic peak. The shape is illustrative.
+- **Incisura (dicrotic notch).** At aortic valve closure the flow is followed by a brief backflow (2.5 % of the stroke volume over 30 ms, half-sine) and then a small forward rebound (3 % over 100 ms). Through Z_c these give a sharp notch on the downstroke and a small dicrotic wave after it. The notch is a valve-closure event. The following wave is in reality shaped by wave reflection, which a lumped Windkessel cannot represent, so the rebound is an illustrative stand-in. When less than 130 ms remains between the end of ejection and 0.9·RR, both terms are scaled down in proportion, so the notch fades at high rates as on real traces. Measured at 120/80 mmHg (noise-free model): the notch sits 7–15 mmHg above DBP, and the pressure rises out of it by about 8 mmHg at 60 bpm, 6 mmHg at 72 bpm, 3 mmHg at 100 bpm and 1.4–1.9 mmHg at 130–150 bpm.
 - **Ejection time.** T_e follows Weissler's regression for men, LVET = 413 − 1.7·HR ms (Weissler 1968, [84]), limited to 0.16 s … 0.6·RR. At 72 bpm T_e = 0.291 s.
-- **Fitting.** For the set HR, SBP and DBP, the time constant τ is solved by bisection so that the steady state of a regular rhythm has exactly the set systolic and diastolic pressures. The characteristic impedance is Z_c = 0.06·R. A narrow pulse pressure (tamponade, cardiogenic shock) cannot be reached with that Z_c and a physiological τ. In that case τ is held at 4 s and Z_c/R is lowered, and only with Z_c = 0 is τ allowed to rise further (up to 60 s). A gain in mmHg per unit stroke volume then scales the result. A unit test checks the fit for seven rate/pressure cases (40–180 bpm, pulse pressures 10–100 mmHg): the simulated extremes are within 1 mmHg of the set values.
+- **Fitting.** For the set HR, SBP and DBP, the time constant τ is solved by bisection so that the steady state of a regular rhythm has exactly the set systolic and diastolic pressures. The characteristic impedance is Z_c = 0.07·R. A narrow pulse pressure (tamponade, cardiogenic shock) cannot be reached with that Z_c and a physiological τ. In that case τ is held at 4 s and Z_c/R is lowered, and only with Z_c = 0 is τ allowed to rise further (up to 60 s). A gain in mmHg per unit stroke volume then scales the result. A unit test checks the fit for seven rate/pressure cases (40–180 bpm, pulse pressures 10–100 mmHg): the simulated extremes are within 1 mmHg of the set values.
 - **Floor pressure.** P∞ = 10 mmHg stands for the mean systemic filling pressure: without beats the pressure falls exponentially toward it with time constant τ (V-Fib, asystole). The value is illustrative.
 - **Superposition.** Pressure is the sum of the responses of all past beats. A long R–R interval therefore gives a lower diastolic pressure and a short one a higher pressure, as in a real circulation.
 - **Stroke volume per beat.** Each beat's stroke volume is multiplied by a filling factor that depends on the preceding R–R interval:
   $$f(RR) = \frac{1 - e^{-(RR - T_e)/0.25\,\mathrm{s}}}{1 - e^{-(60/HR - T_e)/0.25\,\mathrm{s}}}$$
   A beat after a short interval ejects less (pulse deficit in atrial fibrillation). A beat after a long pause ejects more. The 0.25 s filling time constant is illustrative. Beat-to-beat changes of contractility, which Brookes et al. (1998, [85]) measured in AF, are not modelled. A PVC ejects 0.4 of a normal beat and a V-Tach beat 0.5 (teaching choices).
-- **Pulse arrival.** The ejection starts a fixed pulse arrival time of 0.20 s after the R peak. Real PAT varies with distance, pressure and stiffness.
-- **True MAP.** The reference MAP is the time average of the waveform, DBP + (SBP − DBP)·m, where m (the form factor) comes from the fit. Over the tested cases m lies between 0.33 and 0.55, so the true MAP is not always (SBP + 2·DBP)/3.
+- **Pulse arrival.** The ejection starts a pulse arrival time (PAT) after the R peak. PAT is the parameter `pat_ms` (Physiological inputs, 100–400 ms, default 200 ms). It is the sum of the pre-ejection period and the pulse transit time to the measuring site. The same value starts the arterial line beat and the pleth beat, so both channels move together when it is changed. It is set by hand only: it does not follow pressure, stiffness or heart rate here, although real PAT shortens when pressure or arterial stiffness rises.
+- **Beat gain.** Each beat keeps the mmHg gain of the fit that was valid when it was ejected, and the decaying tail of earlier beats is stored in mmHg. When HR, SBP or DBP is changed, only new beats use the new fit, so the trace moves to the new pressure over a few beats without a step. Before this change a new fit rescaled beats already ejected and the pressure jumped by about 75 mmHg within 24 ms when HR was changed from 72 to 40 bpm.
+- **True MAP.** The reference MAP is the time average of the waveform, DBP + (SBP − DBP)·m, where m (the form factor) comes from the fit. Over the tested cases m lies between 0.38 and 0.51 (0.385 at 120/80 mmHg and 72 bpm), so the true MAP is not always (SBP + 2·DBP)/3.
 
-**What is not modelled:** wave reflection, the dicrotic notch, pressure amplification from aorta to periphery, and baroreflex control. The PPG (section 3.3) and the cardiogenic impedance artifact (section 3.4) use the same pressure, normalised so that DBP = 0 and SBP = 1.
+**What is not modelled:** wave reflection in the pressure itself (the dicrotic wave is a stand-in, see above), pressure amplification from aorta to periphery, and baroreflex control. The cardiogenic impedance artifact (section 3.4) uses the same pressure, normalised so that DBP = 0 and SBP = 1. The PPG (section 3.3) uses that normalised pressure as input to the finger volume pulse model below.
+
+**Finger volume pulse.** The light absorbance at the finger follows blood volume, not pressure. Its typical contour (digital volume pulse, DVP) has a systolic peak, a notch or inflection, and a later diastolic peak formed by the wave reflected from the lower body (Millasseau et al. 2002 [93], 2006 [95]; Chowienczyk et al. 1999 [94]). The simulator builds it from the normalised pressure s(t):
+
+$$v(t) = \mathrm{LP}_{\tau_v}\!\left[\frac{s(t) + g\,s(t - \Delta T)}{1 + g}\right],\qquad \Delta T = \frac{\text{height}}{SI},\qquad SI = 0.63 + 0.086\cdot\text{age} + 0.042\cdot MAP\ \ \mathrm{m/s}$$
+
+- The SI regression is the one Millasseau et al. measured in 87 subjects [93]. At 40 years, MAP 93 mmHg and 170 cm, ΔT ≈ 0.21 s; it shortens with age and pressure (stiffer arteries).
+- g is the reflection gain (parameter `ppg_reflection`, default 0.3, range 0–0.8). g = 0 gives a single systolic peak. Vasoconstriction raises the reflection and nitrates lower it [94]; the numeric value of g is illustrative.
+- LP is a first-order low-pass with τ_v = 40 ms that stands for vessel compliance (illustrative).
+- v is rescaled to unit peak-to-trough for a regular rhythm at the current fit, so the set PI is kept. The scale is computed once per parameter set and cached.
 
 **Perfusion state.** A separate variable perf (0–1) relaxes toward 1 with time constant 0.8 s while beats arrive. When no beat has come for 2 × 60/HR + 0.5 s it decays with time constant 1.5 s. It is used only for the capnogram plateau (section 3.8) and is reported in the truth frame. Both time constants are illustrative.
 
@@ -160,7 +171,7 @@ Detector noise is added to both channels. The sensor states are:
 
 **Estimator (monitor side).** At 125 Hz:
 
-1. Take ln(I) for each channel and band-pass it at 0.5–5 Hz to obtain the AC components.
+1. Take ln(I) for each channel and band-pass it at 0.5–5 Hz to obtain the AC components used for R and pulse detection. The displayed pleth is the inverted IR signal band-passed at 0.1–10 Hz (the PI band), which keeps the diastolic decay, the notch and the diastolic peak; the 0.5–5 Hz band had turned the slow decay into a spiky, overshooting trace.
 2. Every 1 s, compute the ratio of ratios over the last 4 s:
    $$R = \frac{\mathrm{RMS}(AC_{red})}{\mathrm{RMS}(AC_{IR})}$$
    Working on ln(I) makes this equal to (AC/DC)_red / (AC/DC)_IR for small pulsations.
@@ -223,6 +234,16 @@ $$P_{sensor}(t) = P_c(t) + G\,[v(p_{art} - P_c) - v(DBP - P_c)],\qquad G = 3\ \t
 4. MAP_osc is the cuff pressure at the maximum amplitude A_m.
 5. **Fixed-ratio method** (Geddes 1982; Forouzanfar 2015): SBP is the cuff pressure above the maximum where the envelope falls to K_s·A_m. DBP is the pressure below the maximum where it falls to K_d·A_m. Defaults are K_s = K_d = 0.55, adjustable. These are the ratios that return the set SBP and DBP for this arctangent artery. Real devices use proprietary ratios, reported as K_s 0.45–0.73 and K_d 0.69–0.83 (Forouzanfar 2015), because a real artery's pressure–volume curve differs from this one. Crossings are linearly interpolated.
 6. If the systolic point is not found (cuff not inflated high enough), the cuff re-inflates once to 50 mmHg higher.
+7. **Stop by the user.** Stopping a running measurement (inflating or deflating) dumps the cuff and records the attempt as `cancelled`, not as a failed measurement. It does not raise the NIBP-failed technical alarm, it keeps the last valid reading on the tile and in the oscillogram view, and the history table shows the row as "cancelled by user". A new measurement can be started at once.
+
+**Cuff strip between measurements.** A measurement takes about 35 s, so on the 60 s sweep the cycle scrolls out soon after it ends and the strip would show a flat 0 mmHg line until the next one. While the cuff is empty, the strip therefore shows the last completed or failed cycle (the newest result keeps its cuff pressure at 100 Hz; older results drop it):
+
+- the recorded cuff pressure against a labelled mmHg axis and a seconds axis;
+- dashed SYS, MAP and DIA markers where the deflating cuff passed the reported values;
+- the oscillation (the reading minus its 2 s centred moving average, deflation only) in a band underneath, magnified ×1, ×2, ×5 … so that it fills the band. A scale bar in mmHg and the largest beat amplitude (peak-to-trough) are printed with it. At 120/80 the largest beat is about 2.5 mmHg, less than 1 px on a 0–300 mmHg axis, which is why it cannot be seen without magnification;
+- a comparison line: the NIBP reading, the arterial-line estimate at the end of the cycle, their difference (NIBP − ART, systolic/diastolic and mean), and the set values.
+
+The label says how long ago the cycle ended in simulated time. During a measurement the live sweep returns, with labelled tick lines at 0–250 mmHg. In the bedside view the strip gets at least 150 px (160 px on a phone) so the axes stay readable. A failed cycle is shown with its error message instead of the markers.
 
 **Derived values.** The app also reports two values calculated from SBP and DBP. Their source is marked `derived`:
 
@@ -281,7 +302,7 @@ The phase constants, the time constants and the 15 %/85 % split are **illustrati
 
 **Estimator (monitor side).** A breath starts when c rises above a threshold. The threshold is 4 mmHg for the first breath. After that it is max(2, 0.5 · (last EtCO₂ − last minimum) · exp(−Δt/6 s)), where Δt is the time since the last breath ended. The breath ends when c falls below FiCO₂ + 0.5 · (breath maximum − FiCO₂).
 
-- EtCO₂ = the maximum of the breath.
+- EtCO₂ = the maximum of the breath, read on a 5-sample (100 ms) moving average of the 50 Hz signal. Without the average the maximum of the 0.25 mmHg noise read EtCO₂ 0.3–0.4 mmHg high on average; with it the mean error is within 0.1 mmHg at RR 12–30 and EtCO₂ 24–58 mmHg (section 9a of `SIMULATION_AUDIT.md`). A NaN sample clears the average.
 - FiCO₂ = the minimum during inspiration.
 - awRR (airway respiratory rate) = 60 / mean of the last 4 breath intervals, reported once at least 2 intervals exist.
 - All three are null if no breath was detected within the apnea delay.
@@ -354,7 +375,7 @@ These rules are **not a validated arrhythmia algorithm**. A clinical arrhythmia 
 | Channel | Stages | Readout |
 |---|---|---|
 | ECG | patient model (mV) → electrodes, amplifier and ADC → display filter → Pan–Tompkins integrator output with the adaptive threshold and the detected QRS marks | HR, rhythm, QRS width |
-| SpO₂ / pleth | red channel → IR channel → ln, 0.5–5 Hz band-pass, inverted | R, SpO₂ (instant and averaged), SQI, status |
+| SpO₂ / pleth | red channel → IR channel → ln, 0.5–5 Hz band-pass (R, pulse peaks); 0.1–10 Hz band-pass, inverted (pleth trace, PI) | R, SpO₂ (instant and averaged), SQI, status |
 | Respiration | demodulated impedance (Ω) → 0.1–1 Hz band-pass with the ± hysteresis thresholds and breath marks | RR, threshold |
 | Arterial line | pressure in the artery → transducer output with the true pressure drawn behind it, on the same scale | SYS/DIA (MAP), f_n, ζ, height |
 | Capnography | CO₂ partial pressure | EtCO₂, FiCO₂, awRR |
@@ -365,7 +386,7 @@ The last stage can be saved as a PNG image.
 
 **Lessons tab** (`src/lessons/lessons.js`, `src/ui/lessonsPanel.js`). Eight guided lessons: ECG signal chain, pulse oximetry, NIBP, rhythms, capnography, arterial line, alarms and deterioration before cardiac arrest (8–10 min each). Each lesson has objectives, a button that loads its scenario (preset), steps that can set controls or open a tab, and a quiz of 3 multiple-choice questions with an explanation for each answer. A unit test checks that the quiz answers about the model (for example the ratio R of the desaturation preset) agree with the simulator. The best score per lesson is kept in the browser's `localStorage` only; it is not measurement data.
 
-**Monitor screen.** Six sweeping waveforms: ECG, pleth (auto scale), ART (0–200 mmHg), respiration (auto scale), CO₂ (0–60 mmHg) and cuff pressure (0–300 mmHg). Respiration, CO₂ and cuff sweep at 6.25 mm/s. The HR tile also shows the rhythm label and the PVC rate. The ART tile shows SYS/DIA (MAP) with the set point and the SYS limits. The EtCO₂ tile shows FiCO₂ and awRR. The page layout adapts to narrow screens (one column at 1100 px and below, a phone layout at 720 px and below).
+**Monitor screen.** Six sweeping waveforms: ECG, pleth (auto scale), ART (optimum scale: the range snaps to 20 mmHg steps around the visible sweep, e.g. 40–140 mmHg at 120/80, and is printed in the label), respiration (auto scale), CO₂ (0–60 mmHg) and cuff pressure (0–300 mmHg). Respiration, CO₂ and cuff sweep at 6.25 mm/s. The HR tile also shows the rhythm label and the PVC rate. The ART tile shows SYS/DIA (MAP) with the set point and the SYS limits. The EtCO₂ tile shows FiCO₂ and awRR. The page layout adapts to narrow screens (one column at 1100 px and below, a phone layout at 720 px and below).
 
 ### 3.12 Scenarios (presets) and the scenario selector
 
@@ -657,7 +678,7 @@ The WebView page is served from the app's own assets and has no network access; 
 ## 8. Assumptions
 
 1. A single ECG lead with fixed P, QRS and T shapes (durations in seconds, independent of rate) and a QT that follows the Framingham formula (section 3.1). Real QT also lags rate changes by 1–2 minutes (QT hysteresis); the model QT follows the previous R–R interval at once. The arrhythmia patterns (AF, SVT, PVC, VT, VF, asystole) are simplified teaching shapes. No other conduction disorders are modelled.
-2. Arterial pressure comes from a three-element Windkessel with a fixed ejection-flow shape and a fixed 0.20 s arrival time (section 3.2). There are no reflected waves and no dicrotic notch. Pressure, PPG, capnogram and respiration share the same beat and breath times.
+2. Arterial pressure comes from a three-element Windkessel with a fixed ejection-flow shape and a user-set arrival time (`pat_ms`, default 0.20 s, section 3.2) shared by the arterial line and the pleth. The incisura comes from a brief valve-closure backflow; the dicrotic wave after it is an illustrative rebound, not a computed reflection. The pleth uses a delayed copy of the pressure for the reflected wave (Millasseau SI regression), not a transmission-line model. Pressure, PPG, capnogram and respiration share the same beat and breath times.
 3. The PPG is two-wavelength transmission with a linear R-to-SpO₂ calibration. No venous pulsation, no ambient light, no dyshaemoglobins.
 4. Respiration is a regular oscillator with I:E = 1:2. No sighs. Expiratory obstruction is shown only in the capnogram shape, not in the impedance signal.
 5. The capnogram is a phase-driven shape, not a gas-exchange model. It behaves like a mainstream sensor: there is no transit delay and no rise-time filtering of a sidestream sampling line.
@@ -681,6 +702,7 @@ These were observed or are known from the model design:
 - **HR in the AF pattern** varies with the irregular intervals (set 110: mean 112.7, range 91–140 bpm over 40 s after an 8-beat average). Earlier versions read 75–85 bpm because short beats had a small QRS; that was fixed in the ECG audit.
 - **Pulse oximeter PI in AF** reads above the set value (4.2 for a set 3.0), because the peak-to-peak window includes the strongest beat after a long interval.
 - **RR estimate** is null for the first breaths after a start or reset.
+- **Pulse arrival time** is one value for both the arterial line and the finger pleth, and it is not coupled to pressure, stiffness or heart rate (section 3.2). On a real patient the finger pulse arrives later than a radial pulse, and PAT shortens as pressure rises.
 - **SpO₂ calibration** is the linear example line, not a device calibration.
 - **Imported timestamps without a time zone** are read in the zone chosen in the import panel. Device clocks that carry no zone information cannot be corrected automatically.
 - A column named `rr` is read as respiratory rate, not as an RR interval.

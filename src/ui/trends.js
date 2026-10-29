@@ -158,5 +158,138 @@
     }
   }
 
-  root.PM.trends = { drawTrend, drawOscillogram, niceTicks };
+  /** Centred moving average over 2k+1 samples (fewer at the ends). */
+  function movingAverage(x, k) {
+    const out = new Float32Array(x.length);
+    let s = 0, a = 0, b = -1;
+    for (let i = 0; i < x.length; i++) {
+      const lo = Math.max(0, i - k), hi = Math.min(x.length - 1, i + k);
+      while (b < hi) s += x[++b];
+      while (a < lo) s -= x[a++];
+      out[i] = s / (b - a + 1);
+    }
+    return out;
+  }
+
+  /**
+   * Split a recorded cuff trace into the slow cuff pressure (2 s centred moving average)
+   * and the oscillation riding on it (reading minus that average, deflation only), and
+   * find when the deflation passed the SYS, MAP and DIA the algorithm reported. Pure.
+   */
+  function cuffCycle(trace, res) {
+    const x = trace.samples, fs = trace.fs, k = fs, d0 = trace.defl || 0;
+    const slow = movingAverage(x, k), osc = new Float32Array(x.length).fill(NaN);
+    let oscMax = 0;
+    for (let i = d0 + k; i < x.length - k; i++) { osc[i] = x[i] - slow[i]; oscMax = Math.max(oscMax, Math.abs(osc[i])); }
+    const cross = p => {
+      if (!Number.isFinite(p)) return null;
+      for (let i = d0; i < x.length; i++) if (slow[i] <= p) return i / fs;
+      return null;
+    };
+    return { slow, osc, oscMax, dur: x.length / fs, sys: cross(res.sbp), map: cross(res.mapOsc), dia: cross(res.dbp) };
+  }
+
+  /** Largest of 1, 2, 5 × 10^n not above x (at least 1). */
+  const niceGain = x => {
+    if (!(x >= 1)) return 1;
+    const mag = Math.pow(10, Math.floor(Math.log10(x)));
+    return [5, 2, 1].map(m => m * mag).find(g => g <= x);
+  };
+
+  /**
+   * The whole last NIBP cycle on the cuff strip: cuff pressure against time with a pressure
+   * and a time axis, the oscillation magnified in a band below, dashed markers where the
+   * deflation passed SYS / MAP / DIA, and the reading set against the arterial line and the
+   * set values. o: {res (with res.trace), art: {sys, dia, map} | null, set: {sbp, dbp},
+   * truthMap, color, artColor}.
+   */
+  const cycles = new WeakMap();
+  function drawCuffCycle(canvas, o) {
+    const { ctx, w, h } = fitCanvas(canvas);
+    ctx.clearRect(0, 0, w, h);
+    const res = o.res, tr = res.trace, x = tr.samples;
+    let c = cycles.get(tr);
+    if (!c) { c = cuffCycle(tr, res); cycles.set(tr, c); }
+    // short strips (a squeezed bedside layout) get a thinner band so the pressure plot keeps most of the height
+    const L = 30, R = 8, T = 42, B = 14, bandH = h < 150 ? 18 : 28;
+    const pw = w - L - R, ph = Math.max(20, h - T - B - bandH - 6), bandMid = h - B - bandH / 2;
+    let pMax = 0;
+    for (const v of c.slow) if (v > pMax) pMax = v;
+    const p1 = Math.ceil((pMax + 10) / 50) * 50;
+    const X = s => L + s / c.dur * pw, Y = p => T + (1 - p / p1) * ph;
+    ctx.font = '10px system-ui, sans-serif'; ctx.lineWidth = 1;
+
+    // axes: mmHg on the left, seconds since the cycle started underneath
+    const pt = niceTicks(0, p1, Math.max(2, Math.floor(ph / 14)));
+    ctx.strokeStyle = 'rgba(200,210,225,0.18)'; ctx.setLineDash([3, 4]); ctx.beginPath();
+    for (const p of pt) { const y = Math.round(Y(p)) + 0.5; ctx.moveTo(L, y); ctx.lineTo(w - R, y); }
+    ctx.moveTo(L, Math.round(bandMid) + 0.5); ctx.lineTo(w - R, Math.round(bandMid) + 0.5);
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(200,210,225,0.65)'; ctx.textAlign = 'right';
+    for (const p of pt) ctx.fillText(String(p), L - 4, Y(p) + 3);
+    ctx.textAlign = 'center';
+    for (const s of niceTicks(0, c.dur, Math.max(2, Math.floor(pw / 60)))) ctx.fillText(s + ' s', Math.min(X(s), w - R - 10), h - 3);
+    ctx.textAlign = 'start';
+
+    // markers where the deflating cuff passed the reported values
+    const marks = res.error ? [] : [[c.sys, res.sbp, 'SYS', '#ffd27a'], [c.map, res.mapOsc, 'MAP', '#9ae6b4'], [c.dia, res.dbp, 'DIA', '#7cc7ff']];
+    marks.forEach(([s, p, lab, col], i) => {
+      if (s === null) return;
+      const xm = Math.round(X(s)) + 0.5;
+      ctx.strokeStyle = col; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(xm, T); ctx.lineTo(xm, h - B); ctx.stroke(); ctx.setLineDash([]);
+      const txt = lab + ' ' + Math.round(p), tw = ctx.measureText(txt).width;
+      ctx.fillStyle = col; ctx.fillText(txt, xm + 3 + tw > w - 2 ? xm - 3 - tw : xm + 3, T + 9 + (ph >= 40 ? 11 * i : 0));
+      ctx.beginPath(); ctx.arc(xm, Y(p), 2.5, 0, 2 * Math.PI); ctx.fill();
+    });
+
+    // cuff pressure as recorded (the oscillation is the small ripple on it)
+    ctx.strokeStyle = o.color; ctx.lineWidth = 1.4; ctx.beginPath();
+    for (let i = 0; i < x.length; i++) { const px = X(i / tr.fs), py = Y(x[i]); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.stroke();
+
+    // oscillation band, magnified ×N relative to the pressure axis above
+    const pxPerMmHg = ph / p1;
+    const gain = c.oscMax > 0 ? niceGain((bandH / 2 - 2) / (c.oscMax * pxPerMmHg)) : 1;
+    ctx.strokeStyle = o.color; ctx.lineWidth = 1; ctx.beginPath();
+    let on = false;
+    for (let i = 0; i < x.length; i++) {
+      const v = c.osc[i];
+      if (v !== v) { on = false; continue; }
+      const px = X(i / tr.fs), py = bandMid - v * gain * pxPerMmHg;
+      on ? ctx.lineTo(px, py) : ctx.moveTo(px, py); on = true;
+    }
+    ctx.stroke();
+    // scale bar in the axis gutter, so band heights can be read in mmHg
+    const pxPer = gain * pxPerMmHg, bar = [5, 2, 1, 0.5].find(v => v * pxPer <= bandH - 4) || 0.5;
+    ctx.strokeStyle = 'rgba(200,210,225,0.85)'; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(L - 5, bandMid + bar * pxPer / 2); ctx.lineTo(L - 5, bandMid - bar * pxPer / 2); ctx.stroke();
+    const amps = (res.envelope || []).filter(b => !b.rejected).map(b => b.amp);
+    const am = amps.length ? Math.max(...amps) : null;
+    const bandText = ['oscillation ×' + gain + ' · bar ' + bar + ' mmHg' + (am ? ' · largest beat ' + am.toFixed(1) + ' mmHg peak-to-trough' : ''),
+      'oscillation ×' + gain + ' · bar ' + bar + ' mmHg' + (am ? ' · largest ' + am.toFixed(1) : ''),
+      '×' + gain + ' · bar ' + bar + ' mmHg'].find(s => ctx.measureText(s).width <= pw - 8) || '×' + gain;
+    ctx.fillStyle = 'rgba(200,210,225,0.75)';
+    ctx.fillText(bandText, L + 4, h - B - bandH + 8);
+
+    // comparison line under the strip label
+    const r = Math.round, sg = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(r(v));
+    const parts = [];
+    if (res.error) parts.push(['Failed: ' + res.error, '#ff9b9b']);
+    else {
+      parts.push(['NIBP ' + r(res.sbp) + '/' + r(res.dbp) + ' (' + r(res.mapOsc) + ')', o.color]);
+      if (o.art) {
+        parts.push(['ART ' + r(o.art.sys) + '/' + r(o.art.dia) + ' (' + r(o.art.map) + ')', o.artColor]);
+        parts.push(['NIBP−ART ' + sg(res.sbp - o.art.sys) + '/' + sg(res.dbp - o.art.dia) + ' (' + sg(res.mapOsc - o.art.map) + ')', 'rgba(200,210,225,0.85)']);
+      }
+    }
+    if (o.set) parts.push(['set ' + r(o.set.sbp) + '/' + r(o.set.dbp) + (Number.isFinite(o.truthMap) ? ' (' + r(o.truthMap) + ')' : ''), 'rgba(200,210,225,0.6)']);
+    ctx.font = '11px system-ui, sans-serif';
+    const gap = 14, width = () => parts.reduce((s, [t]) => s + ctx.measureText(t).width, 0) + gap * (parts.length - 1);
+    while (parts.length > 1 && width() > w - 8) parts.pop();
+    let lx = 4;
+    for (const [t, col] of parts) { ctx.fillStyle = col; ctx.fillText(t, lx, 28); lx += ctx.measureText(t).width + gap; }
+    return { cycle: c, gain, bar, bandText, shown: parts.map(p => p[0]) };
+  }
+
+  root.PM.trends = { drawTrend, drawOscillogram, drawCuffCycle, cuffCycle, niceTicks };
 })(this);

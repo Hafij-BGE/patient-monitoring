@@ -239,3 +239,9 @@ Used by `src/sim/glucose.js` (TECHNICAL_REPORT.md section 3.13). The model is a 
     Supports: BSA = 0.024265 · W^0.5378 · H^0.3964 (BSA option).
 92. **Gellish RL, Goslin BR, Olson RE, et al.** Longitudinal modeling of the relationship between age and maximal heart rate. *Med Sci Sports Exerc.* 2007;39(5):822–829. doi:10.1097/mss.0b013e31803349c6. PMID 17468581.
     Supports: HRmax = 207 − 0.7 · age (maximal heart rate option).
+93. **Millasseau SC, Kelly RP, Ritter JM, Chowienczyk PJ.** Determination of age-related increases in large artery stiffness by digital pulse contour analysis. *Clin Sci (Lond).* 2002;103(4):371–377. doi:10.1042/cs1030371. PMID 12241535.
+    Supports: the finger volume pulse has a direct (systolic) and a reflected (diastolic) peak; their delay ΔT gives the stiffness index SI = height/ΔT, with SI = 0.63 + 0.086·age + 0.042·MAP m/s (87 subjects, 21–68 years). Used for the reflection delay of the simulated pleth.
+94. **Chowienczyk PJ, Kelly RP, MacCallum H, et al.** Photoplethysmographic assessment of pulse wave reflection: blunted response to endothelium-dependent β2-adrenergic vasodilation in type II diabetes mellitus. *J Am Coll Cardiol.* 1999;34(7):2007–2014. doi:10.1016/s0735-1097(99)00441-6. PMID 10588217.
+    Supports: the notch/inflection of the digital volume pulse reflects pressure-wave reflection; nitrates lower it; the time between the first and second peak correlates with aortic transit time (r = 0.75). Basis for the reflection-gain parameter and its help text.
+95. **Millasseau SC, Ritter JM, Takazawa K, Chowienczyk PJ.** Contour analysis of the photoplethysmographic pulse measured at the finger. *J Hypertens.* 2006;24(8):1449–1456. doi:10.1097/01.hjh.0000239277.05068.87. PMID 16877944.
+    Supports: review of the digital volume pulse contour (systolic peak, notch or inflection, diastolic peak) and how vasoactive drugs, age and arterial stiffness change it.

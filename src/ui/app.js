@@ -21,11 +21,32 @@
     ecg: new SV($('#cvEcg'), { ring: () => engine.ecgS, fs: () => engine.ecgS.fs, color: cssVar('--ecg') || '#5ee07a', scale: 'ecg', grid: true }),
     pleth: new SV($('#cvPleth'), { ring: () => engine.plethS, fs: () => E.PPG_FS, color: cssVar('--pleth') || '#5ec8ff', scale: 'auto' }),
     resp: new SV($('#cvResp'), { ring: () => engine.respS, fs: () => E.RESP_FS, color: cssVar('--resp') || '#ffd36b', scale: 'auto' }),
-    art: new SV($('#cvArt'), { ring: () => engine.artS, fs: () => E.ART_FS, color: cssVar('--art') || '#ff5a5a', scale: [0, 200] }),
-    co2: new SV($('#cvCo2'), { ring: () => engine.capS, fs: () => E.CAP_FS, color: cssVar('--co2') || '#e6e6e6', scale: [0, 60] }),
-    cuff: new SV($('#cvCuff'), { ring: () => engine.cuffS, fs: () => E.CUFF_FS, color: cssVar('--cuff') || '#ff9de2', scale: [0, 300] }),
+    art: new SV($('#cvArt'), { ring: () => engine.artS, fs: () => E.ART_FS, color: cssVar('--art') || '#ff5a5a', scale: 'optimum', unit: 'mmHg', label: $('.wave[data-ch="art"] .wave-scale') }),
+    co2: new SV($('#cvCo2'), { ring: () => engine.capS, fs: () => E.CAP_FS, color: cssVar('--co2') || '#e6e6e6', scale: [0, 60], ticks: [0, 20, 40] }),
+    cuff: new SV($('#cvCuff'), { ring: () => engine.cuffS, fs: () => E.CUFF_FS, color: cssVar('--cuff') || '#ff9de2', scale: [0, 300], ticks: [0, 50, 100, 150, 200, 250] }),
   };
   $$('.wave[data-ch="resp"] .wave-scale, .wave[data-ch="co2"] .wave-scale, .wave[data-ch="cuff"] .wave-scale').forEach(s => { s.textContent += ' · ' + SLOW_SWEEP + ' mm/s'; });
+
+  const cuffScale = $('.wave[data-ch="cuff"] .wave-scale'), cuffLive = cuffScale.textContent;
+  const setText = (node, s) => { if (node.textContent !== s) node.textContent = s; };
+  const ago = s => s < 90 ? Math.round(s) + ' s ago' : Math.round(s / 60) + ' min ago';
+  /** Between measurements (cuff empty) the cuff strip shows the last whole cycle instead of a flat line. */
+  function cuffCycleRow() {
+    const n = engine.nibp;
+    if (n.state === 'inflating' || n.state === 'deflating' || n.cuff > 0) return null;
+    for (let i = nibpRows.length - 1; i >= 0; i--) {
+      if (nibpRows[i].res.cancelled) continue;
+      return nibpRows[i].res.trace ? nibpRows[i] : null;
+    }
+    return null;
+  }
+  function drawCuff() {
+    const row = cuffCycleRow();
+    if (!row) { views.cuff.draw(engine.t, SLOW_SWEEP); setText(cuffScale, cuffLive); return; }
+    PM.trends.drawCuffCycle($('#cvCuff'), { res: row.res, art: row.art, set: row.set, truthMap: row.truthMap,
+      color: cssVar('--cuff') || '#ff9de2', artColor: cssVar('--art') || '#ff5a5a' });
+    setText(cuffScale, 'last NIBP cycle, ' + ago(engine.t - row.t) + ' (simulated time)');
+  }
 
   function drawWaves() {
     const sw = engine.p.sweep;
@@ -34,7 +55,7 @@
     views.art.draw(engine.t, sw);
     views.resp.draw(engine.t, SLOW_SWEEP);
     views.co2.draw(engine.t, SLOW_SWEEP);
-    views.cuff.draw(engine.t, SLOW_SWEEP);
+    drawCuff();
   }
 
   function loop(ts) {
@@ -61,13 +82,14 @@
     if (Math.floor(f.t) % 5 === 0) refreshExt();
   };
   engine.onNibp = (res, t) => {
-    nibpRows.push({ t, res, set: { sbp: engine.p.sbp, dbp: engine.p.dbp } });
+    const f = engine.lastFrame; // arterial-line reading and model MAP at the moment of the result, for comparison
+    nibpRows.push({ t, res, set: { sbp: engine.p.sbp, dbp: engine.p.dbp }, art: f && f.est ? f.est.art : null, truthMap: f ? f.truth.map : null });
     if (nibpRows.length > 500) nibpRows.shift();
     PM.panels.renderNibpTable($('#nibpTable tbody'), nibpRows);
     drawOsc();
   };
   const drawOsc = () => {
-    const last = nibpRows[nibpRows.length - 1];
+    const last = nibpRows.slice().reverse().find(r => !r.res.cancelled);
     PM.trends.drawOscillogram($('#cvOsc'), last ? last.res : null, engine.p.nibp_ks, engine.p.nibp_kd);
   };
 
@@ -75,7 +97,11 @@
   const limText = param => {
     const L = alarms.limits[param];
     if (!L || !L.enabled) return 'alarm off';
-    return (L.low === null ? '–' : L.low) + '…' + (L.high === null ? '–' : L.high);
+    // Plain alarm band: "alarm 50–120", or one side only ("alarm < 90") when the other limit is off.
+    if (L.low === null && L.high === null) return 'alarm off';
+    if (L.high === null) return 'alarm < ' + L.low;
+    if (L.low === null) return 'alarm > ' + L.high;
+    return 'alarm ' + L.low + '–' + L.high;
   };
   const setTxt = (id, t) => { const n = $(id); if (n.textContent !== t) n.textContent = t; };
 

@@ -94,7 +94,7 @@
         const low = st.active.some(a => a.id === 'glucose:low');
         return { pass: f.maxG > 120 && near(f.G[300], 90, 15) && on < off - 10 && low,
           observed: 'peak ' + fmt(f.maxG) + ', 5 h ' + fmt(f.G[300]) + ' mg/dL; type 1 at 4 h ' + fmt(off) + ' → ' + fmt(on) + ' mg/dL with bolus; glucose:low ' + (low ? 'active' : 'not active') }; } },
-    { name: 'Derived 12-lead ECG', expected: 'lead II identical to the monitor trace; I + III = II; normal axis +30…+75°; leads off gives no signal',
+    { name: 'Derived 12-lead ECG', expected: 'lead II identical to the monitor trace; I + III = II; normal axis +30° to +75°; leads off gives no signal',
       run() { const e = sim(preset('baseline'), 12).e, n = 1500;
         const II = e.lead12[1].last(n), mon = e.ecgS.last(n), I = e.lead12[0].last(n), III = e.lead12[2].last(n);
         let dII = 0, dE = 0;

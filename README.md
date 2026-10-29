@@ -80,8 +80,8 @@ The design goal is scientific correctness and meaningful interaction, not decora
 |---|---|---|
 | **ECG** | Gaussian-event ECG after McSharry et al., QT by the Framingham formula, with teaching arrhythmias: AF, PVCs, VT, VF, asystole, SVT | Simplified Pan–Tompkins QRS detector with a rhythm classifier and PVC count; model QT/QTc on the HR tile |
 | **12-lead ECG** | Derived from the same beat as a moving heart vector (Dower transform) | Frontal QRS axis from leads I and aVF |
-| **SpO₂** | Red and infrared photoplethysmogram | Ratio-of-ratios R → SpO₂, signal-quality index, perfusion index |
-| **Arterial line (ART)** | Three-element Windkessel pressure (Weissler ejection time), with damping and transducer height error | Beat-by-beat SYS / DIA / MAP |
+| **SpO₂** | Red and infrared photoplethysmogram of a finger volume pulse with a reflected wave (Millasseau stiffness-index delay) | Ratio-of-ratios R → SpO₂, signal-quality index, perfusion index |
+| **Arterial line (ART)** | Three-element Windkessel pressure (Weissler ejection time) with a dicrotic notch at valve closure, damping and transducer height error | Beat-by-beat SYS / DIA / MAP |
 | **Respiration** | Thoracic impedance | Breath detector, RR, apnea |
 | **Capnography (CO₂)** | Capnogram with rebreathing and bronchospasm shapes | EtCO₂, FiCO₂, airway RR |
 | **NIBP** | Oscillometric cuff deflation | Envelope method: MAP at maximum oscillation, SYS / DIA by fixed ratios |
@@ -199,7 +199,7 @@ node --test tests/unit/*.test.js
 
 | Suite | Result |
 |---|---|
-| Node unit tests | **111 tests in 14 files, 111 pass** |
+| Node unit tests | **133 tests in 16 files, 133 pass** |
 | Browser self-test (`?selftest=1`, or the Tests tab) | 17 entries: **16 pass, 0 fail, 1 not run** |
 
 The entry that is not run is the Android watch-hardware check (Health Connect, BLE, export file). It is always reported as "not run" when no hardware is present, never as passed. Scenarios, expected and observed results, and what was not tested are in [`TEST_REPORT.md`](TEST_REPORT.md).
@@ -288,6 +288,7 @@ The full list is in section 9 of [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) an
 | [`REFERENCES.md`](REFERENCES.md) | 92 sources and what each one supports |
 | [`TEST_REPORT.md`](TEST_REPORT.md) | Test scenarios, expected and observed results, what was not tested |
 | [`SIMULATION_AUDIT.md`](SIMULATION_AUDIT.md) | Per-model audit after v1.4.0: what was wrong, the fix, equations and sources, tests, remaining limits |
+| [`CHANGELOG.md`](CHANGELOG.md) | Changes since v1.4.0 |
 | [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) | Step-by-step demonstration (about 11 minutes) |
 | [`DEVICE_INTEGRATION_REPORT.md`](DEVICE_INTEGRATION_REPORT.md) | Device integration removed and why; the Android-only watch routes and their status |
 | [`VIBE_CODING_PROMPT.md`](VIBE_CODING_PROMPT.md) | The prompts used to build the app |

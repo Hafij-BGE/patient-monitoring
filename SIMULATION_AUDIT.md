@@ -91,27 +91,30 @@ P = P_c + Zc·Q,   C·dP_c/dt = Q − (P_c − P∞)/R,   τ = R·C
 ```
 
 - Ejection time T_e = 413 − 1.7·HR ms (Weissler 1968 [84]), limited to 0.16 s … 0.6·RR.
-- τ is fitted by bisection so that the steady-state pressure has the set SBP and DBP. Zc = 0.06·R. When the pulse pressure is too narrow for a fit, τ is held at 4 s.
+- τ is fitted by bisection so that the steady-state pressure has the set SBP and DBP. Zc = 0.07·R. When the pulse pressure is too narrow for a fit, τ is held at 4 s.
 - P∞ (pressure the arteries fall to without inflow) is 10 mmHg.
 - Stroke volume depends on the filling time before the beat, with a 0.25 s time constant (**illustrative**). A beat after a short RR ejects less; this gives the pulse deficit in AF. Beat-to-beat contractility changes (Brookes et al. [85]) are not modelled.
-- The waveform form factor (MAP − DBP)/(SBP − DBP) comes out at 0.33–0.55 depending on rate and pressure. The true MAP is the waveform average, as in a real arterial line.
+- Ejection flow sin(πu)·(1 − u) (was (1 − 0.7u)): earlier peak flow, steeper upstroke, sharper systolic peak.
+- Incisura: after ejection a backflow of 2.5 % of the stroke volume over 30 ms, then a forward rebound of 3 % over 100 ms (both **illustrative**). Through Zc this gives a sharp dicrotic notch and a small dicrotic wave. Both shrink when less than 130 ms remains before 0.9·RR, so the notch fades at high rates. Measured at 120/80 mmHg: rise out of the notch about 8 mmHg at 60 bpm, 6 at 72, 3 at 100, 1.4–1.9 at 130–150 bpm.
+- The waveform form factor (MAP − DBP)/(SBP − DBP) comes out at 0.38–0.51 depending on rate and pressure (0.385 at 120/80 mmHg, 72 bpm). The true MAP is the waveform average, as in a real arterial line.
 - The PPG and the cardiogenic artifact of the respiration signal are driven by the same normalised pressure, so all three agree beat by beat.
+- Finger volume pulse for the PPG: the normalised pressure plus a copy delayed by ΔT = height/SI, SI = 0.63 + 0.086·age + 0.042·MAP m/s (Millasseau 2002 [93]), with reflection gain `ppg_reflection` (default 0.3; illustrative value, direction of change from Chowienczyk 1999 [94]), then a 40 ms first-order low-pass. It is rescaled to unit peak-to-trough so PI keeps its set value. This gives the systolic peak, notch and diastolic peak of the digital volume pulse [95].
 
-**Tests.** `pulse.test.js` (5 tests): the fit reproduces the set SBP/DBP over the rate and pulse-pressure range; ejection time follows Weissler; without beats the pressure decays to P∞ with time constant τ; a short RR gives a smaller beat; the NIBP reads the Windkessel pressure within 3 mmHg.
+**Tests.** `pulse.test.js` (10 tests): the fit reproduces the set SBP/DBP over the rate and pulse-pressure range; ejection time follows Weissler; without beats the pressure decays to P∞ with time constant τ; a short RR gives a smaller beat; the NIBP reads the Windkessel pressure within 3 mmHg; a notch with a rebound follows ejection at 72 bpm and lies between DBP and SBP; the notch is smaller at 150 bpm; the finger volume pulse has two maxima about ΔT apart with the diastolic one lower; without reflection it has one; engine PR and PI stay on the set values with reflection 0, 0.3 and 0.8. The four shape tests fail on the v1.4.0 code.
 
-**Limits.** No reflected wave and no dicrotic notch. A fixed 0.20 s pulse arrival time. No baroreflex: changing HR does not change the pressure.
+**Limits.** The dicrotic wave in the pressure is a stand-in, not a computed reflection; the pleth reflection is a single delayed copy, not a transmission-line model. A fixed 0.20 s pulse arrival time. No baroreflex: changing HR does not change the pressure.
 
 ## 5. Oscillometric NIBP (§3.6, `src/sim/nibp.js`)
 
 **What was wrong.** The cuff model widths (3 mmHg collapse, 15 mmHg distension) and the ratios Ks 0.50 / Kd 0.80 were tuned to the old pulse shape. With the Windkessel pulse, the oscillation maximum no longer sat at the true MAP.
 
 **Change.**
-- Arctangent widths 6 and 8 mmHg. They were fitted so that the cuff pressure at the oscillation maximum matches the waveform MAP over 10 pressure/rate cases (RMS error 0.8 mmHg in the analytic envelope).
+- Arctangent widths 4 and 7.5 mmHg (6 and 8 before the sharper pulse shape and the incisura lowered the form factor). They were fitted with `tests/tools/nibp-fit.js` so that the cuff pressure at the oscillation maximum matches the waveform MAP over 10 pressure/rate cases (RMS error 1.8 mmHg in the analytic envelope). The error surface is flat along w_collapse/w_distend ≈ 0.53; 4/7.5 was chosen over the grid optimum 1.5/2.75 (RMS 1.75) to keep the envelope width close to the earlier one.
 - Ks = Kd = 0.55, the ratios that return the set SBP and DBP with these widths. Published device ratios are Ks 0.45–0.73 and Kd 0.69–0.83 (Forouzanfar 2015); real devices differ because a real artery is not an arctangent.
 - The stop rule now ends deflation after two beats below 0.45 of the maximum (was 0.6), so the DBP point is reached.
 - The displayed MAP is the cuff pressure at the maximum, as on real oscillometric monitors.
 
-**Measured.** SBP and DBP within 2.3 mmHg of the set value in all checked cases. MAP within 3.1 mmHg, except 160/70 mmHg at 60 bpm, where MAP reads 7 mmHg low. That case has a very low form factor; real oscillometric MAP has similar errors in wide pulse pressures.
+**Measured.** SBP and DBP within 2.9 mmHg of the set value in the six checked cases (120/80, 80/46, 140/90, 160/70 at 60 bpm, 100/60 at 120 bpm, 90/50 at 50 bpm). MAP within 3.4 mmHg, except 160/70 mmHg at 60 bpm, where MAP reads 5.9 mmHg low. That case has a very low form factor; real oscillometric MAP has similar errors in wide pulse pressures.
 
 **Tests.** `sim.test.js` (NIBP accuracy, motion failure, set-point change abort), `pulse.test.js` (engine case).
 
@@ -126,7 +129,9 @@ P = P_c + Zc·Q,   C·dP_c/dt = Q − (P_c − P∞)/R,   τ = R·C
 **Change.**
 - A pulse is accepted only when the red and IR AC signals are correlated, Pearson r ≥ 0.6 over the 4 s window. Arterial pulsation moves both wavelengths together; independent noise does not. An autocorrelation gate was tried first and rejected, because it also rejected AF.
 - The signal quality index (SQI) now includes r.
-- PI uses its own 0.1–10 Hz band. It now reads 2.94 % at a set 3.0 %.
+- PI uses its own 0.1–10 Hz band. It reads 3.00 % at a set 3.0 % (2.91–3.25 % over 40–180 bpm and reflection 0–0.8).
+- The displayed pleth now uses the same 0.1–10 Hz band (inverted IR). With the 0.5–5 Hz band the high-pass turned the slow diastolic decay into an overshoot, which made the trace look spiky. R and pulse detection stay on 0.5–5 Hz.
+- The pleth is driven by the finger volume pulse (section 4), so it shows a fast upstroke, systolic peak, notch, diastolic peak and decay to baseline. PR stays within 1 bpm of HR at 40–150 bpm (186 at a set 180, where HRV jitter gives a true mean RR of 0.330 s; the ECG detector reads the same).
 - With no pulse, SpO₂, PR and PI are blanked (shown as missing), not held or guessed.
 
 **Tests.** `sim.test.js`: no pulse blanks SpO₂/PR/PI; AF is still accepted; low PI is measured, not rejected; motion biases SpO₂ toward about 85 %.
@@ -155,7 +160,41 @@ P = P_c + Zc·Q,   C·dP_c/dt = Q − (P_c − P∞)/R,   τ = R·C
 
 The under-damped line model was not changed. Its help text now cites Gardner 1981 [25] for the natural frequency / damping chart.
 
-**Disclosure.** The Windkessel upstroke is smoother than the old Gaussian shape, so the same under-damped line now overshoots by about 8 mmHg instead of more. The self-test threshold for entry 13 was lowered from "SYS ≥ 8 mmHg higher" to "SYS > 6 mmHg higher". This is a change of the test, not of the model. It was made because the old threshold sat exactly on the new overshoot.
+**Disclosure.** The Windkessel upstroke is smoother than the old Gaussian shape, so the same under-damped line now overshoots by about 8 mmHg instead of more. The self-test threshold for entry 13 was lowered from "SYS ≥ 8 mmHg higher" to "SYS > 6 mmHg higher". This is a change of the test, not of the model. It was made because the old threshold sat exactly on the new overshoot. With the sharper ejection flow and the incisura (§4) the overshoot is larger again: the self-test now reads optimal 121/80 (MAP 95) and under-damped 135/78 (MAP 95), so the threshold is met with margin.
+
+**ART display scale.** The ART trace uses an "optimum" scale (`src/ui/waveforms.js`, `optimum()`): the range snaps to 20 mmHg steps around the minimum and maximum of the visible sweep, with at least 5 mmHg of padding and a span of at least 40 mmHg. The range is kept while the trace stays at least 3 mmHg inside it, so it does not jump on every beat. The current range is printed in the label and on dashed reference lines. At 120/80 mmHg it settles at 40–140 mmHg. With the earlier fixed 0–200 mmHg scale the pulse was only about 25 px high and the dicrotic notch was hard to see. The scale changes only the drawing, not any value.
+
+## 9a. Targeted waveform audit (2026-10-29)
+
+A second pass checked each displayed channel (ECG, pleth, arterial line, impedance respiration, CO₂, NIBP cuff) and the renderer. Every number below was measured with the noise sources off unless stated, using `tests/unit/channels.test.js` or the probe scripts named in the text. The old-code numbers come from the same scripts run on commit c914f9a.
+
+### Defects found and fixed
+
+| # | Channel | Evidence (before) | Fix | After |
+|---|---|---|---|---|
+| 1 | Arterial line | A change of HR, SBP or DBP rescaled beats already ejected. At HR 72 → 40 bpm the pressure went 118 → 194 mmHg within 24 ms; at HR 72 → 120 bpm it fell 118 → 76 mmHg. Steady beat-to-beat sample step is 4–6 mmHg. | `Arterial.beat()` stores the gain of the fit that was valid at ejection; the tail of earlier beats is kept in mmHg (`src/sim/pulse.js`). | Largest sample step in the 3 s after the change: 7.2 (HR 120), 6.1 (SBP 150), 5.0 (DBP 60), 3.8 mmHg (HR 40), against 4.1–6.4 mmHg in steady state. |
+| 2 | CO₂ | EtCO₂ was the raw maximum of each breath, so the 0.25 mmHg noise biased it upward: mean error +0.38 (RR 12, 38 mmHg), +0.40 (RR 6, 58), +0.31 (RR 30, 24), +0.32 mmHg (RR 20, 38), 6 seeds each. | The detector reads the maximum of a 5-sample (100 ms) moving average (`CapnoDetector`, `src/sim/detectors.js`). | Mean error +0.06, +0.09, +0.01, +0.01 mmHg. With 80 % expiratory obstruction it is −0.22 mmHg, because the plateau is not reached before inspiration (expected for that pattern). |
+| 3 | Pleth / arterial line | The R-peak to pulse-foot delay was a hidden constant (0.20 s). | New parameter `pat_ms` (100–400 ms, default 200) in Physiological inputs; it starts both the arterial line and the pleth beat (`src/sim/params.js`, `src/sim/engine.js`). | At 150 and 300 ms the arterial foot is within ±12 ms of R + PAT, and the pleth foot lies 0–40 ms after the arterial foot. |
+| 4 | NIBP | Stop during inflation or deflation was stored as a failed measurement: state `failed`, the NIBP-failed technical alarm, and the last valid reading replaced by the error. | `Nibp.cancel()` records a `cancelled` result, dumps the cuff, keeps the last valid reading and raises no alarm; the history row reads "cancelled by user" and the oscillogram view ignores cancelled rows. | Unit test and browser check: 119/82 kept on the tile, "No active alarms", cuff at 0 mmHg, a new start is accepted. |
+| 5 | Layout | At 375 px width the scenario list (506 px), the alarm limit table and the trend source badges made the page 422–514 px wide, so the whole page scrolled sideways. | CSS only: the scenario select is capped to the viewport; single-column grids use `minmax(0, 1fr)` so wide tables scroll inside their own box; the trend source badges wrap. | Every tab is 375 px wide at 375 px (Chromium device emulation). Tablet (768 px) and desktop widths unchanged. |
+| 6 | NIBP cuff strip | The strip sweeps at 6.25 mm/s over 60 s and a measurement takes about 35 s, so the cycle scrolled out and the strip stayed flat at 0 mmHg until the next interval. The scale was 0–300 mmHg with no tick labels, and the oscillation (about 2.5 mmHg peak-to-trough at 120/80) was under 1 px high. In the bedside view the strip was about 85 px tall. | While the cuff is empty the strip shows the last cycle: mmHg and time axes, SYS/MAP/DIA markers, the oscillation magnified in its own band with a mmHg scale bar, and NIBP vs arterial line vs set values (`src/sim/nibp.js` keeps the trace, `drawCuffCycle` in `src/ui/trends.js`). The live sweep gets labelled ticks. The strip is 170 px (160 px on a phone, at least 150 px in the bedside view). | At 120/80 the reading 119/81 (98) sits within 1 mmHg of the cuff pressure under each marker. Peak-to-trough oscillation within ±0.5 s is largest at MAP (2.42 mmHg) and 0.69 (SYS) and 0.65 (DIA) of it there. Browser: desktop, 375 px phone and both bedside layouts (149 and 159 px) show axes, markers, band and comparison line with no horizontal scroll. |
+
+The arterial-line display scale (fixed 0–200 mmHg, pulse about 25 px high) was changed earlier in this pass; see section 9.
+
+### Checked and not changed
+
+- **ECG.** At 120 bpm the model R–R is 0.500 s (±2 ms) and the detector R–R within ±12 ms, HR ±1 bpm. Changing HR from 72 to 40 or 140 bpm causes no step larger than 1.25 × the steady sample step + 0.02 mV. The renderer draws 10 mm/mV and 25 mm/s (checked in pixels for the calibrated scale). The canvas is labelled "Simulated ECG waveform" and the page carries the educational-simulation notice.
+- **Arterial line.** The fit returns 120/80, 160/95 and 90/55 mmHg within ±1.5 mmHg. Under- and over-damped lines keep MAP within ±1.5 mmHg; under-damping raises SBP by more than 8 mmHg, over-damping lowers SBP by more than 5 mmHg and raises DBP by more than 1 mmHg.
+- **Pleth.** SpO₂ comes from the red/IR ratio of the two simulated channels (section 6), never from the shape of the displayed trace. During a sensor dropout the samples are NaN and the estimated numerics are null, not held or guessed.
+- **Respiration and CO₂.** The impedance cycle at RR 12 is 5.00 ± 0.02 s. The CO₂ half-rise of each breath falls 0–0.8 s after the impedance peak, so both channels share one breath clock without forced simultaneous peaks. awRR is within ±0.5 /min.
+- **Determinism.** A reset run and a run advanced in 625 steps of 16 ms are identical sample by sample to a fresh run with the same seed.
+- **Renderer.** NaN samples are drawn as hatched gaps, not as lines to zero. All points stay inside the canvas at 320 × 60, 800 × 160 and 1920 × 300 px, and the sweep width equals the canvas width divided by 25 mm/s. The arterial optimum range brackets the trace with at least 5 mmHg padding and stays fixed over 8 redraws of a steady trace.
+
+### Limits that remain
+
+- One PAT value is used for both the arterial line and the finger pleth. In a patient the finger pulse arrives later than a radial pulse, and PAT shortens as pressure or stiffness rises; here it changes only when the user sets it.
+- The ECG, pleth, arterial and CO₂ shapes are model shapes with illustrative constants; none was fitted to recorded patient signals.
+- The Windows build was not run on a Windows PC. The Linux package was built and started once (`TEST_REPORT.md` section 8 lists what was checked).
 
 ## 10. Alarm tones (§6, `src/ui/app.js`)
 
@@ -251,8 +290,9 @@ The patient banner (hidden in bedside view) shows BMI and BSA, age-normal ranges
 These are known differences from a real patient. They are also listed in TECHNICAL_REPORT §8 and §9.
 
 - Parameters do not affect each other physiologically (no baroreflex, no chemoreflex, no oxygen–CO₂ coupling). Scenarios set every value directly.
-- Fixed waveform shapes for P, QRS, T and the CO₂ curve; no reflected pressure wave.
+- Fixed waveform shapes for P, QRS, T and the CO₂ curve; the reflected wave is a delayed copy in the pleth and an illustrative rebound in the arterial pressure, not a transmission-line model.
 - No QT hysteresis.
+- One user-set pulse arrival time for both the arterial line and the pleth, not coupled to pressure or stiffness (section 9a).
 - No patient variability between runs other than seeded noise and HRV.
 - Sensor models (SpO₂ calibration, NIBP ratios, motion artifacts) are generic and not fitted to any commercial device.
 - No hardware was tested. The Android watch and BLE routes were not tested with real devices.

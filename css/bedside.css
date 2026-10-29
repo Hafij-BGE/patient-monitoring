@@ -18,7 +18,7 @@ body.bedside .bs-top { display: flex; flex: none; gap: 6px 18px; align-items: ce
   background: #0b131d; border-bottom: 1px solid var(--bs-line); font-size: 13px; font-variant-numeric: tabular-nums; }
 .bs-top .bs-bed { font-weight: 700; letter-spacing: .5px; color: #9fd8ff; }
 .bs-top .bs-sim { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 9px; border: 1px solid #f2c94c; color: #f2c94c; }
-.bs-top .bs-scn { color: var(--screen-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; }
+.bs-top .bs-scn { color: var(--screen-text); min-width: 0; max-width: 64ch; }
 .bs-top .bs-muted { color: var(--screen-muted); }
 .bs-top .bs-state.paused { color: #ffb020; font-weight: 700; }
 .bs-top .bs-clock { margin-left: auto; font-weight: 600; }
@@ -31,7 +31,8 @@ body.bedside .monitor { flex: 1 1 auto; min-height: 0; margin: 0; border-radius:
 body.bedside .waves { gap: 0; min-height: 0; border-right: 1px solid var(--bs-line); }
 body.bedside .wave { flex: 1 1 0; min-height: 0; border-bottom: 1px solid var(--bs-line); }
 body.bedside .wave[data-ch="ecg"] { flex-grow: 1.6; }
-body.bedside .wave[data-ch="cuff"] { flex-grow: .7; }
+/* the cuff strip shows the whole last cycle with axes between measurements, so it needs room */
+body.bedside .wave[data-ch="cuff"] { flex-grow: 1.4; min-height: 150px; }
 body.bedside .wave canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 body.bedside .wave-label { z-index: 1; font-size: 12.5px; left: 8px; top: 4px; }
 
@@ -68,7 +69,7 @@ body.bedside .bs-keys { display: flex; flex: none; gap: 4px; padding: 5px 8px; b
   body.bedside .waves { border-right: none; }
   body.bedside .wave { flex: none; height: 74px; }
   body.bedside .wave[data-ch="ecg"] { height: 110px; }
-  body.bedside .wave[data-ch="cuff"] { height: 56px; }
+  body.bedside .wave[data-ch="cuff"] { height: 160px; min-height: 0; }
   body.bedside .tiles { grid-auto-rows: auto; }
   body.bedside .t-val { font-size: 36px; }
   body.bedside .tile.wide .t-val, body.bedside #tArt .t-val { font-size: 30px; }

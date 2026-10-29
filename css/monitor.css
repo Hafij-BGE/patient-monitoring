@@ -44,6 +44,9 @@ code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 12.5
   linear-gradient(90deg, transparent 0 30%, var(--ecg) 30% 36%, transparent 36% 100%) 0 50%/100% 2px no-repeat, var(--screen); position: relative; }
 .logo::after { content: ""; position: absolute; left: 9px; top: 7px; width: 6px; height: 16px; border-left: 2px solid var(--ecg); border-right: 2px solid var(--ecg); transform: skewX(-12deg); }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* long scenario names must not widen the page on a phone */
+.toolbar label.inline { max-width: 100%; min-width: 0; }
+.toolbar label.inline select { max-width: calc(100vw - 110px); }
 .inline { display: inline-flex; gap: 5px; align-items: center; }
 .clock { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 8ch; }
 .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
@@ -76,7 +79,7 @@ code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 12.5
 .wave { position: relative; border-bottom: 1px solid var(--screen-line); }
 .wave canvas { display: block; width: 100%; height: 92px; }
 .wave[data-ch="ecg"] canvas { height: 140px; }
-.wave[data-ch="cuff"] canvas { height: 70px; }
+.wave[data-ch="cuff"] canvas { height: 170px; }
 .wave:last-child { border-bottom: none; }
 .wave-label { position: absolute; left: 4px; top: 2px; font-size: 11px; font-weight: 600; letter-spacing: .3px; display: flex; gap: 10px; pointer-events: none; }
 .wave-scale { color: var(--screen-muted); }
@@ -258,9 +261,11 @@ p.warn { color: var(--warn-text); background: var(--warn-bg); padding: 4px 8px; 
 }
 @media (max-width: 720px) {
   .monitor, .alarmbar, .panel, .tabs, .legend { margin-left: 8px; margin-right: 8px; }
-  .split, .control-groups, .form-grid, .derived { grid-template-columns: 1fr; }
+  /* minmax(0, 1fr): a wide table scrolls inside .table-wrap instead of widening the page */
+  .split, .control-groups, .form-grid, .derived { grid-template-columns: minmax(0, 1fr); }
+  .row.wrap > .inline { flex-wrap: wrap; min-width: 0; }
   .t-val { font-size: 32px; }
   #tArt { grid-column: span 2; }
-  .wave canvas { height: 74px; } .wave[data-ch="ecg"] canvas { height: 110px; } .wave[data-ch="cuff"] canvas { height: 60px; }
+  .wave canvas { height: 74px; } .wave[data-ch="ecg"] canvas { height: 110px; } .wave[data-ch="cuff"] canvas { height: 160px; }
   .topbar { padding: 8px; }
 }

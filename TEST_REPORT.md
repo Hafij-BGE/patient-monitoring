@@ -8,8 +8,8 @@ PM-SIM, Patient Monitor Simulator. Updated 2026-10-29 after the simulation audit
 
 | Test level | Result |
 |---|---|
-| Node unit tests (`node --test tests/unit/*.test.js`) | **111 tests in 14 files, 111 pass, 0 fail** (run 2026-10-29 after the simulation audit, see `SIMULATION_AUDIT.md`; 98 after the profile use cases; 93 after the derived 12-lead ECG; 86 after the critical-illness, stroke, heart-failure and post-operative scenarios and the extreme-low alarms; 80 after the SVT scenario and the QRS beat-time fix, 79 after the NIBP set-point fix, 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
-| Browser self-test (`index.html?selftest=1`) | **17 entries: 16 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-29 after the simulation audit: **16 pass, 0 fail, 1 not run** (section 3). |
+| Node unit tests (`node --test tests/unit/*.test.js`) | **133 tests in 16 files, 133 pass, 0 fail** (run 2026-10-29 after the cuff strip change; 130 after the waveform audit, `SIMULATION_AUDIT.md` §9a; 116 after the arterial notch and finger volume pulse, see `SIMULATION_AUDIT.md` §4 and §6; 111 after the simulation audit; 98 after the profile use cases; 93 after the derived 12-lead ECG; 86 after the critical-illness, stroke, heart-failure and post-operative scenarios and the extreme-low alarms; 80 after the SVT scenario and the QRS beat-time fix, 79 after the NIBP set-point fix, 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
+| Browser self-test (`index.html?selftest=1`) | **17 entries: 16 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-29 after the waveform audit (§9a): **16 pass, 0 fail, 1 not run** (section 3), the same as before it. |
 | Manual interaction checks in a browser | 9 earlier checks (section 4.1) and 5 checks of the new features made on 2026-10-28 (section 4.2), all as expected. |
 | Hardware tests (watch data on Android through Health Connect, native BLE Heart Rate Service, export file) | **Not run.** No watch, heart-rate sensor or Health Connect store was used. |
 | Android app | Not tested on a device. An APK file (`release/PM-SIM-1.4.0-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
@@ -31,9 +31,9 @@ The self-test runs each scenario on a fresh engine instance with a fixed seed. T
 |---|---|---|---|---|
 | 1 | Baseline preset, HR set to 72 bpm, 20 s | HR estimate within ±3 bpm of 72 | HR 72.2 bpm | pass |
 | 2 | Tachycardia preset, HR set to 135 bpm, 25 s | HR within ±4 bpm of 135; HR-high alarm active | HR 137.1 bpm, hr:high active | pass |
-| 3 | Desaturation preset, SpO₂ set to 84 %, 30 s | SpO₂ from the red/IR ratio within ±3 % of 84; SpO₂-low alarm active | SpO₂ 84.0 %, SQI 99.21, spo2:low active | pass |
+| 3 | Desaturation preset, SpO₂ set to 84 %, 30 s | SpO₂ from the red/IR ratio within ±3 % of 84; SpO₂-low alarm active | SpO₂ 84.0 %, SQI 99.07, spo2:low active | pass |
 | 4 | Sensor disconnection preset, 15 s | SpO₂ value `null`, quality `missing`, technical alarm, **no** SpO₂-low alarm | value null, quality missing, technical true, spo2:low false | pass |
-| 5 | Baseline, 120/80 mmHg, one NIBP measurement | SYS/DIA within ±10 mmHg of 120/80; MAP formula = (SYS + 2·DIA)/3 | 119/81 mmHg, MAP osc. 96, MAP formula 93.4 | pass |
+| 5 | Baseline, 120/80 mmHg, one NIBP measurement | SYS/DIA within ±10 mmHg of 120/80; MAP formula = (SYS + 2·DIA)/3 | 119/81 mmHg, MAP osc. 98, MAP formula 93.8 | pass |
 | 6 | Motion artifact preset (70 %), NIBP | Measurement fails with a technical alarm; no numbers reported | failed: "motion artifact (irregular oscillations)" | pass |
 | 7 | Apnea preset (RR = 0), 30 s | Apnea flagged and apnea alarm active after the 20 s delay | apnea true, alarm active | pass |
 | 8 | Input validation: DIA = 130 with SYS = 120 | Rejected with an error, previous DIA kept | error message; DIA kept at 80 | pass |
@@ -41,10 +41,10 @@ The self-test runs each scenario on a fresh engine instance with a fixed seed. T
 | 10 | Bluetooth Heart Rate Measurement parser (used by the Android app): packet `1F 2C 01 0A 00 00 04 00 02`, a no-contact packet `04 50` and a truncated packet `01 48` | u16 HR 300, contact detected, RR intervals 1.0 s and 0.5 s; no-contact packet stored with quality `artifact` and source `device`; truncated packet rejected | hr 300, contact detected, RR 1/0.5 s; no-contact artifact; truncated rejected: true (browser self-test, 2026-10-29) | pass |
 | 11 | V-Tach pattern preset, 20 s | Rhythm classified `vtach` and `rhythm:vtach` alarm active | rhythm vtach, HR 173, rhythm:vtach active | pass |
 | 12 | Hypoventilation preset (RR 6, EtCO₂ set to 58 mmHg), 30 s | EtCO₂ within ±3 mmHg of 58; EtCO₂-high alarm active after its 10 s delay | EtCO₂ 58.8 mmHg, etco2:high active | pass |
-| 13 | Arterial line: optimal vs under-damped, 120/80 mmHg, 20 s each | Optimal SYS/DIA within ±5 of 120/80; under-damped SYS > 6 mmHg higher (was ≥ 8 before the Windkessel pulse; see SIMULATION_AUDIT.md §9) with MAP within ±2 | optimal 120/80 (98), under-damped 128/79 (98) | pass |
+| 13 | Arterial line: optimal vs under-damped, 120/80 mmHg, 20 s each | Optimal SYS/DIA within ±5 of 120/80; under-damped SYS > 6 mmHg higher (was ≥ 8 before the Windkessel pulse; see SIMULATION_AUDIT.md §9) with MAP within ±2 | optimal 121/80 (95), under-damped 135/78 (95) | pass |
 | 14 | Health Connect records (Android bridge logic): one valid heart-rate record and one SpO₂ record of 150 % | Valid record stored as source `device`; SpO₂ 150 % rejected, not clamped | 1 stored (hr 61, device), 1 rejected | pass |
 | 15 | Glucose model (no diabetes: 50 g meal, 5 h; type 1: fasting 200 mg/dL, basal 0.8 U/h, 6 U bolus, 4 h; alarm engine at 60 mg/dL) | Meal peak above 120 mg/dL and back within ±15 of 90 by 5 h; bolus lowers the 4 h value by ≥ 10 mg/dL; glucose-low alarm active | peak 167, 5 h 84 mg/dL; type 1 at 4 h 200 → 104 mg/dL with bolus; glucose:low active | pass |
-| 16 | Derived 12-lead ECG: baseline preset, 12 s, then electrode contact 5 % for 2 s | Lead II of the 12-lead identical to the monitor trace; I + III = II; frontal axis +30…+75°; leads off gives no signal in all 12 leads | largest II − monitor difference 0 mV, largest I + III − II residual 2.1 × 10⁻¹⁴ mV, axis +49°, leads off: no signal | pass |
+| 16 | Derived 12-lead ECG: baseline preset, 12 s, then electrode contact 5 % for 2 s | Lead II of the 12-lead identical to the monitor trace; I + III = II; frontal axis +30° to +75°; leads off gives no signal in all 12 leads | largest II − monitor difference 0 mV, largest I + III − II residual 2.1 × 10⁻¹⁴ mV, axis +49°, leads off: no signal | pass |
 | 17 | Watch data on Android (Health Connect, BLE, export file): readings arrive with source `device` and the route in the provenance | Live readings from a real watch or sensor | **not run**: no hardware available | not run |
 
 Entry 14 tests only the page-side conversion code with records written in the test. It does not involve Health Connect or a phone. Entry 17 is reported as "not run" by design. The code never marks a hardware test as passed without hardware. Earlier versions of the self-test also had scenarios for the BLE packet replay, HL7 v2, the HL7 bed filter and MLLP framing, and FHIR/SDC import (15 entries: 13 pass, 2 not run). They were removed together with those features.
@@ -111,7 +111,7 @@ When served over `http://localhost`, the app made no network requests other than
 
 ## 6. Node unit and integration tests
 
-111 tests in 14 files (21 + 10 + 4 + 13 + 3 + 12 + 3 + 4 + 6 + 8 + 6 + 7 + 9 + 5). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
+133 tests in 16 files (21 + 10 + 4 + 13 + 3 + 12 + 3 + 4 + 6 + 8 + 10 + 6 + 7 + 9 + 14 + 3). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
 
 The first five files were already described before the new features were added. Their counts did not change.
 
@@ -235,13 +235,20 @@ These tests use records and packets written in the test. They do not involve a p
 
 These tests check the model against its own design targets and the published parameter values. They are not a validation against measured patient data.
 
-### `tests/unit/pulse.test.js` (5 tests)
+### `tests/unit/pulse.test.js` (10 tests)
 
 - The three-element Windkessel fit reproduces the set SBP/DBP over the rate and pulse-pressure range.
 - Ejection time follows Weissler (413 − 1.7·HR ms) within its limits.
 - Without beats the pressure decays toward the filling pressure with time constant τ.
 - Stroke volume depends on the preceding filling time (smaller beat after a short R–R).
 - Engine: the true MAP is the waveform area, and the NIBP reads SBP, DBP and MAP within 3 mmHg of it.
+- Arterial pressure at 72 bpm: a notch (local minimum) follows the end of ejection, then a rebound; the notch lies between DBP and SBP, and the set SBP/DBP still hold.
+- The rebound out of the notch is smaller at 150 bpm than at 72 bpm.
+- Finger volume pulse: two maxima per beat, about ΔT (Millasseau stiffness index) apart, the diastolic one lower; the trough is at end-diastole.
+- Finger volume pulse without reflection: one maximum per beat.
+- Engine: PR within 3 bpm of HR and PI within 15 % of the set value with reflection 0, 0.3 and 0.8, at 72 and 120 bpm, and at PI 0.3 %.
+
+The four waveform-shape tests were also run against the v1.4.0 code and fail there, so they detect the missing notch and reflected wave.
 
 ### `tests/unit/critical.test.js` (6 tests)
 
@@ -280,6 +287,33 @@ The cold-wet and shivering checks record limitations on purpose: the monitor mis
 
 Browser checks of the use cases (2026-10-28, local preview): switches default to calculators on, shock index on, age BP off; switching each off hides its cards or row and is kept after reload. Male 180 cm shows PBW 75.1 kg and tidal volume 451 mL; sex unspecified at 172 cm shows both values (63.3 and 67.8 kg). With age BP on, age 40 male gives 122/74, age 75 gives 133/69, age 30 via the Controls tab 119/71, and a later manual SYS of 150 is kept. With the switch off, changing age leaves the blood pressure unchanged. The hypotension scenario loads 82/48 unchanged; after an NIBP the tile shows SI 0.88 (highlighted) and Age × SI 35.
 
+### `tests/unit/channels.test.js` (14 tests)
+
+Waveform audit fixtures (`SIMULATION_AUDIT.md` §9a). Noise sources off unless stated; fixed seeds.
+
+- ECG at 120 bpm: model R–R 0.500 s ±2 ms, detector R–R ±12 ms, HR ±1 bpm.
+- ECG HR change 72 → 40 and 72 → 140 bpm: no sample step above 1.25 × the steady step + 0.02 mV.
+- Arterial fit: 120/80, 160/95, 90/55 mmHg within ±1.5 mmHg.
+- Line damping: MAP within ±1.5 mmHg; under-damped SBP > reference + 8; over-damped SBP < reference − 5 and DBP > reference + 1 mmHg.
+- Arterial line after a change of HR (120, 40), SBP (150) or DBP (60): no sample step above 1.5 × the steady step + 1 mmHg.
+- `pat_ms` 150 and 300 ms: arterial foot within ±12 ms of R + PAT; pleth foot 0–40 ms after the arterial foot (−8 ms allowed for detection).
+- EtCO₂ mean over seeds 1–4 within ±0.3 mmHg of the set value at RR/EtCO₂ 12/38, 30/24 and 8/55; awRR within ±0.5 /min.
+- CO₂ half-rise 0–0.8 s after the impedance peak; impedance cycle 5.00 ± 0.02 s at RR 12.
+- NIBP stop during deflation: state `cancelled`, cuff 0 mmHg, no NIBP-failed flag, last reading kept, a new start accepted.
+- Sensor dropout: NaN in the sample rings; estimated numerics finite or null.
+- Reset and chunked advance (625 × 16 ms): identical to a fresh run.
+- Renderer (stub canvas in a `vm` sandbox): 1 mV = 10 mm and 1 s = 25 mm in pixels; arterial optimum range brackets the trace with ≥ 5 mmHg padding and ≥ 40 mmHg span and is stable over 8 redraws; NaN drawn as hatched gaps; all points inside the canvas at 320 × 60, 800 × 160 and 1920 × 300 px; sweep width = canvas width / 25 mm/s.
+
+On commit c914f9a (before the fixes) the arterial-step, EtCO₂ and NIBP-stop tests fail (arterial step 17.7 against a limit of 4.9 mmHg; EtCO₂ mean 38.36 mmHg at a set 38, outside ±0.3; NIBP state `failed`).
+
+### `tests/unit/cuffcycle.test.js` (3 tests)
+
+The cuff strip between measurements (`SIMULATION_AUDIT.md` §9a, row 6). Quiet patient at 120/80.
+
+- The result keeps its cycle at 100 Hz with a valid deflation index; the peak is within 5 mmHg of the inflation target; the cycle lasts 20–60 s; an older result drops its trace when a new one completes.
+- The deflating cuff passes SYS, MAP and DIA in that order, within ±1 mmHg of the reported values. No oscillation is shown before deflation. Peak-to-trough oscillation within ±0.5 s of SYS and DIA is 0.4–0.85 of that at MAP.
+- Renderer (stub canvas in a `vm` sandbox) at 340 × 160, 800 × 170, 1600 × 170 and 900 × 110 px: the comparison line starts with the NIBP reading and, from 800 px, also shows ART, NIBP − ART and the set values; SYS, MAP and DIA labels; pressure ticks at 50 and 100 mmHg (at least three ticks at 110 px); time ticks; a band gain of 1, 2 or 5 × 10ⁿ with a mmHg scale bar; every text and point inside the canvas. A failed result reads "Failed: …".
+
 ## 7. Defects found and fixed during testing
 
 Defects found in the removed device code are not listed here.
@@ -288,6 +322,7 @@ Defects found in the removed device code are not listed here.
 |---|---|---|
 | Browser kept running old JavaScript after edits | Cached files | Tests served with `Cache-Control: no-store` |
 | Reset said limits were restored, but they were not | Reset did not call the alarm engine's restore function | Reset now restores the default limits |
+| Waveform defects found in the second 2026-10-29 pass (arterial step on parameter change, EtCO₂ noise bias, hidden PAT, NIBP stop counted as a failure, page wider than a phone screen) | See `SIMULATION_AUDIT.md` §9a | See `SIMULATION_AUDIT.md` §9a |
 | Model errors found in the 2026-10-29 audit (AF HR read 75–85 at a set 110, TP baseline below zero, SpO₂ read from noise in VF, hypotension MAP on the alarm limit, filter label above Nyquist, type 1 glucose effectiveness, and others) | See `SIMULATION_AUDIT.md` | See `SIMULATION_AUDIT.md`, one section per model |
 
 ## 8. Not tested and known limitations
@@ -298,6 +333,7 @@ Defects found in the removed device code are not listed here.
 - **Website:** the GitHub Pages workflow runs the unit tests before deploying. The live site at https://hafij-bge.github.io/patient-monitoring/ was not part of the testing described here.
 - **`file://`** was checked statically only (section 5).
 - Browsers other than Chromium were not tested.
+- **Desktop builds after the waveform audit:** the Linux `.deb` (1.4.0 version string, current source) was built with `desktop/build-deb.sh` and started once. Through the DevTools protocol after 7.8 s it showed HR 71, SpO₂ 97, ART 119/74, EtCO₂ 38, RR not yet reported, and all six waveform canvases drawn. Xvfb is no longer installed on the build PC, so this run used the desktop session, not a virtual display. The browser self-test was not run inside this package. The Windows `.exe` is built only by the GitHub Actions workflow and was not built or run for this pass; no Windows build has been started on a real Windows PC.
 - Model limitations observed during testing are listed in `TECHNICAL_REPORT.md` section 9: NIBP fails at motion ≥ 20 %, SpO₂ is biased toward about 85 % under motion, and the QRS detector has no search-back. Found while adding the new scenarios and not fixed: in the atrial-fibrillation scenario (set HR 110) the displayed HR is about 75–85 bpm, because short beats have a smaller QRS that the detector misses; and the low-SQI flag does not catch strong motion (0 flagged frames in 90 s for the motion and shivering scenarios).
 
 ## 9. How to repeat

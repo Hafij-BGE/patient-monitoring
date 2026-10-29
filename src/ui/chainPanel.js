@@ -32,8 +32,8 @@
           note: 'Transmitted red light. Each pulse adds blood, absorbs more light and makes a small dip on a large DC level.' },
         { tap: 'ppg.ir', name: 'Infrared channel at the photodiode', unit: 'norm.',
           note: 'Transmitted infrared light. Its pulsatile part relative to red depends on the oxygen saturation.' },
-        { tap: 'ppg.ac', name: 'ln, 0.5–5 Hz band-pass, inverted (IR)', unit: 'a.u.',
-          note: 'The AC part of ln(I). This is the pleth trace. R = RMS(AC red) / RMS(AC IR) over 4 s, then SpO₂ ≈ 110 − 25·R.' },
+        { tap: 'ppg.ac', name: 'ln, 0.1–10 Hz band-pass, inverted (IR)', unit: 'a.u.',
+          note: 'The AC part of ln(I). This is the pleth trace: systolic peak, dicrotic notch, diastolic (reflected) wave. R uses the 0.5–5 Hz band: R = RMS(AC red) / RMS(AC IR) over 4 s, then SpO₂ ≈ 110 − 25·R.' },
       ],
       readout: (f, e) => {
         const o = e.spo2Est.out;
