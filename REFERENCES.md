@@ -1,6 +1,6 @@
 # References
 
-Each entry lists what it supports in PM-SIM. Web pages were consulted in October 2026. References used only by the removed device integration (HL7 v2, MLLP, IHE PCD, IEEE 11073, FHIR, LOINC, Web Bluetooth, Web Serial, Electron) were dropped on 2026-10-28.
+Each entry lists what it supports in VitalsLab. Web pages were consulted in October 2026. References used only by the removed device integration (HL7 v2, MLLP, IHE PCD, IEEE 11073, FHIR, LOINC, Web Bluetooth, Web Serial, Electron) were dropped on 2026-10-28.
 
 ## Signal models and algorithms
 
@@ -39,7 +39,7 @@ Each entry lists what it supports in PM-SIM. Web pages were consulted in October
 ## Alarms
 
 15. **IEC 60601-1-8.** Medical electrical equipment, Part 1-8: General requirements, tests and guidance for alarm systems in medical electrical equipment and medical electrical systems.
-    Supports: vocabulary only (alarm condition, delay, priority, acknowledge, audio paused, technical versus physiological). PM-SIM does not claim compliance.
+    Supports: vocabulary only (alarm condition, delay, priority, acknowledge, audio paused, technical versus physiological). VitalsLab does not claim compliance.
 
 ## Watch data and units (Android app)
 
@@ -67,18 +67,18 @@ Each entry lists what it supports in PM-SIM. Web pages were consulted in October
 
 ## Capnography, arterial line and rhythm analysis
 
-These entries were added on 2026-10-28 with the capnography, arterial-line and arrhythmia features. The constants used in PM-SIM for these features are teaching choices and are not taken from these documents (see `TECHNICAL_REPORT.md` sections 3.8–3.10).
+These entries were added on 2026-10-28 with the capnography, arterial-line and arrhythmia features. The constants used in VitalsLab for these features are teaching choices and are not taken from these documents (see `TECHNICAL_REPORT.md` sections 3.8–3.10).
 
 25. **Gardner RM.** Direct blood pressure measurement—dynamic response requirements. *Anesthesiology.* 1981;54:227–236.
     Supports: describing a fluid-filled catheter–transducer system by its natural frequency and damping coefficient, and the effect of under- and over-damping on systolic and diastolic readings (`src/sim/engine.js`, IBP damping).
 26. **ISO 80601-2-55.** Medical electrical equipment, Part 2-55: Particular requirements for the basic safety and essential performance of respiratory gas monitors.
-    Supports: vocabulary only (end-tidal and inspired CO₂, sidestream sampling). PM-SIM does not claim compliance.
+    Supports: vocabulary only (end-tidal and inspired CO₂, sidestream sampling). VitalsLab does not claim compliance.
 27. **IEC 60601-2-27.** Medical electrical equipment, Part 2-27: Particular requirements for the basic safety and essential performance of electrocardiographic monitoring equipment.
-    Supports: the note that a clinical arrhythmia detector is tested against annotated ECG databases (`src/sim/arrhythmia.js`). The rhythm alarm priorities in `src/alarms/alarmEngine.js` are set only in the spirit of this standard. PM-SIM's rhythm analyser was not tested this way and does not claim compliance.
+    Supports: the note that a clinical arrhythmia detector is tested against annotated ECG databases (`src/sim/arrhythmia.js`). The rhythm alarm priorities in `src/alarms/alarmEngine.js` are set only in the spirit of this standard. VitalsLab's rhythm analyser was not tested this way and does not claim compliance.
 
 ## Scenario sources
 
-These entries were added on 2026-10-28 with the combined-sign scenarios in `src/sim/params.js` (preset field `refs`). Each scenario is an illustrative teaching pattern; real presentations vary and the values are not diagnostic. Where a source gives only a direction (for example "pulse pressure decreased"), the number in PM-SIM is an illustrative choice inside that direction.
+These entries were added on 2026-10-28 with the combined-sign scenarios in `src/sim/params.js` (preset field `refs`). Each scenario is an illustrative teaching pattern; real presentations vary and the values are not diagnostic. Where a source gives only a direction (for example "pulse pressure decreased"), the number in VitalsLab is an illustrative choice inside that direction.
 
 28. **Spahn DR, et al.** Management of bleeding and coagulopathy following major trauma: an updated European guideline. *Crit Care.* 2013;17:R76. doi:10.1186/cc12685. PMID 23601765.
     Supports: ATLS class II (HR 100–120, SBP normal, pulse pressure decreased, RR 20–30) and class III (HR 120–140, SBP and pulse pressure decreased, RR 30–40) (`haem-2`, `haem-3`). These ranges are the ATLS 9th-edition table quoted by this guideline; the 10th edition (2018) no longer gives numeric HR and RR ranges.
@@ -205,9 +205,9 @@ Used by `src/sim/glucose.js` (TECHNICAL_REPORT.md section 3.13). The model is a 
 76. **Caputo N, Reilly J, Kanter M, West J.** A retrospective analysis of the respiratory adjusted shock index to determine the presence of occult shock in trauma patients. *J Trauma Acute Care Surg.* 2018;84(4):674–678. doi:10.1097/TA.0000000000001761. PMID 29251715.
     Supports: shock index = HR / SBP, healthy adult range 0.5–0.7; SI alone had AUC 0.58 for occult hypoperfusion (`SI_NORMAL`, NIBP tile).
 77. **Zarzaur BL, Croce MA, Fischer PE, Magnotti LJ, Fabian TC.** New vitals after injury: shock index for the young and age x shock index for the old. *J Surg Res.* 2008;147(2):229–236. doi:10.1016/j.jss.2008.03.025. PMID 18498875.
-    Supports: age × SI predicted 48-h mortality better than HR, SBP or SI in injured patients older than 55 (AUC 0.828). The abstract gives no cut-off, so PM-SIM does not show Age × SI (removed 2026-10-29); the reference explains why only SI is shown.
+    Supports: age × SI predicted 48-h mortality better than HR, SBP or SI in injured patients older than 55 (AUC 0.828). The abstract gives no cut-off, so VitalsLab does not show Age × SI (removed 2026-10-29); the reference explains why only SI is shown.
 78. **Wright JD, Hughes JP, Ostchega Y, Yoon SS, Nwankwo T.** Mean systolic and diastolic blood pressure in adults aged 18 and over in the United States, 2001–2008. *Natl Health Stat Report.* 2011;(35):1–22, 24. PMID 21485611.
-    Supports: mean SBP/DBP by age group (18–39, 40–59, 60+) and sex, "Total" columns of Tables 2–7 (`BP_NORMS`, `bpForAge`). The group centres 28.5, 49.5 and 70 years and the linear interpolation between them are PM-SIM's own choice.
+    Supports: mean SBP/DBP by age group (18–39, 40–59, 60+) and sex, "Total" columns of Tables 2–7 (`BP_NORMS`, `bpForAge`). The group centres 28.5, 49.5 and 70 years and the linear interpolation between them are VitalsLab's own choice.
 79. **Franklin SS, Gustin W, Wong ND, et al.** Hemodynamic patterns of age-related changes in blood pressure. The Framingham Heart Study. *Circulation.* 1997;96(1):308–315. doi:10.1161/01.cir.96.1.308. PMID 9236450.
     Supports: SBP rises with age, DBP falls after age 50–60 and pulse pressure widens (unit test of `bpForAge`).
 80. **Ostchega Y, Porter KS, Hughes J, Dillon CF, Nwankwo T.** Resting pulse rate reference data for children, adolescents, and adults: United States, 1999–2008. *Natl Health Stat Report.* 2011;(41). PMID 21905522.

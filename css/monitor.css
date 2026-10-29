@@ -1,4 +1,4 @@
-/* PM-SIM — original styling. Page chrome follows the system light/dark theme;
+/* VitalsLab — original styling. Page chrome follows the system light/dark theme;
  * the monitor screen itself is always dark for waveform contrast. */
 :root {
   --bg: #f4f5f7; --panel: #ffffff; --text: #1d2330; --muted: #5d6677; --line: #d9dde5;
@@ -40,6 +40,7 @@ code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 12.5
 .topbar { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; justify-content: space-between; padding: 10px 16px; }
 .brand { display: flex; gap: 10px; align-items: center; }
 .brand .sub { margin: 0; color: var(--muted); font-size: 12px; }
+.brand .sub a { color: inherit; }
 .logo { width: 30px; height: 30px; border-radius: 8px; background:
   linear-gradient(90deg, transparent 0 30%, var(--ecg) 30% 36%, transparent 36% 100%) 0 50%/100% 2px no-repeat, var(--screen); position: relative; }
 .logo::after { content: ""; position: absolute; left: 9px; top: 7px; width: 6px; height: 16px; border-left: 2px solid var(--ecg); border-right: 2px solid var(--ecg); transform: skewX(-12deg); }
@@ -269,3 +270,24 @@ p.warn { color: var(--warn-text); background: var(--warn-bg); padding: 4px 8px; 
   .wave canvas { height: 74px; } .wave[data-ch="ecg"] canvas { height: 110px; } .wave[data-ch="cuff"] canvas { height: 160px; }
   .topbar { padding: 8px; }
 }
+
+/* community scenario sharing */
+.share-row { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 6px 0; }
+.share-row .hint { margin: 0; }
+dialog.share { width: min(640px, calc(100vw - 16px)); max-height: calc(100vh - 16px); padding: 12px 16px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); }
+dialog.share::backdrop { background: rgba(0,0,0,.55); }
+dialog.share h2 { margin: 0 0 6px; } dialog.share h3 { margin: 10px 0 4px; font-size: 14px; }
+dialog.share .warn { color: var(--warn-text); background: var(--warn-bg); padding: 6px 8px; border-radius: 6px; margin: 8px 0; }
+.share-field { display: grid; gap: 2px; margin: 8px 0; }
+.share-field span { font-weight: 600; }
+.share-field small { color: var(--muted); }
+.share-field input, .share-field textarea { width: 100%; box-sizing: border-box; padding: 5px 7px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); font: inherit; color: inherit; }
+.share-check { display: block; margin: 8px 0; }
+.share-preview { max-height: 180px; overflow: auto; margin: 0; padding: 6px 8px; font-size: 12px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); white-space: pre-wrap; word-break: break-word; }
+.share-btns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+a.button { display: inline-block; border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; text-decoration: none; color: inherit; }
+a.button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+a.button[aria-disabled="true"] { opacity: .45; pointer-events: none; }

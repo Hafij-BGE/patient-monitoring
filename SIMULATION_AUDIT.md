@@ -1,6 +1,6 @@
 # Simulation audit (after v1.4.0)
 
-PM-SIM, homework 2 "Interactive Medical Device Simulator". Author: Md. Hafijur Rahman. Audit date 2026-10-29.
+VitalsLab, homework 2 "Interactive Medical Device Simulator". Author: Md. Hafijur Rahman. Audit date 2026-10-29.
 
 This document lists every model in the simulator that was checked after release v1.4.0. For each one it states what was wrong, what was changed, the equations and parameters now used with their sources, how the result was tested and what limits remain. Numbers in brackets are entries in `REFERENCES.md`. The full model descriptions are in `TECHNICAL_REPORT.md`; the section is named in each heading.
 

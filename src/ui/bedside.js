@@ -25,7 +25,7 @@
 
   function build() {
     top = el('div.bs-top', { role: 'status', 'aria-label': 'Bedside status' }, [
-      el('span.bs-bed', { text: 'PM-SIM · BED 01' }),
+      el('span.bs-bed', { text: 'VitalsLab · BED 01' }),
       el('span.bs-sim', { text: 'SIMULATED' }),
       el('span.bs-scn', { id: 'bsScn' }),
       el('span.bs-muted', { id: 'bsSpeed' }),

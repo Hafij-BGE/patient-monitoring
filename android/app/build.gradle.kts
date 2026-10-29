@@ -13,9 +13,9 @@ val webRoot: File = rootDir.parentFile
 val wwwAssetsRoot: File = layout.buildDirectory.dir("generated/www-assets").get().asFile
 
 val syncWebAssets by tasks.registering(Sync::class) {
-    description = "Copies the PM-SIM web app (index.html, css, src, fixtures) into generated assets."
+    description = "Copies the VitalsLab web app (index.html, css, src, fixtures) into generated assets."
     from(webRoot) {
-        include("index.html", "css/**", "src/**", "fixtures/**")
+        include("index.html", "css/**", "src/**", "fixtures/**", "community/**")
     }
     into(File(wwwAssetsRoot, "www"))
 }
@@ -116,14 +116,14 @@ tasks.named("preBuild") { dependsOn(syncWebAssets) }
 
 // Copy the signed release APK next to the desktop builds.
 val copyReleaseApk by tasks.registering(Copy::class) {
-    description = "Copies the release APK to <project>/release/PM-SIM-<version>-android.apk"
+    description = "Copies the release APK to <project>/release/VitalsLab-<version>-android.apk"
     from(layout.buildDirectory.dir("outputs/apk/release")) {
         include("*.apk")
-        rename { "PM-SIM-1.5.0-android.apk" }
+        rename { "VitalsLab-${android.defaultConfig.versionName}-android.apk" }
     }
     into(File(webRoot, "release"))
     doFirst {
-        if (!haveReleaseSigning) logger.warn("PM-SIM: release signing config not found; copied APK is UNSIGNED.")
+        if (!haveReleaseSigning) logger.warn("VitalsLab: release signing config not found; copied APK is UNSIGNED.")
     }
 }
 tasks.matching { it.name == "assembleRelease" }.configureEach { finalizedBy(copyReleaseApk) }

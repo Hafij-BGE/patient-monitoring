@@ -8,7 +8,7 @@ By the owner's decision the project is a **simulator first**. On 2026-10-28 the 
 
 - **Website:** https://hafij-bge.github.io/patient-monitoring/, a static site published by `.github/workflows/pages.yml` (unit tests, then deploy). Browser-only, no backend, Content Security Policy `connect-src 'none'`. Also runs locally (`python3 -m http.server 8766`) or from `index.html`.
 - **Android app (in development):** `android/`, package `edu.deu.pmsim` 1.5.0, wraps the same page in a WebView. It is the only place where real watch data enters (Health Connect read, native BLE Heart Rate Service 0x180D, health-app export file). Nothing is hardware-tested yet.
-- **Linux desktop app (.deb):** `desktop/` (added for v1.1.0 at the owner's request), a minimal Electron shell that only shows the same page; `desktop/build-deb.sh` builds `release/PM-SIM-1.5.0-amd64.deb`.
+- **Linux desktop app (.deb):** `desktop/` (added for v1.1.0 at the owner's request), a minimal Electron shell that only shows the same page; `desktop/build-deb.sh` builds `release/VitalsLab-<version>-amd64.deb` (`PM-SIM-…` up to v1.5.0).
 
 ## Environment (inspected 2026-10-27)
 

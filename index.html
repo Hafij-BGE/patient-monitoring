@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; connect-src 'none'; media-src 'self' blob:">
-<title>PM-SIM Patient Monitor Simulator</title>
+<title>VitalsLab · Patient Monitor Simulator</title>
 <link rel="stylesheet" href="css/monitor.css">
 <link rel="stylesheet" href="css/bedside.css">
 </head>
@@ -17,8 +17,9 @@
   <div class="brand">
     <span class="logo" aria-hidden="true"></span>
     <div>
-      <h1>PM-SIM</h1>
-      <p class="sub">Interactive multiparameter patient monitor simulator, homework 2 (BMT, DEU)</p>
+      <h1>VitalsLab</h1>
+      <p class="sub">Interactive multiparameter patient monitor simulator, homework 2 (BMT, DEU) · by Md. Hafijur Rahman ·
+        <a href="https://github.com/Hafij-BGE/patient-monitoring" target="_blank" rel="noopener">github.com/Hafij-BGE/patient-monitoring</a></p>
     </div>
   </div>
   <div class="toolbar" role="toolbar" aria-label="Simulation controls">
@@ -164,6 +165,8 @@
   <p class="hint">Each control shows its unit and range; hover a name, or tick <em>Show explanations</em>, for what it does. Values outside the range are clamped with a warning.
     A scenario resets the patient and sensor settings, keeps the display settings, and highlights what it changed.</p>
   <div class="sev-legend" aria-label="Colour key"><span class="h">high-priority alarm</span><span class="m">medium-priority alarm</span><span class="l">technical alarm</span><span class="d">not the default value</span></div>
+  <p class="share-row"><button id="btnShare" type="button" title="Turn the current patient and sensor settings into a scenario other people can load">Share as community scenario…</button>
+    <span class="hint">Community scenarios are submitted as public GitHub issues and appear in the scenario list after a maintainer approves them.</span></p>
   <div id="controlMsgs" class="msgs" aria-live="polite"></div>
   <div id="controls" class="control-groups"></div>
 </section>
@@ -509,8 +512,9 @@
 </section>
 
 <footer class="foot">
-  PM-SIM is an original educational design. It does not reproduce the interface of any monitor manufacturer.
-  It runs fully offline. It makes no network requests. Measurements are not saved between sessions. Browser storage keeps only the best lesson scores, the Controls view choice and whether Bedside view is on.
+  VitalsLab (formerly PM-SIM) is an original educational design by Md. Hafijur Rahman. It does not reproduce the interface of any monitor manufacturer.
+  Source code: <a href="https://github.com/Hafij-BGE/patient-monitoring" target="_blank" rel="noopener">github.com/Hafij-BGE/patient-monitoring</a>.
+  It runs fully offline. It makes no network requests. Community scenarios are part of the page; "Share as community scenario" opens a GitHub issue only when you click it. Measurements are not saved between sessions. Browser storage keeps only the best lesson scores, the Controls view choice and whether Bedside view is on.
 </footer>
 
 <!-- logic modules (no DOM) -->
@@ -528,6 +532,8 @@
 <script src="src/sim/nibp.js"></script>
 <script src="src/sim/detectors.js"></script>
 <script src="src/sim/params.js"></script>
+<script src="src/core/community.js"></script>
+<script src="community/scenarios.js"></script>
 <script src="src/sim/glucose.js"></script>
 <script src="src/sim/engine.js"></script>
 <script src="src/alarms/alarmEngine.js"></script>
@@ -541,6 +547,7 @@
 <script src="src/ui/dom.js"></script>
 <script src="src/ui/waveforms.js"></script>
 <script src="src/ui/ecg12Panel.js"></script>
+<script src="src/ui/sharePanel.js"></script>
 <script src="src/ui/trends.js"></script>
 <script src="src/ui/panels.js"></script>
 <script src="src/ui/dataPanel.js"></script>

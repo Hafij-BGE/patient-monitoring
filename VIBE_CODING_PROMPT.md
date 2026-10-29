@@ -1,6 +1,6 @@
 # Vibe Coding Prompt
 
-PM-SIM was built with Vibe Coding. The author described the goal, constraints and acceptance criteria in natural language. An AI coding agent (Claude Code, Anthropic, model Claude Opus) then inspected the environment, wrote a plan, wrote the code and tests, ran them, and fixed defects. The author reviewed the results and gave follow-up instructions.
+VitalsLab (called PM-SIM up to v1.5.0) was built with Vibe Coding. The author described the goal, constraints and acceptance criteria in natural language. An AI coding agent (Claude Code, Anthropic, model Claude Opus) then inspected the environment, wrote a plan, wrote the code and tests, ran them, and fixed defects. The author reviewed the results and gave follow-up instructions.
 
 This file records the prompts in the order they were given. Prompts 1, 3 and 4, and the prompts in the two revision notes at the end, are reproduced verbatim. Nothing was added to them afterwards. Prompt 3 still describes the original wearable integration task; that integration was removed in the first revision note and an Android-only watch route was added in the second (2026-10-28).
 

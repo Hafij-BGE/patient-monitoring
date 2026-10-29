@@ -25,7 +25,7 @@
       el('div.e12-head', null,
         el('h2', { id: 'dlg12Title', text: 'Derived 12-lead ECG' }),
         el('div.e12-btns', null, holdBtn,
-          el('button', { type: 'button', text: 'Save PNG', onclick: () => canvasPng(cv, 'pm-sim-12lead-' + stamp() + '.png') }),
+          el('button', { type: 'button', text: 'Save PNG', onclick: () => canvasPng(cv, 'vitalslab-12lead-' + stamp() + '.png') }),
           el('button.primary', { type: 'button', text: 'Close', onclick: () => dlg.close() }))),
       info,
       el('div.e12-paper', null, cv),
@@ -118,7 +118,7 @@
     // the low-pass corner is capped at 0.49·fs (dsp.rbj), e.g. 122.5 Hz at 250 Hz sampling
     const filt = p.ecg_filter === 'monitor' ? 'monitor 0.5–40 Hz' : p.ecg_filter === 'diagnostic' ? 'diagnostic 0.05–' + +Math.min(150, 0.49 * p.ecg_fs).toFixed(1) + ' Hz' : 'no filter';
     g.fillStyle = '#1d2330'; g.font = '600 ' + Math.max(10, 3.4 * mm) + 'px system-ui, sans-serif'; g.textBaseline = 'alphabetic';
-    g.fillText('PM-SIM derived 12-lead ECG  ·  HR ' + hr + '  ·  ' + (Number.isFinite(axis) ? 'QRS axis ' + axisText(axis) : 'no QRS complexes'), 2 * mm, 6 * mm);
+    g.fillText('VitalsLab derived 12-lead ECG  ·  HR ' + hr + '  ·  ' + (Number.isFinite(axis) ? 'QRS axis ' + axisText(axis) : 'no QRS complexes'), 2 * mm, 6 * mm);
     g.font = Math.max(9, 2.8 * mm) + 'px system-ui, sans-serif'; g.fillStyle = '#5d6677';
     g.fillText(MM_S + ' mm/s  ·  ' + MM_MV + ' mm/mV  ·  ' + filt + (p.notch === 'on' ? ' + ' + p.mains_hz + ' Hz notch' : '') +
       '  ·  ' + fs + ' Hz  ·  sim t = ' + engine.t.toFixed(1) + ' s  ·  ' + new Date().toISOString().slice(0, 19).replace('T', ' '), 2 * mm, 10.2 * mm);

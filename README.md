@@ -1,6 +1,6 @@
 <div align="center">
 
-# PM-SIM
+# VitalsLab
 
 ### An interactive bedside patient-monitor simulator for teaching
 
@@ -10,7 +10,7 @@ Every number on the screen sits next to the value that generated it, so measurem
 [![Live demo](https://img.shields.io/badge/live%20demo-GitHub%20Pages-2ea44f?logo=github)](https://hafij-bge.github.io/patient-monitoring/)
 [![Release](https://img.shields.io/github/v/release/Hafij-BGE/patient-monitoring?label=release)](https://github.com/Hafij-BGE/patient-monitoring/releases/latest)
 [![Pages](https://github.com/Hafij-BGE/patient-monitoring/actions/workflows/pages.yml/badge.svg)](https://github.com/Hafij-BGE/patient-monitoring/actions/workflows/pages.yml)
-![Unit tests](https://img.shields.io/badge/unit%20tests-133%20pass-brightgreen)
+![Unit tests](https://img.shields.io/badge/unit%20tests-145%20pass-brightgreen)
 ![Dependencies](https://img.shields.io/badge/runtime%20dependencies-none-blue)
 ![Platforms](https://img.shields.io/badge/runs%20on-web%20%7C%20Linux%20%7C%20Windows%20%7C%20Android-informational)
 
@@ -26,7 +26,7 @@ Every number on the screen sits next to the value that generated it, so measurem
 > **Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.**
 
 <div align="center">
-  <img src="docs/media/demo.gif" alt="PM-SIM demo: normal rhythm, SVT, deterioration, peri-arrest and heart failure on the bedside view, then the Controls and Signal chain tabs" width="100%">
+  <img src="docs/media/demo.gif" alt="VitalsLab demo: normal rhythm, SVT, deterioration, peri-arrest and heart failure on the bedside view, then the Controls and Signal chain tabs" width="100%">
   <sub>Recorded from the app. Full-quality video (43 s, 1280 × 800, H.264): <a href="docs/media/demo.mp4">docs/media/demo.mp4</a></sub>
 </div>
 
@@ -39,6 +39,7 @@ Every number on the screen sits next to the value that generated it, so measurem
 - [What it simulates](#what-it-simulates)
 - [Features](#features)
 - [Derived 12-lead ECG](#derived-12-lead-ecg)
+- [Community scenarios](#community-scenarios)
 - [Get it](#get-it)
 - [Tests](#tests)
 - [How it works](#how-it-works)
@@ -50,9 +51,9 @@ Every number on the screen sits next to the value that generated it, so measurem
 
 ## About
 
-PM-SIM is Homework 2, *Interactive Medical Device Simulator*, for the Biomedical Technologies master's programme at Dokuz Eylül University. The assigned device is a multiparameter bedside **patient monitor**. Author: Md. Hafijur Rahman. The app was built with Vibe Coding; the prompts are in [`VIBE_CODING_PROMPT.md`](VIBE_CODING_PROMPT.md).
+VitalsLab is Homework 2, *Interactive Medical Device Simulator*, for the Biomedical Technologies master's programme at Dokuz Eylül University. The assigned device is a multiparameter bedside **patient monitor**. Author: Md. Hafijur Rahman. Source code: [github.com/Hafij-BGE/patient-monitoring](https://github.com/Hafij-BGE/patient-monitoring). VitalsLab was called PM-SIM up to v1.5.0. The app was built with Vibe Coding; the prompts are in [`VIBE_CODING_PROMPT.md`](VIBE_CODING_PROMPT.md).
 
-The design goal is scientific correctness and meaningful interaction, not decoration. A real monitor does not *know* the patient's heart rate: it estimates it from a noisy signal. PM-SIM shows that whole chain. You set the "true" physiology, choose how the sensors behave (motion, poor contact, mains noise, probe off), and watch the monitor's estimators get it right or wrong.
+The design goal is scientific correctness and meaningful interaction, not decoration. A real monitor does not *know* the patient's heart rate: it estimates it from a noisy signal. VitalsLab shows that whole chain. You set the "true" physiology, choose how the sensors behave (motion, poor contact, mains noise, probe off), and watch the monitor's estimators get it right or wrong.
 
 ## Screenshots
 
@@ -162,6 +163,21 @@ How the leads are made:
 
 A single moving dipole gives textbook shapes only: no regional ST changes, no infarct Q waves. It is a teaching view, **not a diagnostic ECG**. Sources: Dower et al. 1980, Edenbrandt and Pahlm 1988, Kligfield et al. 2007 (AHA/ACCF/HRS), [`REFERENCES.md`](REFERENCES.md) entries 69–71.
 
+## Community scenarios
+
+Anyone can propose a scenario, and approved scenarios appear for everyone under **Community scenarios** in the scenario list of the website (and of later app builds).
+
+1. Set up the patient in **Controls**: start from the baseline or from a built-in scenario and change the values.
+2. Press **Share as community scenario…**. Give it a name, an optional teaching note and the source of the numbers (guideline, textbook, DOI or PubMed ID). The dialog shows exactly what will be sent and checks it with the same rules as the server side.
+3. **Open GitHub issue…** opens a prefilled issue with the *Community scenario* template. You need a GitHub account and must tick two boxes: the values are invented or taken from teaching material, and the scenario may be published under the MIT licence with your GitHub user name.
+4. The workflow [`community-scenarios.yml`](.github/workflows/community-scenarios.yml) checks the issue and replies with the result. A maintainer reviews it and adds the `approved` label. The workflow then checks it again, adds it to [`community/scenarios.json`](community/scenarios.json), runs the unit tests, commits and redeploys the website.
+
+What the checks cover: only patient and sensor parameters (no display or filter settings), every value inside the simulator's ranges without clamping, no value equal to the baseline, no duplicate of an existing scenario's settings or name, plain-text fields of limited length. The issue text is parsed as JSON only and never reaches a shell. Only users with write access to the repository can approve.
+
+What they do not cover: **clinical plausibility**. The maintainer checks the format and the ranges, not the medicine. Community scenarios show their author, issue number and the author's own source, and are marked as illustrative and not diagnostic. They have no entries in [`REFERENCES.md`](REFERENCES.md) unless a maintainer adds them.
+
+The page itself still makes no network requests: the approved list ships with the site as a script (`community/scenarios.js`, generated from the JSON file).
+
 ## Get it
 
 No installation, no build step, no backend and no network access after loading. All computation runs on your device.
@@ -169,7 +185,7 @@ No installation, no build step, no backend and no network access after loading. 
 | Platform | How | Status |
 |---|---|---|
 | 🌐 **Web** | Open <https://hafij-bge.github.io/patient-monitoring/> in a current Chrome, Edge, Firefox or Safari | Tested |
-| 🐧 **Linux** (.deb) | [`PM-SIM-1.5.0-amd64.deb`](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.5.0/PM-SIM-1.5.0-amd64.deb), then `sudo apt install ./PM-SIM-1.5.0-amd64.deb` and start **PM-SIM** from the menu | Installed on the author's Linux PC |
+| 🐧 **Linux** (.deb) | [`PM-SIM-1.5.0-amd64.deb`](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.5.0/PM-SIM-1.5.0-amd64.deb), then `sudo apt install ./PM-SIM-1.5.0-amd64.deb` and start **VitalsLab** from the menu | Installed on the author's Linux PC |
 | 🪟 **Windows** | [Setup](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.5.0/PM-SIM-1.5.0-setup-x64.exe), [portable .exe](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.5.0/PM-SIM-1.5.0-portable-x64.exe) or [.zip](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.5.0/PM-SIM-1.5.0-win-x64.zip). Not code-signed, so SmartScreen shows a warning | Built on a GitHub Windows runner; **not yet run on a real Windows PC** |
 | 🤖 **Android** | [`PM-SIM-1.5.0-android.apk`](https://github.com/Hafij-BGE/patient-monitoring/releases/download/v1.5.0/PM-SIM-1.5.0-android.apk) (package `edu.deu.pmsim`) | In development; watch routes **not tested with real hardware** |
 
@@ -199,7 +215,7 @@ node --test tests/unit/*.test.js
 
 | Suite | Result |
 |---|---|
-| Node unit tests | **133 tests in 16 files, 133 pass** |
+| Node unit tests | **145 tests in 17 files, 145 pass** |
 | Browser self-test (`?selftest=1`, or the Tests tab) | 17 entries: **16 pass, 0 fail, 1 not run** |
 
 The entry that is not run is the Android watch-hardware check (Health Connect, BLE, export file). It is always reported as "not run" when no hardware is present, never as passed. Scenarios, expected and observed results, and what was not tested are in [`TEST_REPORT.md`](TEST_REPORT.md).
@@ -273,11 +289,12 @@ The full list is in section 9 of [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) an
 ## Privacy and safety
 
 - The page makes **no network requests**. Its Content Security Policy sets `connect-src 'none'` and loads scripts and styles only from its own folder. The website, the Android app and the desktop apps all use the same page.
+- **Sharing a community scenario is the only route by which anything leaves the page, and only when you click.** The *Share as community scenario* dialog shows the exact JSON first, never includes display settings, and leaves out the patient profile unless you tick the box. The link opens a GitHub issue page in your browser; nothing is sent until you press *Create* there. GitHub issues are public and permanent, so use invented values only.
 - Imported files are read in the browser tab and are not uploaded anywhere.
 - No measurement data is saved between sessions; reloading the page clears it. Only four settings are kept in this browser's `localStorage`: the best quiz score per lesson (`pmsim.lessons.v1`), the Controls view choice (`pmsim.controls.v1`), the Bedside view on/off state (`pmsim.bedside`) and the three profile use-case switches (`pmsim.usecases.v1`).
 - The Android app has no `INTERNET` permission and disables cloud backup. Health Connect permissions are read-only and requested from the user. This is the intended design; it has not yet been verified with real devices.
 - Only documented, vendor-neutral interfaces are used (Android Health Connect, the Bluetooth SIG Heart Rate Service, the user's own export files). No proprietary protocol is reverse-engineered.
-- PM-SIM is an original educational design. It does not reproduce the interface of any monitor manufacturer.
+- VitalsLab is an original educational design. It does not reproduce the interface of any monitor manufacturer.
 - It is not a medical device, has not been validated, and must not be used for diagnosis or patient monitoring.
 
 ## Documents

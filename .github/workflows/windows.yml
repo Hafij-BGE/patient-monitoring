@@ -29,21 +29,21 @@ jobs:
         run: |
           mkdir -p stage/web
           cp desktop/main.cjs desktop/package.json desktop/icon.png stage/
-          cp -r index.html css src fixtures stage/web/
+          cp -r index.html css src fixtures community stage/web/
       - run: npm install --no-audit --no-fund
         working-directory: stage
       - run: npx electron-builder --win --publish never
         working-directory: stage
       - uses: actions/upload-artifact@v4
         with:
-          name: pm-sim-windows
+          name: vitalslab-windows
           path: |
-            stage/dist/PM-SIM-*.exe
-            stage/dist/PM-SIM-*.zip
+            stage/dist/VitalsLab-*.exe
+            stage/dist/VitalsLab-*.zip
           if-no-files-found: error
       - name: Add the files to the release
         working-directory: stage/dist
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
-        run: gh release upload "$TAG" PM-SIM-*.exe PM-SIM-*.zip --repo "$GITHUB_REPOSITORY" --clobber
+        run: gh release upload "$TAG" VitalsLab-*.exe VitalsLab-*.zip --repo "$GITHUB_REPOSITORY" --clobber

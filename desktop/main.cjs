@@ -1,6 +1,6 @@
 'use strict';
 
-// Desktop shell for PM-SIM (Linux .deb, Windows .exe). It only shows the same web page as the
+// Desktop shell for VitalsLab (Linux .deb, Windows .exe). It only shows the same web page as the
 // website, served from app://pm-sim/ inside the package. No preload, no Node in
 // the page, no device access; the page's CSP (connect-src 'none') applies unchanged.
 
@@ -34,7 +34,7 @@ function createWindow() {
     height: 900,
     minWidth: 360,
     minHeight: 560,
-    title: 'PM-SIM',
+    title: 'VitalsLab',
     backgroundColor: '#0b1620',
     autoHideMenuBar: true,
     icon: path.join(__dirname, 'icon.png'),

@@ -1,0 +1,30 @@
+name: Community scenario
+description: Share a VitalsLab scenario (patient and sensor settings) so other users can load it.
+title: "Scenario: "
+labels: ["scenario-submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The easiest way to fill this in: open VitalsLab, set up the patient in **Controls**, then press **Share as community scenario…**. It fills in the field below.
+
+        **This issue is public.** Use invented values only. Never enter real patient data, names, dates or other identifying details.
+
+        An automatic check replies within a minute. A maintainer then reviews the scenario; when the maintainer adds the `approved` label, the scenario is added to the website and this issue is closed.
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Scenario
+      description: 'JSON with "name", optional "note", "source" and "changes" (parameter: value pairs from the Controls tab).'
+      render: json
+    validations:
+      required: true
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Confirmation
+      options:
+        - label: The values are invented or taken from published teaching material. They do not describe a real patient.
+          required: true
+        - label: I agree that the scenario is published in VitalsLab under the project's MIT licence, together with my GitHub user name.
+          required: true

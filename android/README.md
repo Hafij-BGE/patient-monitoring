@@ -1,6 +1,6 @@
-# PM-SIM for Android (WebView wrapper)
+# VitalsLab for Android (WebView wrapper)
 
-A thin Android host for the PM-SIM web app. The web files are **not** duplicated in this
+A thin Android host for the VitalsLab web app. The web files are **not** duplicated in this
 folder: at build time the Gradle task `syncWebAssets` copies `index.html`, `css/`, `src/`
 and `fixtures/` from the project root into `app/build/generated/www-assets/www`. That folder
 is registered as an assets source dir.
@@ -20,7 +20,7 @@ No Gradle wrapper is committed. Use the local Gradle 8.11.1:
 cd android
 export ANDROID_HOME=~/Android/Sdk          # or write sdk.dir into local.properties (git-ignored)
 ~/.local/opt/gradle-8.11.1/bin/gradle --offline assembleDebug     # app/build/outputs/apk/debug/app-debug.apk
-~/.local/opt/gradle-8.11.1/bin/gradle --offline assembleRelease   # also copies to ../release/PM-SIM-1.1.0-android.apk
+~/.local/opt/gradle-8.11.1/bin/gradle --offline assembleRelease   # also copies to ../release/VitalsLab-*-android.apk
 ```
 
 Leave out `--offline` the first time on a machine whose Gradle cache does not hold the
@@ -38,8 +38,8 @@ Verify:
 
 ```bash
 BT=~/Android/Sdk/build-tools/35.0.0
-$BT/apksigner verify --print-certs ../release/PM-SIM-1.1.0-android.apk
-$BT/aapt2 dump badging ../release/PM-SIM-1.1.0-android.apk | grep uses-permission
+$BT/apksigner verify --print-certs ../release/VitalsLab-*-android.apk
+$BT/aapt2 dump badging ../release/VitalsLab-*-android.apk | grep uses-permission
 ```
 
 The APK holds a **snapshot** of the web files from build time, so rebuild after you change them.
@@ -121,7 +121,7 @@ body temperature, weight, height and steps. `PrivacyActivity` handles
 `ViewPermissionUsageActivity` handles `android.intent.action.VIEW_PERMISSION_USAGE` +
 `android.intent.category.HEALTH_PERMISSIONS` (Android 14+). Both show:
 
-> PM-SIM reads the health records you allow, only to show them on this device. Nothing is
+> VitalsLab reads the health records you allow, only to show them on this device. Nothing is
 > uploaded; the app has no internet permission. Educational simulation only. Simulated values
 > and consumer wearable readings are not a substitute for clinical monitoring or medical advice.
 

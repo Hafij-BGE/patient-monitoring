@@ -1,0 +1,116 @@
+# Community scenarios submitted through the "Community scenario" issue form.
+#  - check:   on every new or edited submission, validate it and reply with the result.
+#  - approve: when a user with write access adds the "approved" label, validate again,
+#             append it to community/scenarios.json (+ scenarios.js), push, redeploy Pages
+#             and close the issue.
+# The issue text is untrusted: it is read only by tools/community-scenario.js from the
+# event file and is never put into a shell command.
+name: community-scenarios
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: community-scenarios
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: >-
+      github.event.action != 'labeled' && github.event.issue.state == 'open' &&
+      contains(github.event.issue.labels.*.name, 'scenario-submission')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: check
+        run: node tools/community-scenario.js check "$GITHUB_EVENT_PATH" "$RUNNER_TEMP/comment.md"
+      - name: Reply and label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          VALID: ${{ steps.check.outputs.valid }}
+        run: |
+          gh issue comment "$NUMBER" --body-file "$RUNNER_TEMP/comment.md"
+          if [ "$VALID" = true ]; then
+            gh issue edit "$NUMBER" --add-label scenario-valid
+            gh issue edit "$NUMBER" --remove-label scenario-invalid || true
+          else
+            gh issue edit "$NUMBER" --add-label scenario-invalid
+            gh issue edit "$NUMBER" --remove-label scenario-valid || true
+          fi
+
+  approve:
+    if: >-
+      github.event.action == 'labeled' && github.event.label.name == 'approved' &&
+      github.event.issue.state == 'open' &&
+      contains(github.event.issue.labels.*.name, 'scenario-submission')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: Only maintainers can approve
+        env:
+          SENDER: ${{ github.event.sender.login }}
+        run: |
+          perm=$(gh api "repos/$GH_REPO/collaborators/$SENDER/permission" --jq .permission)
+          case "$perm" in
+            admin|maintain|write) echo "approved by $SENDER ($perm)" ;;
+            *) gh issue edit "$NUMBER" --remove-label approved || true
+               echo "::error::$SENDER has $perm access and cannot approve"; exit 1 ;;
+          esac
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: add
+        run: node tools/community-scenario.js add "$GITHUB_EVENT_PATH" "$RUNNER_TEMP/comment.md"
+      - name: Test and push
+        id: push
+        if: steps.add.outputs.added == 'true'
+        run: |
+          node --test tests/unit/*.test.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add community/scenarios.json community/scenarios.js
+          git commit -m "Add community scenario from issue #$NUMBER"
+          git push origin HEAD:main
+          # Pushes made with the workflow token do not start other workflows; start Pages explicitly.
+          gh workflow run pages.yml --ref main
+      - name: Reply
+        if: always() && steps.add.outcome != 'skipped'
+        env:
+          ADDED: ${{ steps.add.outputs.added }}
+          PUSHED: ${{ steps.push.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$ADDED" = true ] && [ "$PUSHED" = success ]; then
+            gh issue comment "$NUMBER" --body-file "$RUNNER_TEMP/comment.md"
+            gh issue edit "$NUMBER" --add-label scenario-added
+            gh issue edit "$NUMBER" --remove-label scenario-valid || true
+            gh issue close "$NUMBER" --reason completed
+          elif [ "$ADDED" = true ]; then
+            gh issue comment "$NUMBER" --body "The scenario passed the checks, but the tests or the push failed in $RUN_URL. Nothing was added; a maintainer will look at it."
+            gh issue edit "$NUMBER" --remove-label approved || true
+          else
+            gh issue comment "$NUMBER" --body-file "$RUNNER_TEMP/comment.md"
+            gh issue edit "$NUMBER" --remove-label approved || true
+          fi

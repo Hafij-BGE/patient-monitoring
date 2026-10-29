@@ -117,10 +117,10 @@
       expBox.append(el('label.inline', null, c, ' ', el('span.badge.' + s, { text: s })));
     }
     const chosen = () => store.all().filter(x => expChecks[x.source].checked);
-    $('#btnExpCsv').addEventListener('click', () => download('pm-sim-observations-' + stamp() + '.csv', toCSV(chosen()), 'text/csv'));
-    $('#btnExpJson').addEventListener('click', () => download('pm-sim-observations-' + stamp() + '.json',
+    $('#btnExpCsv').addEventListener('click', () => download('vitalslab-observations-' + stamp() + '.csv', toCSV(chosen()), 'text/csv'));
+    $('#btnExpJson').addEventListener('click', () => download('vitalslab-observations-' + stamp() + '.json',
       toJSON(chosen(), { notice: 'Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.' }), 'application/json'));
-    $('#btnExpWave').addEventListener('click', () => download('pm-sim-waveforms-' + stamp() + '.csv', waveCSV(o.getEngine(), 10), 'text/csv'));
+    $('#btnExpWave').addEventListener('click', () => download('vitalslab-waveforms-' + stamp() + '.csv', waveCSV(o.getEngine(), 10), 'text/csv'));
 
     // ---------------------------------------------------------- summary
     function renderSummary() {

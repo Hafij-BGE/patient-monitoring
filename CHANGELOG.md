@@ -2,6 +2,16 @@
 
 Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.
 
+## Unreleased
+
+### VitalsLab and community scenarios, 2026-10-29
+
+- **Renamed PM-SIM to VitalsLab** in the page, the docs, the Linux desktop app, the Windows build and the Android app label. Release files are now `VitalsLab-<version>-…`; exported files start with `vitalslab-`. The Android package id (`edu.deu.pmsim`) and the `localStorage` keys (`pmsim.*`) stay the same, so installs update in place and saved settings are kept.
+- **Author and repository** in the page header ("by Md. Hafijur Rahman · github.com/Hafij-BGE/patient-monitoring") and the footer.
+- **Community scenarios.** *Share as community scenario…* in Controls turns the current settings into a submission, shows the exact JSON and opens a prefilled GitHub issue (`.github/ISSUE_TEMPLATE/scenario.yml`). The workflow `.github/workflows/community-scenarios.yml` checks it; when a maintainer with write access adds the `approved` label it appends the entry to `community/scenarios.json`, regenerates `community/scenarios.js`, runs the tests, commits and redeploys the website. Approved entries appear for everyone under "Community scenarios" in the scenario list. Checks: scenario parameters only, no clamping, no baseline values, no duplicate settings or names, plain text of limited length. Not checked: clinical plausibility (`src/core/community.js`, `src/ui/sharePanel.js`, `tools/community-scenario.js`).
+- **Android:** links to this repository on github.com open in the system browser; all other external links stay blocked. `community/` is bundled with the web assets, also in the Linux and Windows builds and on GitHub Pages.
+- **Tests:** `tests/unit/community.test.js` (12 tests); 145 unit tests pass. The GitHub workflow has not run on GitHub yet.
+
 ## v1.5.0 (2026-10-29)
 
 ### Shock index, 2026-10-29

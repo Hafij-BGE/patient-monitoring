@@ -159,7 +159,7 @@
     }
     sel.addEventListener('change', () => { build(); draw(); });
     $('#chPng').addEventListener('click', () => {
-      if (canvases.length) canvasPng(canvases[canvases.length - 1], 'pm-sim-chain-' + sel.value + '-' + stamp() + '.png');
+      if (canvases.length) canvasPng(canvases[canvases.length - 1], 'vitalslab-chain-' + sel.value + '-' + stamp() + '.png');
     });
 
     function draw() {

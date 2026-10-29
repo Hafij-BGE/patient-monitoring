@@ -1,6 +1,6 @@
 # Demo Script
 
-A demonstration of PM-SIM in about 11 minutes. Each step names what to click, what to say and what the audience should see. Times are cumulative.
+A demonstration of VitalsLab in about 11 minutes. Each step names what to click, what to say and what the audience should see. Times are cumulative.
 
 > **Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.**
 
@@ -17,7 +17,7 @@ A demonstration of PM-SIM in about 11 minutes. Each step names what to click, wh
 
 **Say:**
 
-- PM-SIM simulates a multiparameter bedside monitor: ECG, pulse oximetry, respiration, capnography (CO₂), invasive arterial pressure, non-invasive blood pressure and temperature.
+- VitalsLab simulates a multiparameter bedside monitor: ECG, pulse oximetry, respiration, capnography (CO₂), invasive arterial pressure, non-invasive blood pressure and temperature.
 - The signals come from published models. The numbers are then measured *from those signals* by simplified monitor algorithms, the way a real monitor does it.
 - Point at the notice bar: this is an educational simulation, not a medical device.
 - Point at one tile: the large number is the measured value, the small "set" value under it is what the model was told. The difference is the measurement error. The badge shows the data source (here `simulated`).
@@ -147,7 +147,7 @@ Use this step if time allows; it is not counted in the 11 minutes.
 
 ## 10. Watch data on Android (9:30–10:00)
 
-This part is a short spoken note, or an optional demonstration if a phone is available. Real watch data enters PM-SIM only through the Android app, which wraps the same page. In a normal browser the "On this phone" panel is hidden. The Android app has **not been tested with real hardware**, so do not present any result from it as verified.
+This part is a short spoken note, or an optional demonstration if a phone is available. Real watch data enters VitalsLab only through the Android app, which wraps the same page. In a normal browser the "On this phone" panel is hidden. The Android app has **not been tested with real hardware**, so do not present any result from it as verified.
 
 **Say:**
 

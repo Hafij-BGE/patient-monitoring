@@ -1,6 +1,6 @@
 # Device Integration Report
 
-What device integration PM-SIM had, why it was removed, and how real watch data can still reach the app through the Android version. Rewritten on 2026-10-28, and updated later the same day for the in-page Android panel and the export route.
+What device integration VitalsLab had, why it was removed, and how real watch data can still reach the app through the Android version. Rewritten on 2026-10-28, and updated later the same day for the in-page Android panel and the export route.
 
 > **Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.**
 
@@ -25,7 +25,7 @@ The Data import tab now reads CSV/JSON tables only. Manual entry and CSV/JSON ex
 
 ## 3. Watch data: Android app only
 
-The Android app (`android/`, package `edu.deu.pmsim`, version 1.5.0) wraps the same web page in a WebView. It is the **only** place where real watch data enters PM-SIM. The watch can be an HONOR watch or any other watch. There are three routes:
+The Android app (`android/`, package `edu.deu.pmsim`, version 1.5.0) wraps the same web page in a WebView. It is the **only** place where real watch data enters VitalsLab. The watch can be an HONOR watch or any other watch. There are three routes:
 
 | Route | How it works | Limits |
 |---|---|---|

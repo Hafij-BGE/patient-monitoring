@@ -38,7 +38,7 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 
 /**
- * Single-activity WebView host for the PM-SIM web app. The page is served from the APK
+ * Single-activity WebView host for the VitalsLab web app. The page is served from the APK
  * assets through [WebViewAssetLoader] at https://appassets.androidplatform.net/assets/www/.
  * Everything else (other hosts, external apps) is blocked. The app has no INTERNET permission.
  */
@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val TAG = "PMSIM"
         const val HOST = "appassets.androidplatform.net"
+        const val PROJECT_PATH = "/Hafij-BGE/patient-monitoring"
         const val ORIGIN = "https://$HOST"
         const val START_URL = "$ORIGIN/assets/www/index.html"
         const val BG = 0xFF0B0F14.toInt()
@@ -175,8 +176,19 @@ class MainActivity : ComponentActivity() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url
                 val allowed = url.scheme == "https" && url.host == HOST
-                if (!allowed) Log.i(TAG, "Blocked navigation to ${url.scheme}://${url.host}")
-                return !allowed
+                if (allowed) return false
+                // The only outside page the app opens: the project's GitHub pages (source link and
+                // "Share as community scenario"). They open in the browser; the app itself stays offline.
+                if (url.scheme == "https" && url.host == "github.com" && url.path.orEmpty().let { it == PROJECT_PATH || it.startsWith("$PROJECT_PATH/") }) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, url).addCategory(Intent.CATEGORY_BROWSABLE))
+                    } catch (e: ActivityNotFoundException) {
+                        Log.i(TAG, "No browser for $url")
+                    }
+                    return true
+                }
+                Log.i(TAG, "Blocked navigation to ${url.scheme}://${url.host}")
+                return true
             }
 
             override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {

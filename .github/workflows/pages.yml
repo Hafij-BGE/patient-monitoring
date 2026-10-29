@@ -31,7 +31,7 @@ jobs:
       - name: Collect site files
         run: |
           mkdir -p _site
-          cp -r index.html css src fixtures _site/
+          cp -r index.html css src fixtures community _site/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

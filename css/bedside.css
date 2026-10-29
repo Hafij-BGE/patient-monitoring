@@ -1,5 +1,5 @@
 /* Bedside view: full-screen monitor layout (waveforms left, large numerics right,
-   status strip on top, softkeys at the bottom). Original PM-SIM styling; it does not
+   status strip on top, softkeys at the bottom). Original VitalsLab styling; it does not
    copy any manufacturer's screen. Everything is scoped under body.bedside. */
 
 #btnBedside[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }

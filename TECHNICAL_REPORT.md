@@ -1,4 +1,4 @@
-# Technical Report: PM-SIM, an Interactive Patient Monitor Simulator
+# Technical Report: VitalsLab, an Interactive Patient Monitor Simulator
 
 Md. Hafijur Rahman. Homework 2, *Interactive Medical Device Simulator*. Dokuz Eylül University, 2026.
 
@@ -6,7 +6,7 @@ Md. Hafijur Rahman. Homework 2, *Interactive Medical Device Simulator*. Dokuz Ey
 
 ## 1. Purpose and scope
 
-A multiparameter bedside patient monitor acquires several physiological signals at once, estimates numeric values from them, compares the numerics with alarm limits, and shows waveforms, numerics and trends. PM-SIM reproduces this chain in a browser, at teaching level:
+A multiparameter bedside patient monitor acquires several physiological signals at once, estimates numeric values from them, compares the numerics with alarm limits, and shows waveforms, numerics and trends. VitalsLab reproduces this chain in a browser, at teaching level:
 
 ```
 simulated physiology  →  sensor forward model  →  acquisition (sampling, noise, filters)
@@ -17,7 +17,7 @@ simulated physiology  →  sensor forward model  →  acquisition (sampling, noi
 
 The set point of every parameter is known, so the app shows each estimate next to the value that produced it. The difference is the measurement error of the simulated monitor. This is the main teaching point: a monitor reports an *estimate*, and the estimate depends on the sensor, the noise and the algorithm.
 
-**What PM-SIM is not.** It is not a validated physiological model, it does not reproduce any commercial monitor's algorithms or interface, and it makes no claim of clinical accuracy. All constants that are teaching choices, rather than published values, are marked as such below.
+**What VitalsLab is not.** It is not a validated physiological model, it does not reproduce any commercial monitor's algorithms or interface, and it makes no claim of clinical accuracy. All constants that are teaching choices, rather than published values, are marked as such below.
 
 ## 2. Architecture
 
@@ -34,7 +34,7 @@ The set point of every parameter is known, so the app shows each estimate next t
 
 The simulation, alarm, data and parser modules never touch the DOM. Each uses a UMD wrapper, so the same file runs in the browser (`window.PM.*`) and in Node for the unit tests. There is no build step and no ES-module import, so `index.html` also works from `file://`.
 
-**Website and Android app.** The page is published as a static website at https://hafij-bge.github.io/patient-monitoring/ by the GitHub Actions workflow `.github/workflows/pages.yml`, which runs the unit tests and then deploys `index.html`, `css/`, `src/` and `fixtures/`. It can also be served locally (`python3 -m http.server 8766`) or opened from `file://`. The Content Security Policy (`connect-src 'none'`) means the page makes no network requests. The Android app (`android/`, package `edu.deu.pmsim`, version 1.5.0) wraps the same page in a WebView. It is the only place where real watch data enters (section 7.2) and it has not been tested with real hardware. The earlier Electron desktop app (with the hospital routes and the Windows build) was removed on 2026-10-28. For v1.1.0 a new, minimal Linux desktop app was added in `desktop/`: an Electron shell that shows the same page from inside a `.deb` package, with no preload script, no Node access in the page and no device access, so the page's CSP applies unchanged. It was smoke-tested under a virtual X display (Xvfb): the page loaded and the browser self-test of v1.1.0 gave 14 passed, 0 failed, 1 not run. After the glucose model and the derived 12-lead ECG were added the self-test has 17 entries; the browser run on 2026-10-29 gave 16 passed, 0 failed, 1 not run (`TEST_REPORT.md` section 3).
+**Website and Android app.** The page is published as a static website at https://hafij-bge.github.io/patient-monitoring/ by the GitHub Actions workflow `.github/workflows/pages.yml`, which runs the unit tests and then deploys `index.html`, `css/`, `src/`, `fixtures/` and `community/`. It can also be served locally (`python3 -m http.server 8766`) or opened from `file://`. The Content Security Policy (`connect-src 'none'`) means the page makes no network requests; the only outbound route is a link to a GitHub issue page that the user opens by hand (section 3.12, *Community scenarios*). The Android app (`android/`, package `edu.deu.pmsim`, version 1.5.0) wraps the same page in a WebView. It is the only place where real watch data enters (section 7.2) and it has not been tested with real hardware. The earlier Electron desktop app (with the hospital routes and the Windows build) was removed on 2026-10-28. For v1.1.0 a new, minimal Linux desktop app was added in `desktop/`: an Electron shell that shows the same page from inside a `.deb` package, with no preload script, no Node access in the page and no device access, so the page's CSP applies unchanged. It was smoke-tested under a virtual X display (Xvfb): the page loaded and the browser self-test of v1.1.0 gave 14 passed, 0 failed, 1 not run. After the glucose model and the derived 12-lead ECG were added the self-test has 17 entries; the browser run on 2026-10-29 gave 16 passed, 0 failed, 1 not run (`TEST_REPORT.md` section 3).
 
 ### 2.1 Time base
 
@@ -424,6 +424,30 @@ There are 50 scenarios. The first 25 change one or two signs, or one sensor sett
 
 Where a source gives a range (for example ATLS class III: HR 120–140, RR 30–40) the value lies inside it. Where a source gives only a direction (for example "pulse pressure decreased", "bradycardia"), the number is an **illustrative choice** in that direction. The ECG scale factors for raised potassium are illustrative; the source gives only the order of the changes, and the patterns carry no potassium values. The DKA-type pattern shows only glucose above 250 mg/dL together with the compensatory breathing of [35, 36]; ketones, pH and potassium are not modelled. The critical-illness and post-operative scenarios also show what the monitor **cannot** see, and their notes say so. In the peri-arrest pattern the low EtCO₂ comes from low pulmonary blood flow; pulseless electrical activity (PEA) is not modelled, because the model always couples a QRS complex to a pulse. The stroke pattern shows only the blood pressure (above the 185/110 mmHg limit for thrombolysis [61]); the neurological deficit is not visible on a monitor. The cold-wet heart-failure pattern has a proportional pulse pressure of (92 − 74)/92 < 25 % [64] but raises no default alarm, although it is the profile with the highest risk. Cardiogenic shock raises the same alarms as the blood-loss pattern; venous pressure and right-ventricular failure are not modelled. In the shivering pattern the SpO₂ of about 85 % is a motion artefact (set point 97 %) that the signal quality index does not flag (section 9). The monitor cannot tell atelectasis from pneumonia or pulmonary embolism. A unit test (`tests/unit/critical.test.js`) checks the alarms each of these scenarios raises. Every scenario is an illustrative pattern for education only. Real presentations vary and the values are not diagnostic. A unit test checks that every sourced scenario passes validation without clamping, that its references exist in `REFERENCES.md` and that no two scenarios have the same settings.
 
+#### Community scenarios
+
+Other people can propose scenarios. They are stored in the repository and shipped with the website, so every visitor sees them under *Community scenarios* in the scenario list. The code is in `src/core/community.js` (shared by the page and the GitHub Action), `src/ui/sharePanel.js`, `tools/community-scenario.js`, `.github/ISSUE_TEMPLATE/scenario.yml` and `.github/workflows/community-scenarios.yml`.
+
+*Format.* A submission is `{ name, note, source, changes }`. `changes` holds only patient and sensor parameters, the same kind of object as a built-in scenario; display and processing settings (`group: 'processing'` in `src/sim/params.js`) are excluded. A stored entry adds `id` (`c-` plus a slug of the name, made unique with `-2`, `-3`, …), `author` (GitHub user name), `issue` (issue number) and `added` (date). The canonical list is `community/scenarios.json` (format `vitalslab-community-scenarios`, version 1, at most 200 entries). `community/scenarios.js` is generated from it and sets `PM.communityData`, so the page reads the list as a script and needs no `fetch` under `connect-src 'none'`.
+
+*Validation* (the same function in the page, in the Action and at load time):
+
+- every key in `changes` is a known scenario parameter; numbers are numbers and options are listed options;
+- `validate()` from `src/sim/params.js` reports no error and no clamping, so the stored values are the values that run; diastolic is at least 10 mmHg below systolic;
+- no value equals the baseline, and at least one parameter is set;
+- the settings do not equal those of any loaded scenario (built-in or community), and no scenario has the same name (case-insensitive);
+- name 3–80, note 0–600 and source 5–300 characters, plain text with no `<`, `>`, backticks or control characters. The text is set with `textContent` in the page, and the comment code block in the Action cannot be broken out of.
+
+At load time `register()` validates each entry again and skips any that fail or reuse an id; skipped entries are reported in the browser console. A community scenario has no references (`refs: []`); the message shown when it is loaded names the author, the issue, the date and the author's source, and says that the maintainer checked format and ranges, not clinical content.
+
+*Submission.* The *Share as community scenario…* button in Controls opens a dialog. It builds the submission from the current settings (the patient profile only if a box is ticked), shows the exact JSON, lists any errors and, when it is valid, offers a link to `github.com/Hafij-BGE/patient-monitoring/issues/new?template=scenario.yml` with the title and the JSON filled in. Nothing is sent by the page; the user submits the issue on GitHub. The issue form requires two confirmations: the values are invented or taken from published teaching material, and the scenario may be published under the MIT licence with the author's GitHub name. In the Android app only links to this repository are opened, in the system browser; all other external links stay blocked.
+
+*Review.* The workflow runs on issues with the `scenario-submission` label. On *opened* and *edited* it checks the issue (`tools/community-scenario.js check`), comments the result and sets `scenario-valid` or `scenario-invalid`. When the `approved` label is added it first checks that the person who added it has write, maintain or admin permission on the repository; otherwise the label is removed and the job stops. It then checks the issue again against the current list, appends the entry, regenerates the script, runs the unit tests, commits as `github-actions[bot]`, pushes to `main` and starts the Pages workflow. On success it comments, adds `scenario-added` and closes the issue; on any failure it comments with the errors or the run link and removes `approved`.
+
+*Security.* The issue body is untrusted. It is read from the event file by Node and parsed as JSON only; it is never interpolated into a shell command or into `${{ }}` expressions in the workflow. Error lines in comments have backticks and line breaks replaced and are length-limited. Only the two `community/` files change, and only after validation and passing tests.
+
+*Limits.* The checks cover format and ranges, not clinical plausibility; that judgement is the maintainer's and is not verified by software. New entries reach the Android and desktop apps only with the next release. As of 2026-10-29 the workflow has not yet run on GitHub (`TEST_REPORT.md` section 4.4).
+
 ### 3.13 Glucose–insulin model and projection
 
 `src/sim/glucose.js` (pure, no DOM) adds plasma glucose and insulin to the simulated patient. It joins three published model parts. Time is in minutes. Numbers in brackets are entries in `REFERENCES.md`.
@@ -711,6 +735,7 @@ These were observed or are known from the model design:
 - **Watch data** (Android app only) has not been tested with any real watch, heart-rate sensor or Health Connect store. Consumer wearable readings are not clinical measurements (see `TEST_REPORT.md`).
 - **Glucose model.** Population parameters only; no person is fitted. Renal glucose excretion, glucagon, counter-regulation, exercise and the change of endogenous glucose output with insulin are not modelled. Without insulin action, glucose still returns towards fasting through SG (glucose effectiveness), so untreated type 1 hyperglycaemia resolves slowly in the model, unlike in reality. Minimal-model SI is lower than clamp-derived sensitivity (about 66 % lower in [54]), so a bolus has a modest effect. Secretion gain σ, the type 2 factor 0.5 and fasting insulin are illustrative. There is no CGM or glucose meter model (no sensor lag, no noise). Ketones and pH are not modelled.
 - Measurements are not persisted between sessions. Only the best lesson quiz scores, the Controls view choice, the Bedside view on/off state and the profile use-case switches are kept, in the browser's `localStorage` (keys `pmsim.lessons.v1`, `pmsim.controls.v1`, `pmsim.bedside`, `pmsim.usecases.v1`).
+- **Community scenarios** are checked for format and parameter ranges only. Their clinical content is the author's responsibility and is reviewed by a person, not by software. Submissions are public GitHub issues.
 
 ## 10. References
 

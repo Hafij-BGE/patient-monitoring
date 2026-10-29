@@ -1,7 +1,7 @@
 {
   "name": "pm-sim",
   "version": "1.5.0",
-  "description": "PM-SIM: educational patient monitor simulator",
+  "description": "VitalsLab: educational patient monitor simulator",
   "private": true,
   "license": "MIT",
   "author": {
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "io.github.hafijbge.pmsim",
-    "productName": "PM-SIM",
+    "productName": "VitalsLab",
     "directories": { "output": "dist" },
     "files": ["main.cjs", "icon.png", "web/**"],
     "linux": {
@@ -27,7 +27,7 @@
       "maintainer": "Hafij-BGE <mdhafijur.rahman@ogr.deu.edu.tr>",
       "synopsis": "Educational patient monitor simulator",
       "description": "Simulates a multiparameter bedside monitor (ECG, pulse oximetry, invasive and non-invasive blood pressure, capnography, respiration, temperature) for teaching. Not a medical device.",
-      "artifactName": "PM-SIM-${version}-${arch}.${ext}",
+      "artifactName": "VitalsLab-${version}-${arch}.${ext}",
       "syncDesktopName": true
     },
     "deb": { "packageCategory": "education" },
@@ -38,16 +38,16 @@
         { "target": "zip", "arch": ["x64"] }
       ],
       "icon": "icon.png",
-      "artifactName": "PM-SIM-${version}-win-${arch}.${ext}",
+      "artifactName": "VitalsLab-${version}-win-${arch}.${ext}",
       "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "PM-SIM-${version}-setup-${arch}.${ext}",
-      "shortcutName": "PM-SIM"
+      "artifactName": "VitalsLab-${version}-setup-${arch}.${ext}",
+      "shortcutName": "VitalsLab"
     },
-    "portable": { "artifactName": "PM-SIM-${version}-portable-${arch}.${ext}" }
+    "portable": { "artifactName": "VitalsLab-${version}-portable-${arch}.${ext}" }
   }
 }

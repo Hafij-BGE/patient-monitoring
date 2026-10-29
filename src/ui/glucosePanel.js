@@ -42,7 +42,7 @@
     $('#gluBolusBtn').addEventListener('click', () => give('units'));
     for (const id of ['#gluHorizon', '#gluPlanMeal', '#gluPlanMealAt', '#gluPlanBolus', '#gluPlanBolusAt'])
       $(id).addEventListener('change', () => { msg.textContent = ''; draw(); });
-    $('#gluPng').addEventListener('click', () => canvasPng($('#cvGlu'), 'pm-sim-glucose-projection-' + stamp() + '.png'));
+    $('#gluPng').addEventListener('click', () => canvasPng($('#cvGlu'), 'vitalslab-glucose-projection-' + stamp() + '.png'));
 
     let last = null;
     /** Planned events from the form, or null when a field is invalid. */

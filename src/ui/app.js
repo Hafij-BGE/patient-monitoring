@@ -226,7 +226,7 @@
   $('#alarmNotice').textContent = PM.alarms.NOTICE + ' Limits, delays and priorities below are illustrative.';
   const limits = PM.panels.buildLimits($('#limitTable tbody'), alarms, $('#limitMsg'), () => engine.lastFrame && updateTiles(engine.lastFrame));
   $('#btnLimitsDefault').addEventListener('click', () => { alarms.restoreDefaultLimits(); limits.render(); $('#limitMsg').textContent = 'Default limits restored.'; });
-  $('#btnAlarmCsv').addEventListener('click', () => download('pm-sim-alarm-history-' + stamp() + '.csv', PM.alarms.historyCSV(alarms.history), 'text/csv'));
+  $('#btnAlarmCsv').addEventListener('click', () => download('vitalslab-alarm-history-' + stamp() + '.csv', PM.alarms.historyCSV(alarms.history), 'text/csv'));
   $('#btnAlarmClear').addEventListener('click', () => { alarms.history.length = 0; PM.panels.renderAlarmHistory($('#alarmHistory tbody'), alarms.history); });
 
   // Alarm tones (Web Audio), off by default. Burst patterns follow the IEC 60601-1-8
@@ -302,7 +302,14 @@
   }
   for (const s of P.SPEC.speed.options) $('#selSpeed').append(el('option', { value: String(s), text: s + '×' }));
   $('#selSpeed').addEventListener('change', e => { engine.setParams({ speed: e.target.value }); controls.sync(engine.p); afterParams(); });
-  for (const p of P.PRESETS) $('#selPreset').append(el('option', { value: p.id, text: p.name }));
+  // Community scenarios ship with the page (community/scenarios.js); an entry that fails the checks is skipped.
+  const community = PM.community && PM.communityData ? PM.community.register(PM.communityData) : { added: [], rejected: [] };
+  if (community.rejected.length) console.warn('Community scenarios skipped:', community.rejected);
+  for (const p of P.PRESETS) if (!p.community) $('#selPreset').append(el('option', { value: p.id, text: p.name }));
+  if (community.added.length) {
+    $('#selPreset').append(el('optgroup', { label: 'Community scenarios' },
+      community.added.map(p => el('option', { value: p.id, text: p.name + ' (community)' }))));
+  }
   $('#selPreset').append(el('option', { value: 'custom', text: 'Custom (edited)', disabled: true }));
   $('#selPreset').addEventListener('change', e => {
     if (e.target.value === 'custom') return;
@@ -312,7 +319,8 @@
     engine.startNibp(); // a fresh cuff reading for the new scenario
     controls.showMsgs({ errors: s.errors, warnings: s.warnings });
     $('#controlMsgs').prepend(el('div.ok', { text: 'Scenario "' + r.preset.name + '" applied' + (r.changed.length ? '. Changed: ' + r.changed.map(k => P.SPEC[k].label).join(', ') + '.' : ' (all patient and sensor settings at default).') }));
-    if (r.preset.note) $('#controlMsgs').prepend(el('div.ok', { text: r.preset.note + ' References: ' + r.preset.refs.map(n => '[' + n + ']').join(' ') + ' in REFERENCES.md. Illustrative pattern for education only; real presentations vary and values are not diagnostic.' }));
+    if (r.preset.community) $('#controlMsgs').prepend(el('div.ok', { text: 'Community scenario by @' + r.preset.author + ' (GitHub issue #' + r.preset.issue + ', added ' + r.preset.added + '). ' + (r.preset.note ? r.preset.note + ' ' : '') + 'Source given by the author: ' + r.preset.source + '. The maintainer checked the format and the parameter ranges, not the clinical content. Illustrative pattern for education only; values are not diagnostic.' }));
+    else if (r.preset.note) $('#controlMsgs').prepend(el('div.ok', { text: r.preset.note + ' References: ' + r.preset.refs.map(n => '[' + n + ']').join(' ') + ' in REFERENCES.md. Illustrative pattern for education only; real presentations vary and values are not diagnostic.' }));
     afterParams();
   });
 
@@ -371,13 +379,13 @@
     g.fillStyle = '#0b0f14'; g.fillRect(0, 0, w, h);
     g.fillStyle = '#e2e8f0'; g.font = Math.round(14 * dpr) + 'px system-ui, sans-serif';
     const f = engine.lastFrame;
-    const txt = f ? 'PM-SIM  t = ' + f.t.toFixed(0) + ' s   HR ' + fmt(f.est.hr) + '   SpO2 ' + fmt(f.est.spo2) + ' %   NIBP ' + $('#vNibp').textContent + '   ART ' + $('#vArt').textContent + '   RR ' + $('#vRr').textContent + '   EtCO2 ' + fmt(f.est.etco2) + '   Temp ' + fmt(f.est.temp, 1) + ' °C' : 'PM-SIM';
+    const txt = f ? 'VitalsLab  t = ' + f.t.toFixed(0) + ' s   HR ' + fmt(f.est.hr) + '   SpO2 ' + fmt(f.est.spo2) + ' %   NIBP ' + $('#vNibp').textContent + '   ART ' + $('#vArt').textContent + '   RR ' + $('#vRr').textContent + '   EtCO2 ' + fmt(f.est.etco2) + '   Temp ' + fmt(f.est.temp, 1) + ' °C' : 'VitalsLab';
     g.fillText(txt, 10 * dpr, 24 * dpr);
     g.fillStyle = '#fbbf24'; g.font = Math.round(12 * dpr) + 'px system-ui, sans-serif';
     g.fillText('Educational simulation only. Simulated values are not clinical data. ' + new Date().toISOString(), 10 * dpr, 48 * dpr);
     let y = head;
     for (const c of cvs) { g.drawImage(c, 0, y); y += c.height; }
-    canvasPng(out, 'pm-sim-monitor-' + stamp() + '.png');
+    canvasPng(out, 'vitalslab-monitor-' + stamp() + '.png');
   }
 
   // ------------------------------------------------------------- signal chain
@@ -430,10 +438,10 @@
     $('#trPause').textContent = trendPaused ? 'Resume trend' : 'Pause trend';
     $('#trPause').setAttribute('aria-pressed', String(trendPaused));
   });
-  $('#trPng').addEventListener('click', () => canvasPng($('#cvTrend'), 'pm-sim-trend-' + $('#trParam').value + '-' + stamp() + '.png'));
+  $('#trPng').addEventListener('click', () => canvasPng($('#cvTrend'), 'vitalslab-trend-' + $('#trParam').value + '-' + stamp() + '.png'));
   $('#trCsv').addEventListener('click', () => {
     const list = lastTrend ? lastTrend.series.flatMap(s => s.values) : [];
-    download('pm-sim-trend-' + $('#trParam').value + '-' + stamp() + '.csv', PM.store.toCSV(list), 'text/csv');
+    download('vitalslab-trend-' + $('#trParam').value + '-' + stamp() + '.csv', PM.store.toCSV(list), 'text/csv');
   });
 
   function drawTrendNow() {
@@ -473,6 +481,7 @@
   renderAlarms();
   PM.panels.renderNibpTable($('#nibpTable tbody'), nibpRows);
   PM.ecg12Panel.attach(engine);
+  PM.sharePanel.attach($('#btnShare'), () => engine.p);
 
   root.PM.app = { engine, alarms, store, showTab, setRunning, glucose: () => glucose };
   requestAnimationFrame(loop);

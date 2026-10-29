@@ -1,6 +1,6 @@
 # Test Report
 
-PM-SIM, Patient Monitor Simulator. Updated 2026-10-29 after the simulation audit (`SIMULATION_AUDIT.md`); earlier updated 2026-10-28 after the device integration and the Electron desktop app were removed (the Devices tab, HL7/FHIR/SDC import, Web Bluetooth, Web Serial and the desktop builds no longer exist, so their tests were removed too). Updated again on 2026-10-28 after capnography, the arterial line, arrhythmia patterns, the Signal chain and Lessons tabs and the Android page bridge were added. A new minimal Linux desktop app (`desktop/`, `.deb`) was then built; the browser self-test run inside the packaged app under Xvfb gave 14 passed, 0 failed, 1 not run (hardware).
+VitalsLab, Patient Monitor Simulator. Updated 2026-10-29 after the simulation audit (`SIMULATION_AUDIT.md`); earlier updated 2026-10-28 after the device integration and the Electron desktop app were removed (the Devices tab, HL7/FHIR/SDC import, Web Bluetooth, Web Serial and the desktop builds no longer exist, so their tests were removed too). Updated again on 2026-10-28 after capnography, the arterial line, arrhythmia patterns, the Signal chain and Lessons tabs and the Android page bridge were added. A new minimal Linux desktop app (`desktop/`, `.deb`) was then built; the browser self-test run inside the packaged app under Xvfb gave 14 passed, 0 failed, 1 not run (hardware).
 
 > **Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.**
 
@@ -8,9 +8,9 @@ PM-SIM, Patient Monitor Simulator. Updated 2026-10-29 after the simulation audit
 
 | Test level | Result |
 |---|---|
-| Node unit tests (`node --test tests/unit/*.test.js`) | **133 tests in 16 files, 133 pass, 0 fail** (run 2026-10-29 after the cuff strip change; 130 after the waveform audit, `SIMULATION_AUDIT.md` §9a; 116 after the arterial notch and finger volume pulse, see `SIMULATION_AUDIT.md` §4 and §6; 111 after the simulation audit; 98 after the profile use cases; 93 after the derived 12-lead ECG; 86 after the critical-illness, stroke, heart-failure and post-operative scenarios and the extreme-low alarms; 80 after the SVT scenario and the QRS beat-time fix, 79 after the NIBP set-point fix, 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
+| Node unit tests (`node --test tests/unit/*.test.js`) | **145 tests in 17 files, 145 pass, 0 fail** (run 2026-10-29 after the community scenarios were added; 133 after the cuff strip change; 130 after the waveform audit, `SIMULATION_AUDIT.md` §9a; 116 after the arterial notch and finger volume pulse, see `SIMULATION_AUDIT.md` §4 and §6; 111 after the simulation audit; 98 after the profile use cases; 93 after the derived 12-lead ECG; 86 after the critical-illness, stroke, heart-failure and post-operative scenarios and the extreme-low alarms; 80 after the SVT scenario and the QRS beat-time fix, 79 after the NIBP set-point fix, 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
 | Browser self-test (`index.html?selftest=1`) | **17 entries: 16 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-29 after the waveform audit (§9a): **16 pass, 0 fail, 1 not run** (section 3), the same as before it. |
-| Manual interaction checks in a browser | 9 earlier checks (section 4.1) and 5 checks of the new features made on 2026-10-28 (section 4.2), all as expected. |
+| Manual interaction checks in a browser | 9 earlier checks (section 4.1), 5 checks of the new features made on 2026-10-28 (section 4.2), the derived 12-lead view (section 4.3) and the community scenarios on 2026-10-29 (section 4.4), all as expected. |
 | Hardware tests (watch data on Android through Health Connect, native BLE Heart Rate Service, export file) | **Not run.** No watch, heart-rate sensor or Health Connect store was used. |
 | Android app | Not tested on a device. An APK file (`release/PM-SIM-1.5.0-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
 | Website | Published from `.github/workflows/pages.yml`, which runs the unit tests before deploying. The deployed site was not checked as part of this report. |
@@ -98,6 +98,25 @@ Performed on 2026-10-28 in the browser pane (Chromium) served from `localhost`, 
 
 The *Save PNG* button uses the same `canvasPng` helper as the other PNG buttons; the download itself was not clicked in this session.
 
+### 4.4 Community scenarios and the rename
+
+Performed on 2026-10-29 in the browser pane (Chromium) served from `localhost`. For the list checks a temporary sample entry was written to `community/scenarios.js` and removed afterwards; the shipped list is empty.
+
+| Check | Expected | Observed |
+|---|---|---|
+| Page title and header | "VitalsLab" with the author and a link to the repository | Title "VitalsLab · Patient Monitor Simulator"; header "by Md. Hafijur Rahman · github.com/Hafij-BGE/patient-monitoring" |
+| Sample entry in the list | A "Community scenarios" group after the built-in ones; the entry ends in "(community)" | As expected |
+| Load the sample entry | Its values are set; the message names the author, the issue, the date and the author's source, and says that the clinical content was not checked | HR 118, temperature 38.6 °C; message as expected |
+| Bedside view scenario list | Same entries as in Controls | 52 options; choosing the entry switches the scenario |
+| Share dialog with baseline settings | Nothing to share; link disabled | Message "Nothing to share yet…"; link has no `href` |
+| Share dialog with a built-in scenario loaded unchanged | Refused as a duplicate | "same settings as the existing scenario …" |
+| Profile checkbox | Off: no profile keys in the preview; on: changed profile keys appear | `age_years` appears only when ticked |
+| `<b>` in the name | Refused; link disabled | "plain text only …"; `href` removed, `aria-disabled="true"` |
+| Valid entry | Preview equals the JSON in the link; link goes to the issue template | URL `https://github.com/Hafij-BGE/patient-monitoring/issues/new?template=scenario.yml&title=…&scenario=…`; decoded JSON equals the preview |
+| Reset, console, self-test | Back to baseline; no errors; self-test unchanged | As expected; self-test 16 pass, 0 fail, 1 not run |
+
+Not tested: the GitHub side (issue form, the `community-scenarios.yml` workflow, the labels, the commit and the redeploy) has not run on GitHub yet; it is covered only by the unit tests of `tools/community-scenario.js`. The link was not clicked, so no issue was created. Opening the link from the Android app (allow-listed for this repository only) and from the Linux desktop app was not tested. The dialog was not checked in dark mode.
+
 ## 5. Offline and `file://` operation
 
 The page was not opened from `file://` in a browser during this session. The local Chromium-based browser available here (a snap package) could not read files under `/tmp` or `/mnt` because of its sandbox, and the browser pane cannot open `file://` URLs. Instead the following was checked statically:
@@ -111,7 +130,7 @@ When served over `http://localhost`, the app made no network requests other than
 
 ## 6. Node unit and integration tests
 
-133 tests in 16 files (21 + 10 + 4 + 13 + 3 + 12 + 3 + 4 + 6 + 8 + 10 + 6 + 7 + 9 + 14 + 3). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
+145 tests in 17 files (21 + 10 + 4 + 13 + 3 + 12 + 3 + 4 + 6 + 8 + 10 + 6 + 7 + 9 + 14 + 3 + 12). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
 
 The first five files were already described before the new features were added. Their counts did not change.
 
@@ -314,6 +333,23 @@ The cuff strip between measurements (`SIMULATION_AUDIT.md` §9a, row 6). Quiet p
 - The deflating cuff passes SYS, MAP and DIA in that order, within ±1 mmHg of the reported values. No oscillation is shown before deflation. Peak-to-trough oscillation within ±0.5 s of SYS and DIA is 0.4–0.85 of that at MAP.
 - Renderer (stub canvas in a `vm` sandbox) at 340 × 160, 800 × 170, 1600 × 170 and 900 × 110 px: the comparison line starts with the NIBP reading and, from 800 px, also shows ART, NIBP − ART and the set values; SYS, MAP and DIA labels; pressure ticks at 50 and 100 mmHg (at least three ticks at 110 px); time ticks; a band gain of 1, 2 or 5 × 10ⁿ with a mmHg scale bar; every text and point inside the canvas. A failed result reads "Failed: …".
 
+### `tests/unit/community.test.js` (12 tests)
+
+Community scenarios (`src/core/community.js`, `tools/community-scenario.js`).
+
+- A well-formed submission passes and gets the id `c-<slug>`.
+- Refused: unknown parameters, display/processing settings, wrong types, values the simulator would clamp, diastolic not 10 mmHg below systolic, values equal to the baseline, unknown options, empty changes, unknown fields.
+- Text fields: length limits, required source, no `<`, `>`, backticks or control characters.
+- Duplicates of an existing scenario are refused by settings and by name (case-insensitive).
+- `changesFrom` leaves out display settings and, unless asked, the patient profile.
+- The issue URL opens the `scenario.yml` template with the title and the JSON in the form field; it stays under 8000 characters.
+- The issue body parser reads the first JSON block and reports bad JSON.
+- Collection: unique ids (`-2` suffix), a second entry for the same issue is refused, an invalid author is refused, `toScript` round-trips.
+- `register` adds valid entries as community presets with no references and skips broken ones; a registered entry counts for the duplicate check; registering again adds nothing.
+- Action tool, `check`: both consent boxes are required; a parameter name containing a code fence and an `@` mention produces a comment with only the opening and closing fence and no mention line.
+- Action tool, `add`: run as a child process on the real `community/` files, it adds one entry with the author and the issue number, writes the script and the comment, refuses the same issue a second time, and restores the files.
+- The shipped list is valid and `scenarios.js` equals the script generated from `scenarios.json`.
+
 ## 7. Defects found and fixed during testing
 
 Defects found in the removed device code are not listed here.
@@ -323,6 +359,9 @@ Defects found in the removed device code are not listed here.
 | Browser kept running old JavaScript after edits | Cached files | Tests served with `Cache-Control: no-store` |
 | Reset said limits were restored, but they were not | Reset did not call the alarm engine's restore function | Reset now restores the default limits |
 | Waveform defects found in the second 2026-10-29 pass (arterial step on parameter change, EtCO₂ noise bias, hidden PAT, NIBP stop counted as a failure, page wider than a phone screen) | See `SIMULATION_AUDIT.md` §9a | See `SIMULATION_AUDIT.md` §9a |
+| Android app blocked the link to the repository's own front page | The allow-list checked only paths below `/Hafij-BGE/patient-monitoring/` | It now accepts the repository path itself or a path below it |
+| A failed push in the approval workflow could still be reported as "added" | The reply step looked only at the tool's result | The push step has its own outcome; the reply reports a failed push with the run link and removes `approved` |
+| The `add` unit test assumed an empty community list | Written before the workflow ran the tests after adding an entry | The test counts relative to the current list and uses a unique name |
 | Model errors found in the 2026-10-29 audit (AF HR read 75–85 at a set 110, TP baseline below zero, SpO₂ read from noise in VF, hypotension MAP on the alarm limit, filter label above Nyquist, type 1 glucose effectiveness, and others) | See `SIMULATION_AUDIT.md` | See `SIMULATION_AUDIT.md`, one section per model |
 
 ## 8. Not tested and known limitations
@@ -333,6 +372,7 @@ Defects found in the removed device code are not listed here.
 - **Website:** the GitHub Pages workflow runs the unit tests before deploying. The live site at https://hafij-bge.github.io/patient-monitoring/ was not part of the testing described here.
 - **`file://`** was checked statically only (section 5).
 - Browsers other than Chromium were not tested.
+- **Community scenario workflow** (`.github/workflows/community-scenarios.yml`): not yet run on GitHub (section 4.4). Approval is limited to users with write access; this check runs only on GitHub.
 - **Desktop builds after the waveform audit:** the Linux `.deb` (1.4.0 version string, current source) was built with `desktop/build-deb.sh` and started once. Through the DevTools protocol after 7.8 s it showed HR 71, SpO₂ 97, ART 119/74, EtCO₂ 38, RR not yet reported, and all six waveform canvases drawn. Xvfb is no longer installed on the build PC, so this run used the desktop session, not a virtual display. The browser self-test was not run inside this package. The Windows `.exe` is built only by the GitHub Actions workflow and was not built or run for this pass; no Windows build has been started on a real Windows PC.
 - Model limitations observed during testing are listed in `TECHNICAL_REPORT.md` section 9: NIBP fails at motion ≥ 20 %, SpO₂ is biased toward about 85 % under motion, and the QRS detector has no search-back. Found while adding the new scenarios: in the atrial-fibrillation scenario (set HR 110) the displayed HR was about 75–85 bpm, because short beats had a smaller QRS that the detector missed; this was fixed in the simulation audit (`SIMULATION_AUDIT.md` §2). Not fixed: the low-SQI flag does not catch strong motion (0 flagged frames in 90 s for the motion and shivering scenarios).
 
