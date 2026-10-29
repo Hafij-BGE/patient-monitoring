@@ -4,6 +4,10 @@ Educational simulation only. Simulated values and consumer wearable readings are
 
 ## Unreleased (after v1.4.0)
 
+### Shock index, 2026-10-29
+
+- **Removed Age × SI** from the patient banner, `src/core/profile.js` and the docs. It was studied only for 48-h mortality in injured patients over 55 (Zarzaur 2008) and has no validated cut-off, so the number could not be judged. The shock index (healthy adult range 0.5–0.7, highlighted above 0.7) stays.
+
 ### Waveform audit, 2026-10-29 (`SIMULATION_AUDIT.md` §9a)
 
 - **Arterial line:** changing HR, SBP or DBP no longer makes the pressure jump. Beats already ejected keep the gain of their own fit (`src/sim/pulse.js`). Before: about 75 mmHg within 24 ms at HR 72 → 40 bpm; after: no step larger than in steady state.

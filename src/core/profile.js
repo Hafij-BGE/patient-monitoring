@@ -165,12 +165,6 @@
     return Number.isFinite(hr) && Number.isFinite(sbp) && sbp > 0 ? hr / sbp : null;
   }
 
-  /** Age x shock index (Zarzaur et al. 2008). No validated cut-off is used here. */
-  function ageShockIndex(ageYears, hr, sbp) {
-    const si = shockIndex(hr, sbp);
-    return si === null || !Number.isFinite(ageYears) ? null : ageYears * si;
-  }
-
   // ------------------------------------------------------------- age-typical blood pressure
   /**
    * Mean SBP/DBP (mmHg) of US adults by age group and sex, NHANES 2001-2008,
@@ -207,5 +201,5 @@
   }
 
   return { DEFAULT_PROFILE, ADULT_MIN_AGE, bmi, bsaMosteller, bsa, hrMax, qtc, FORMULAS, formulaInfo, bmiCategory, normaliseHistory, weightChange,
-    predictedBodyWeight, tidalVolume, weightDose, hrMaxTanaka, SI_NORMAL, shockIndex, ageShockIndex, BP_NORMS, bpForAge };
+    predictedBodyWeight, tidalVolume, weightDose, hrMaxTanaka, SI_NORMAL, shockIndex, BP_NORMS, bpForAge };
 });

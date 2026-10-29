@@ -165,8 +165,8 @@
     siRow.hidden = !PM.panels.useCases.si;
     if (!siRow.hidden) {
       const hr = f.technical.ecgLeadsOff ? null : est.hr, sbp = lastOk ? lastOk.res.sbp : null;
-      const si = PM.profile.shockIndex(hr, sbp), asi = PM.profile.ageShockIndex(engine.p.age_years, hr, sbp);
-      setTxt('#vSi', si === null ? '--' : si.toFixed(2)); setTxt('#vAgeSi', asi === null ? '--' : asi.toFixed(0));
+      const si = PM.profile.shockIndex(hr, sbp);
+      setTxt('#vSi', si === null ? '--' : si.toFixed(2));
       $('#vSi').classList.toggle('si-high', si !== null && si > PM.profile.SI_NORMAL.hi);
     }
 

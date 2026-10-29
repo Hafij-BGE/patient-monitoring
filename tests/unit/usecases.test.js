@@ -25,12 +25,11 @@ test('age-predicted maximal heart rate (Tanaka)', () => {
   assert.equal(profile.hrMaxTanaka(undefined), null);
 });
 
-test('shock index and age x shock index', () => {
+test('shock index', () => {
   assert.equal(profile.shockIndex(72, 120), 0.6);
-  assert.equal(profile.ageShockIndex(40, 72, 120), 24);
+  assert.equal(profile.ageShockIndex, undefined, 'Age x SI removed: no validated cut-off');
   assert.equal(profile.shockIndex(72, 0), null);
   assert.equal(profile.shockIndex(null, 120), null);
-  assert.equal(profile.ageShockIndex(NaN, 72, 120), null);
   assert.deepEqual({ ...profile.SI_NORMAL }, { lo: 0.5, hi: 0.7 });
 });
 

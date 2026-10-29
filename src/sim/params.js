@@ -20,7 +20,7 @@
   const SPEC = {
     // ---- patient profile (also shown in the Profile tab) ----
     age_years:   { group: 'patient', label: 'Age', unit: 'years', type: 'num', min: 18, max: 100, step: 1, def: 40,
-                   help: 'Used for the adult BMI category, the age-predicted maximal heart rate (formula chosen under Profile → Formulas; default Tanaka, 208 − 0.7 × age) and age × shock index (Profile tab). The simulated vital signs do not depend on age, except that with "Age and sex set typical blood pressure" on, a hand edit sets SYS/DIA to the NHANES mean [78]. Age, height and MAP set the delay of the reflected wave in the pleth shape (Millasseau 2002 [93]).' },
+                   help: 'Used for the adult BMI category, the age-predicted maximal heart rate (formula chosen under Profile → Formulas; default Tanaka, 208 − 0.7 × age). The simulated vital signs do not depend on age, except that with "Age and sex set typical blood pressure" on, a hand edit sets SYS/DIA to the NHANES mean [78]. Age, height and MAP set the delay of the reflected wave in the pleth shape (Millasseau 2002 [93]).' },
     sex:         { group: 'patient', label: 'Sex', type: 'sel', options: ['unspecified', 'female', 'male'], def: 'unspecified',
                    help: 'Used for predicted body weight (ARDS Network formula) and, with "Age and sex set typical blood pressure" on, for the sex-specific NHANES blood pressure [78].' },
     height_cm:   { group: 'patient', label: 'Height', unit: 'cm', type: 'num', min: 120, max: 220, step: 1, def: 172,

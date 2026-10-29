@@ -275,7 +275,7 @@ New user choices under Profile → Formulas. Each default is the one recommended
 | Max HR | Tanaka (208 − 0.7·age), Gellish (207 − 0.7·age), Fox (220 − age) | Tanaka: meta-analysis of 351 studies plus a lab study [75]. |
 | NIBP MAP shown | Oscillometric (cuff pressure at the largest oscillation), DBP + (SBP − DBP)/3 | Oscillometric: what a real cuff monitor shows. The one-third rule is shown for teaching and is not equal to the waveform MAP (form factor 0.33–0.55, section 4). |
 
-The patient banner (hidden in bedside view) shows BMI and BSA, age-normal ranges, and shock index with Age × SI (for example 80/46 mmHg (61), SI 0.90, Age×SI 36).
+The patient banner (hidden in bedside view) shows BMI and BSA, age-normal ranges, and the shock index (for example 80/46 mmHg (61), SI 0.90). Age × SI was shown here until 2026-10-29 and then removed: it was studied only in injured patients over 55 [77] and has no validated cut-off, so the number could not be judged.
 
 **Tests.** `usecases.test.js` (9 tests): BSA formulas, max HR formulas, QTc formulas diverge at fast rates, engine QT, shock index, age-typical BP.
 

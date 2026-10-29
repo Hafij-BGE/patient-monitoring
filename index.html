@@ -82,7 +82,7 @@
       <span class="pb-item"><span class="pb-k">BSA</span> <b id="bBsa">--</b> m² <span class="pb-note" id="bBsaF"></span></span>
       <span class="pb-item" title="Mean resting SBP/DBP of US adults of this age and sex (NHANES 2001–2008), interpolated. Adults 18+ only."><span class="pb-k">Typical BP for age</span> <b id="bBpAge">--</b> <span class="pb-note">NHANES mean</span></span>
       <span class="pb-item"><span class="pb-k">Max HR</span> <b id="bHrMax">--</b> <span class="pb-note" id="bHrMaxF"></span></span>
-      <span class="pb-item" id="siRow" hidden title="Shock index = displayed HR / last NIBP systolic. Healthy adult range 0.5–0.7. Age × SI has no validated cut-off in this simulator."><span class="pb-k">SI</span> <b id="vSi">--</b> · <span class="pb-k">Age×SI</span> <b id="vAgeSi">--</b></span>
+      <span class="pb-item" id="siRow" hidden title="Shock index = displayed HR / last NIBP systolic. Healthy adult range 0.5–0.7."><span class="pb-k">SI</span> <b id="vSi">--</b></span>
     </div>
     <div class="tile" data-ch="ecg" id="tHr">
       <div class="t-head"><span>HR</span><span class="unit">bpm</span></div>
@@ -344,7 +344,7 @@
     the at-least-30 mL/kg crystalloid volume suggested for sepsis-induced hypoperfusion within 3 h (weak recommendation, low-quality evidence) [73];
     the 0.5 mL/kg/h urine output below which, for 6 h, KDIGO stage 1 acute kidney injury is met [74]; and the age-predicted maximal heart rate, 208 − 0.7 × age [75].
     <b>Shock index</b> (SI = HR / systolic pressure) uses the displayed HR and the last NIBP systolic; the healthy adult range is 0.5–0.7 [76], and SI alone discriminates poorly (AUC 0.58 in that study).
-    Age × SI predicted 48-h mortality better than SI in injured patients over 55 [77]; that study gives no cut-off, so none is shown.
+    Age × SI is not shown: it was studied only for 48-h mortality in injured patients over 55 [77] and has no validated cut-off, so the number could not be judged.
     <b>Age and sex set typical blood pressure</b>: when you change age or sex by hand, SBP and DBP are set to the mean of US adults of that age and sex (NHANES 2001–2008, all participants) [78], interpolated between the published age groups 18–39, 40–59 and 60+.
     Systolic pressure rises with age while diastolic falls after about 50 [79]. Scenarios never trigger it, and you can still change SBP and DBP afterwards. Resting heart rate is not changed: it stays near 72 beats/min at all adult ages [80].
     These are teaching calculations, not prescriptions.</p>

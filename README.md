@@ -10,7 +10,7 @@ Every number on the screen sits next to the value that generated it, so measurem
 [![Live demo](https://img.shields.io/badge/live%20demo-GitHub%20Pages-2ea44f?logo=github)](https://hafij-bge.github.io/patient-monitoring/)
 [![Release](https://img.shields.io/github/v/release/Hafij-BGE/patient-monitoring?label=release)](https://github.com/Hafij-BGE/patient-monitoring/releases/latest)
 [![Pages](https://github.com/Hafij-BGE/patient-monitoring/actions/workflows/pages.yml/badge.svg)](https://github.com/Hafij-BGE/patient-monitoring/actions/workflows/pages.yml)
-![Unit tests](https://img.shields.io/badge/unit%20tests-98%20pass-brightgreen)
+![Unit tests](https://img.shields.io/badge/unit%20tests-133%20pass-brightgreen)
 ![Dependencies](https://img.shields.io/badge/runtime%20dependencies-none-blue)
 ![Platforms](https://img.shields.io/badge/runs%20on-web%20%7C%20Linux%20%7C%20Windows%20%7C%20Android-informational)
 
@@ -63,7 +63,7 @@ The design goal is scientific correctness and meaningful interaction, not decora
   </tr>
   <tr>
     <td><img src="docs/media/twelve-lead.png" alt="Derived 12-lead ECG dialog on ECG grid paper"><br><sub><b>Derived 12-lead ECG.</b> Click the ECG waveform. 3 × 4 layout plus a 10 s lead II rhythm strip, 25 mm/s, 10 mm/mV.</sub></td>
-    <td><img src="docs/media/controls.png" alt="Controls tab, Simple view"><br><sub><b>Controls.</b> Simple view shows the main controls plus any the scenario changed; Advanced shows all 62.</sub></td>
+    <td><img src="docs/media/controls.png" alt="Controls tab, Simple view"><br><sub><b>Controls.</b> Simple view shows the main controls plus any the scenario changed; Advanced shows all 64.</sub></td>
   </tr>
   <tr>
     <td><img src="docs/media/signal-chain.png" alt="Signal chain tab showing ECG processing stages"><br><sub><b>Signal chain.</b> Each processing stage as a live plot, from the clean model signal to the detector output.</sub></td>
@@ -104,9 +104,9 @@ These are illustrative patterns for education only. They are not diagnostic.
 </details>
 
 <details>
-<summary><b>62 validated controls, Simple and Advanced views</b></summary>
+<summary><b>64 validated controls, Simple and Advanced views</b></summary>
 
-Five groups: patient profile, physiology, glucose and insulin, sensor, processing. Each control has a label, a unit, a range and a short explanation. **Simple** shows 16 main controls (the 5 patient profile fields: age, sex, height, weight, diabetes status; then HR, arrhythmia, SYS, DIA, SpO₂, RR, EtCO₂, temperature, motion, SpO₂ probe state, NIBP interval) plus any control the scenario changed or an alarm points to. **Advanced** shows all 62. Invalid input is rejected with a message, for example DIA ≥ SYS.
+Five groups: patient profile, physiology, glucose and insulin, sensor, processing. Each control has a label, a unit, a range and a short explanation. **Simple** shows 16 main controls (the 5 patient profile fields: age, sex, height, weight, diabetes status; then HR, arrhythmia, SYS, DIA, SpO₂, RR, EtCO₂, temperature, motion, SpO₂ probe state, NIBP interval) plus any control the scenario changed or an alarm points to. **Advanced** shows all 64. Invalid input is rejected with a message, for example DIA ≥ SYS.
 </details>
 
 <details>
@@ -130,10 +130,10 @@ Limits and delays for the physiological parameters, rhythm alarms (for example V
 - **Glucose and insulin:** meal or bolus now, or a 2–4 h **model projection** with a planned meal and bolus: the curve, time to cross 70 / 54 / 180 / 250 mg/dL and time in 70–180 mg/dL. It is a model projection, not a clinical prediction, and not dosing advice.
 - **Patient profile:** age, sex, height, weight and diabetes status, BMI and BSA. Adult BMI categories only from age 20.
 - **Formulas** (Profile tab): where the literature has more than one accepted formula you choose it: QTc (Framingham, Fridericia, Hodges, Bazett), BSA (Mosteller, Du Bois, Haycock), maximal heart rate (Tanaka, Gellish, Fox) and the NIBP MAP shown (oscillometric or the one-third rule). The defaults and the reasons are in TECHNICAL_REPORT section 5.2.
-- **Patient banner** above the monitor (hidden in bedside view): BMI and BSA, age-normal ranges, and shock index with Age × SI.
+- **Patient banner** above the monitor (hidden in bedside view): BMI and BSA, age-normal ranges, and the shock index.
 - **Use the profile** (three switches in the Profile tab, kept in this browser):
   - *Bedside calculators* (on by default): predicted body weight (ARDS Network formula, needs sex), low tidal volume 6 mL/kg PBW, sepsis fluid bolus 30 mL/kg, urine output threshold 0.5 mL/kg/h and age-predicted maximal heart rate (Tanaka 208 − 0.7 × age).
-  - *Shock index on the NIBP tile* (on by default): live SI = displayed HR / last NIBP systolic (healthy adults 0.5–0.7, values above 0.7 are highlighted) and Age × SI.
+  - *Shock index on the NIBP tile* (on by default): live SI = displayed HR / last NIBP systolic (healthy adults 0.5–0.7, values above 0.7 are highlighted).
   - *Age and sex set typical blood pressure* (off by default): changing age or sex by hand sets SYS/DIA to the US adult mean for that age and sex (NHANES 2001–2008, interpolated between age groups). Scenarios are never changed.
   - These are teaching calculations, not prescriptions. Sources: `REFERENCES.md` entries 72–80; the formula choices also use 82 and 88–92.
 - **Data import / export:** CSV and JSON tables (wide or long, unit conversion, time zones, missing tokens, duplicates and conflicts), manual entry, CSV / JSON export by source and a waveform CSV export.
@@ -261,7 +261,7 @@ A missing value is stored as `null` with quality `missing`, never as 0. Series f
 
 Stated plainly, so nobody relies on a feature that has not been shown to work:
 
-- **AF heart rate under-reads.** In the atrial-fibrillation scenario the displayed HR is about 75–85 bpm while the set rate is 110 bpm.
+- **AF heart rate jumps beat to beat.** In the atrial-fibrillation scenario the displayed HR follows the irregular intervals: for a set rate of 110 bpm it averaged 112.7 bpm and ranged 91–140 bpm over 40 s.
 - **The SpO₂ signal-quality index misses some artifacts.** Strong motion and shivering are not always flagged.
 - **Windows builds have never been run on a real Windows PC.** They were built and checksummed on a GitHub runner only.
 - **The Android app has not been tested with real hardware.** Health Connect, BLE and export-file routes are implemented but unverified.

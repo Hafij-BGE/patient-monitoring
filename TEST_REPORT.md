@@ -278,14 +278,14 @@ The cold-wet and shivering checks record limitations on purpose: the monitor mis
 - Predicted body weight: 180 cm male 75.12 kg, 165 cm female 56.97 kg, 152.4 cm male exactly 50 kg; null when sex is unspecified or height is invalid.
 - Tidal volume 6 mL/kg × 75.12 kg = 451 mL; 30 mL/kg × 70 kg = 2100 mL; 0.5 mL/kg/h × 70 kg = 35 mL/h; null for invalid weight.
 - Tanaka maximal heart rate: 180 bpm at 40 years, 159 bpm at 70 years.
-- Shock index 72/120 = 0.6, Age × SI at 40 years = 24; null when SBP is 0 or HR is missing.
+- Shock index 72/120 = 0.6; null when SBP is 0 or HR is missing. Age × SI is no longer exported (removed 2026-10-29).
 - BSA at 70 kg, 172 cm: Mosteller 1.829, Du Bois 1.825, Haycock 1.834 m²; null for weight 0.
 - Maximal heart rate at age 60: Tanaka 166, Gellish 165, Fox 160 bpm; null for a negative age.
 - QTc: all four formulas give 400 ms for QT 400 ms at RR 1 s. QT 360 ms at RR 0.6 s gives Framingham 421.6 and Hodges 430 ms; Bazett at RR 0.64 s gives 450 ms; RR outside 0.3–2 s gives null; an unknown formula falls back to the default.
 - Engine QT at 50, 72 and 120 bpm: Framingham QTc of the model QT is 400 ± 1 ms; Bazett QTc is above 420 ms at 120 bpm. VF, asystole and VT give no QT.
 - Age-typical BP: male 20 y 119/70 (held flat), unspecified 28.5 y 115/69, female 49.5 y 122/74, male 60 y 129/73 (interpolated), female 90 y 139/68 (held flat), null below 18 y. For every sex SBP rises from 30 to 50 to 75 y, DBP falls from 50 to 75 y and pulse pressure widens.
 
-Browser checks of the use cases (2026-10-28, local preview): switches default to calculators on, shock index on, age BP off; switching each off hides its cards or row and is kept after reload. Male 180 cm shows PBW 75.1 kg and tidal volume 451 mL; sex unspecified at 172 cm shows both values (63.3 and 67.8 kg). With age BP on, age 40 male gives 122/74, age 75 gives 133/69, age 30 via the Controls tab 119/71, and a later manual SYS of 150 is kept. With the switch off, changing age leaves the blood pressure unchanged. The hypotension scenario loads 82/48 unchanged; after an NIBP the tile shows SI 0.88 (highlighted) and Age × SI 35.
+Browser checks of the use cases (2026-10-28, local preview): switches default to calculators on, shock index on, age BP off; switching each off hides its cards or row and is kept after reload. Male 180 cm shows PBW 75.1 kg and tidal volume 451 mL; sex unspecified at 172 cm shows both values (63.3 and 67.8 kg). With age BP on, age 40 male gives 122/74, age 75 gives 133/69, age 30 via the Controls tab 119/71, and a later manual SYS of 150 is kept. With the switch off, changing age leaves the blood pressure unchanged. The hypotension scenario loads 82/48 unchanged; after an NIBP the tile shows SI 0.88 (highlighted). (Age × SI was also shown then; it was removed on 2026-10-29.)
 
 ### `tests/unit/channels.test.js` (14 tests)
 
@@ -334,7 +334,7 @@ Defects found in the removed device code are not listed here.
 - **`file://`** was checked statically only (section 5).
 - Browsers other than Chromium were not tested.
 - **Desktop builds after the waveform audit:** the Linux `.deb` (1.4.0 version string, current source) was built with `desktop/build-deb.sh` and started once. Through the DevTools protocol after 7.8 s it showed HR 71, SpO₂ 97, ART 119/74, EtCO₂ 38, RR not yet reported, and all six waveform canvases drawn. Xvfb is no longer installed on the build PC, so this run used the desktop session, not a virtual display. The browser self-test was not run inside this package. The Windows `.exe` is built only by the GitHub Actions workflow and was not built or run for this pass; no Windows build has been started on a real Windows PC.
-- Model limitations observed during testing are listed in `TECHNICAL_REPORT.md` section 9: NIBP fails at motion ≥ 20 %, SpO₂ is biased toward about 85 % under motion, and the QRS detector has no search-back. Found while adding the new scenarios and not fixed: in the atrial-fibrillation scenario (set HR 110) the displayed HR is about 75–85 bpm, because short beats have a smaller QRS that the detector misses; and the low-SQI flag does not catch strong motion (0 flagged frames in 90 s for the motion and shivering scenarios).
+- Model limitations observed during testing are listed in `TECHNICAL_REPORT.md` section 9: NIBP fails at motion ≥ 20 %, SpO₂ is biased toward about 85 % under motion, and the QRS detector has no search-back. Found while adding the new scenarios: in the atrial-fibrillation scenario (set HR 110) the displayed HR was about 75–85 bpm, because short beats had a smaller QRS that the detector missed; this was fixed in the simulation audit (`SIMULATION_AUDIT.md` §2). Not fixed: the low-SQI flag does not catch strong motion (0 flagged frames in 90 s for the motion and shivering scenarios).
 
 ## 9. How to repeat
 
