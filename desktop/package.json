@@ -1,6 +1,6 @@
 {
   "name": "pm-sim",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "VitalsLab: educational patient monitor simulator",
   "private": true,
   "license": "MIT",

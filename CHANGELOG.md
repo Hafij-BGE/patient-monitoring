@@ -2,7 +2,7 @@
 
 Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.
 
-## Unreleased
+## v1.6.0 (2026-11-02)
 
 ### VitalsLab and community scenarios, 2026-10-29
 
