@@ -347,5 +347,6 @@
       provenance: { entry: 'manual', originalValue: String(o.value), originalUnit: o.unit || null, note: o.note || '', device: o.device || '' } }) };
   }
 
-  return { importText, importCSV, importJSON, parseTimestamp, parseValue, detectMapping, splitHeader, paramFor, manualEntry, SYNONYMS, MAX_ENTRIES };
+  return { importText, importCSV, importJSON, parseTimestamp, parseValue, detectMapping, splitHeader, paramFor, manualEntry, SYNONYMS, MAX_ENTRIES,
+    NAMES: { time: TIME_NAMES, param: PARAM_COL, value: VALUE_COL, unit: UNIT_COL, missing: [...MISSING_TOKENS] } };
 });

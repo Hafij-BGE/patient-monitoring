@@ -10,7 +10,7 @@ Every number on the screen sits next to the value that generated it, so measurem
 [![Live demo](https://img.shields.io/badge/live%20demo-GitHub%20Pages-2ea44f?logo=github)](https://hafij-bge.github.io/patient-monitoring/)
 [![Release](https://img.shields.io/github/v/release/Hafij-BGE/patient-monitoring?label=release)](https://github.com/Hafij-BGE/patient-monitoring/releases/latest)
 [![Pages](https://github.com/Hafij-BGE/patient-monitoring/actions/workflows/pages.yml/badge.svg)](https://github.com/Hafij-BGE/patient-monitoring/actions/workflows/pages.yml)
-![Unit tests](https://img.shields.io/badge/unit%20tests-145%20pass-brightgreen)
+![Unit tests](https://img.shields.io/badge/unit%20tests-155%20pass-brightgreen)
 ![Dependencies](https://img.shields.io/badge/runtime%20dependencies-none-blue)
 ![Platforms](https://img.shields.io/badge/runs%20on-web%20%7C%20Linux%20%7C%20Windows%20%7C%20Android-informational)
 
@@ -68,7 +68,6 @@ The design goal is scientific correctness and meaningful interaction, not decora
   </tr>
   <tr>
     <td><img src="docs/media/signal-chain.png" alt="Signal chain tab showing ECG processing stages"><br><sub><b>Signal chain.</b> Each processing stage as a live plot, from the clean model signal to the detector output.</sub></td>
-    <td><img src="docs/media/lessons.png" alt="Lessons tab"><br><sub><b>Lessons.</b> Eight guided lessons with buttons that set the controls, and a graded quiz.</sub></td>
   </tr>
   <tr>
     <td colspan="2"><img src="docs/media/trends.png" alt="Trends tab"><br><sub><b>Trends.</b> Any parameter from any source over a chosen window. Gaps are drawn as breaks, never as zeros.</sub></td>
@@ -87,19 +86,23 @@ The design goal is scientific correctness and meaningful interaction, not decora
 | **Capnography (CO₂)** | Capnogram with rebreathing and bronchospasm shapes | EtCO₂, FiCO₂, airway RR |
 | **NIBP** | Oscillometric cuff deflation | Envelope method: MAP at maximum oscillation, SYS / DIA by fixed ratios |
 | **Temperature** | Core temperature | Direct reading |
-| **Glucose and insulin** | Bergman minimal model with meal absorption and subcutaneous insulin (Hovorka) | Model value with a "model" badge, projection 2–4 h ahead |
+| **Glucose and insulin** | Bergman minimal model with meal absorption and subcutaneous insulin (Hovorka) | Model value with a "model" badge on the GLU tile |
 
 The equations, parameters and their sources are in [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) and [`REFERENCES.md`](REFERENCES.md). [`SIMULATION_AUDIT.md`](SIMULATION_AUDIT.md) lists what was found wrong in each model after v1.4.0, what was changed, how it was tested and what is still not real.
 
 ## Features
 
 <details open>
-<summary><b>50 teaching scenarios</b></summary>
+<summary><b>95 teaching scenarios in 12 disease and condition groups, all with sources</b></summary>
 
-A scenario sets every patient, physiology and sensor control (its own values, all others at default). Editing any of them by hand shows **Custom (edited)**.
+A scenario sets every patient, physiology and sensor control (its own values, all others at default). Editing any of them by hand shows **Custom (edited)**. Every scenario cites its sources in `REFERENCES.md`. Below the controls, the **Scenario summary** shows the selected scenario: its group, its teaching note, a table of the values it changes next to the defaults, and each cited reference with what it supports and a DOI link. The **Scenario details** tab (next to Controls, or the button in the summary) explains the selected scenario in plain language: what the condition is, what happens in the body, what this scenario shows on the monitor and what it cannot show, with the same references. Basic and sensor scenarios are marked as a vital-sign pattern or a technical problem, not a disease.
 
-- **25 simple scenarios:** baseline, tachycardia, bradycardia, irregular timing, desaturation, low and high blood pressure, fast and slow breathing, temperature elevation, sensor disconnection, motion artifact, noisy ECG, missing observations, apnea, atrial fibrillation, PVCs, ventricular tachycardia, ventricular fibrillation, asystole, hypoventilation, bronchospasm, rebreathing, under-damped arterial line, transducer height error.
-- **25 combined-sign patterns from the literature**, each with its sources and a note shown on load: blood loss (ATLS class II and III), infection screening (SIRS / qSOFA), acute allergic reaction, hypoventilation masked by O₂, compensatory hyperventilation, dead-space (PE-type) pattern, hypothermia, early and late hypermetabolic (MH-type) pattern, obstructive hypercapnic (COPD-type) pattern, early and late raised-potassium ECG, raised-ICP (Cushing) reflex, SVT, hyperglycaemic crisis (DKA-type), pre-arrest deterioration, peri-arrest, acute stroke with high blood pressure, three heart-failure profiles (warm-wet, cold-wet, cardiogenic shock) and three post-operative patterns (opioid respiratory depression, hypothermia with shivering, pulmonary complication).
+- **25 simple scenarios**, each now with its sources: baseline, tachycardia, bradycardia, irregular timing, desaturation, low and high blood pressure, fast and slow breathing, temperature elevation, sensor disconnection, motion artifact, noisy ECG, missing observations, apnea, atrial fibrillation, PVCs, ventricular tachycardia, ventricular fibrillation, asystole, hypoventilation, bronchospasm, rebreathing, under-damped arterial line, transducer height error.
+- **24 combined-sign patterns from the literature**, each with its sources and a teaching note: blood loss (ATLS class II and III), infection screening (SIRS / qSOFA), acute allergic reaction, hypoventilation masked by O₂, dead-space (PE-type) pattern, hypothermia, early and late hypermetabolic (MH-type) pattern, obstructive hypercapnic (COPD-type) pattern, early and late raised-potassium ECG, raised-ICP (Cushing) reflex, SVT, hyperglycaemic crisis (DKA-type), pre-arrest deterioration, peri-arrest, acute stroke with high blood pressure, three heart-failure profiles (warm-wet, cold-wet, cardiogenic shock) and three post-operative patterns (opioid respiratory depression, hypothermia with shivering, pulmonary complication).
+
+- **46 disease and condition patterns** added after v1.6.0, each with its sources and a note on what the monitor cannot show: athlete bradycardia, AF with fast ventricular rate, hypertensive emergency, wide pulse pressure, tamponade, high-risk PE, ATLS class I and IV blood loss, septic, neurogenic and reflex (vasovagal) shock, severe and life-threatening asthma, severe pneumonia, ARDS, tension pneumothorax, hyperventilation, brain injury with secondary insults, seizure, autonomic dysreflexia, neuromuscular respiratory failure, low glucose, thyroid storm, myxoedema coma, adrenal crisis, catecholamine crisis, missed dialysis, hypothermia stage I, heatstroke, NMS, serotonin toxicity, calcium-channel-blocker, tricyclic, organophosphate, stimulant, carbon-monoxide and opioid poisoning, post-induction hypotension, oesophageal intubation, venous air embolism, local-anaesthetic toxicity, pre-eclampsia, postpartum haemorrhage, amniotic-fluid embolism, spinal hypotension at caesarean, and after return of circulation (post-ROSC).
+
+The scenario list groups them under 12 headings: single vital-sign changes, sensor and signal artefacts, heart rhythm, heart and circulation, bleeding, shock and sepsis, lungs and airway, brain and nerves, metabolic, endocrine and electrolytes, temperature, drugs and poisoning, anaesthesia and after surgery, pregnancy and birth, deterioration and cardiac arrest.
 
 These are illustrative patterns for education only. They are not diagnostic.
 </details>
@@ -117,18 +120,17 @@ Limits and delays for the physiological parameters, rhythm alarms (for example V
 </details>
 
 <details>
-<summary><b>NIBP, trends, signal chain, lessons</b></summary>
+<summary><b>NIBP, trends, signal chain</b></summary>
 
 - **NIBP:** manual start and stop, or an automatic interval (default every 5 min). Live cuff-pressure trace, the oscillogram with the detected points, and a results table.
 - **Trends:** any parameter from any source over a chosen window, with pause, PNG, CSV and summary statistics. Missing values are breaks, never zeros.
 - **Signal chain:** pick ECG, PPG, respiration, arterial line or capnography and see each stage as a live plot with units and a note, for example the QRS detector's integrated signal with its threshold and detections.
-- **Lessons:** 8 guided lessons (ECG chain, SpO₂, NIBP, rhythms, capnography, arterial line, alarms, deterioration before cardiac arrest). Each has objectives, steps with buttons that set the controls, and a 3-question quiz graded in the page.
 </details>
 
 <details>
 <summary><b>Glucose model, patient profile, data import and export</b></summary>
 
-- **Glucose and insulin:** meal or bolus now, or a 2–4 h **model projection** with a planned meal and bolus: the curve, time to cross 70 / 54 / 180 / 250 mg/dL and time in 70–180 mg/dL. It is a model projection, not a clinical prediction, and not dosing advice.
+- **Glucose and insulin:** the model runs in the background and its value is shown on the GLU tile with a "model" badge. Its settings are in Controls. There is no separate Glucose tab (removed 2026-11-03, because glucose is not part of a standard bedside monitor), so meals, boluses and the projection are no longer in the page.
 - **Patient profile:** age, sex, height, weight and diabetes status, BMI and BSA. Adult BMI categories only from age 20.
 - **Formulas** (Profile tab): where the literature has more than one accepted formula you choose it: QTc (Framingham, Fridericia, Hodges, Bazett), BSA (Mosteller, Du Bois, Haycock), maximal heart rate (Tanaka, Gellish, Fox) and the NIBP MAP shown (oscillometric or the one-third rule). The defaults and the reasons are in TECHNICAL_REPORT section 5.2.
 - **Patient banner** above the monitor (hidden in bedside view): BMI and BSA, age-normal ranges, and the shock index.
@@ -137,14 +139,14 @@ Limits and delays for the physiological parameters, rhythm alarms (for example V
   - *Shock index on the NIBP tile* (on by default): live SI = displayed HR / last NIBP systolic (healthy adults 0.5–0.7, values above 0.7 are highlighted).
   - *Age and sex set typical blood pressure* (off by default): changing age or sex by hand sets SYS/DIA to the US adult mean for that age and sex (NHANES 2001–2008, interpolated between age groups). Scenarios are never changed.
   - These are teaching calculations, not prescriptions. Sources: `REFERENCES.md` entries 72–80; the formula choices also use 82 and 88–92.
-- **Data import / export:** CSV and JSON tables (wide or long, unit conversion, time zones, missing tokens, duplicates and conflicts), manual entry, CSV / JSON export by source and a waveform CSV export.
-- **Android only:** readings from a watch or other wearable through Android Health Connect, a Bluetooth LE heart-rate sensor (Heart Rate Service 0x180D) or a health-app export file. Real data is shown next to the simulation and never drives it.
+- **Data import / export:** CSV and JSON tables (wide or long, unit conversion, time zones, missing tokens, duplicates and conflicts), manual entry, CSV / JSON export by source and a waveform CSV export. The Data tab explains what a file may contain (the table of column names, units and ranges is read from the importer itself), offers four synthetic **sample files** to download, edit and import again, and lists the ways to bring in readings from a device, with the note that the device routes are not tested with real hardware.
+- **Watch data:** the "On this phone" panel (Health Connect and Bluetooth LE heart-rate sensor in the Android app) was removed on 2026-11-03. Readings from a watch or other device come in as a CSV/JSON export file or by manual entry. Real data is shown next to the simulation and never drives it.
 </details>
 
 <details>
 <summary><b>Run control and views</b></summary>
 
-Run / pause (<kbd>Space</kbd>), playback speed 0.25–4×, freeze, reset (also restores default alarm limits) and a PNG snapshot that carries the educational notice. Bedside view: toolbar button, <kbd>B</kbd>, or `?bedside=1`. The layout adapts to narrow screens and phones.
+Run / pause (<kbd>Space</kbd>), playback speed 0.25–4×, freeze, reset (also restores default alarm limits) and a PNG snapshot that carries the educational notice. Bedside view: toolbar button, <kbd>B</kbd>, or `?bedside=1`. Its softkeys include the scenario list, the playback speed and **Edit values**, which opens the Controls panel as a drawer on the right so the scenario values can be changed without leaving the view (<kbd>Esc</kbd> closes it; on screens 1200 px and wider the monitor moves aside instead of being covered). The layout adapts to narrow screens and phones.
 </details>
 
 ## Derived 12-lead ECG
@@ -215,7 +217,7 @@ node --test tests/unit/*.test.js
 
 | Suite | Result |
 |---|---|
-| Node unit tests | **145 tests in 17 files, 145 pass** |
+| Node unit tests | **155 tests in 19 files, 155 pass** |
 | Browser self-test (`?selftest=1`, or the Tests tab) | 17 entries: **16 pass, 0 fail, 1 not run** |
 
 The entry that is not run is the Android watch-hardware check (Health Connect, BLE, export file). It is always reported as "not run" when no hardware is present, never as passed. Scenarios, expected and observed results, and what was not tested are in [`TEST_REPORT.md`](TEST_REPORT.md).
@@ -247,9 +249,9 @@ src/core/               observation model, units, patient profile, observation s
 src/sim/                parameters and presets, RNG, DSP, ECG, derived 12-lead, arrhythmias,
                         pulse, sensors, NIBP, detectors, glucose model, engine
 src/alarms/             alarm engine, alarm-to-tile/control links (severity)
-src/data/               CSV reader, importer (mapping, units, timestamps, validation)
+src/data/               CSV reader, importer (mapping, units, timestamps, validation), sample import files
 src/devices/            Bluetooth Heart Rate Measurement parser, Android bridge (Health Connect, BLE)
-src/lessons/            lesson content and quiz grading (no DOM)
+src/lessons/            lesson content and quiz grading (no DOM; not loaded by the page since 2026-11-03)
 src/ui/                 canvas waveforms and trends, panels, 12-lead dialog, bedside view,
                         data tab, self-test, app wiring
 android/                Android WebView app (edu.deu.pmsim, in development)
@@ -291,7 +293,7 @@ The full list is in section 9 of [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md) an
 - The page makes **no network requests**. Its Content Security Policy sets `connect-src 'none'` and loads scripts and styles only from its own folder. The website, the Android app and the desktop apps all use the same page.
 - **Sharing a community scenario is the only route by which anything leaves the page, and only when you click.** The *Share as community scenario* dialog shows the exact JSON first, never includes display settings, and leaves out the patient profile unless you tick the box. The link opens a GitHub issue page in your browser; nothing is sent until you press *Create* there. GitHub issues are public and permanent, so use invented values only.
 - Imported files are read in the browser tab and are not uploaded anywhere.
-- No measurement data is saved between sessions; reloading the page clears it. Only four settings are kept in this browser's `localStorage`: the best quiz score per lesson (`pmsim.lessons.v1`), the Controls view choice (`pmsim.controls.v1`), the Bedside view on/off state (`pmsim.bedside`) and the three profile use-case switches (`pmsim.usecases.v1`).
+- No measurement data is saved between sessions; reloading the page clears it. Only three settings are kept in this browser's `localStorage`: the Controls view choice (`pmsim.controls.v1`), the Bedside view on/off state (`pmsim.bedside`) and the three profile use-case switches (`pmsim.usecases.v1`).
 - The Android app has no `INTERNET` permission and disables cloud backup. Health Connect permissions are read-only and requested from the user. This is the intended design; it has not yet been verified with real devices.
 - Only documented, vendor-neutral interfaces are used (Android Health Connect, the Bluetooth SIG Heart Rate Service, the user's own export files). No proprietary protocol is reverse-engineered.
 - VitalsLab is an original educational design. It does not reproduce the interface of any monitor manufacturer.

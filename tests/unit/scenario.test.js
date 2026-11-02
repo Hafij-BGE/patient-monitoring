@@ -55,7 +55,7 @@ test('severity: every alarm param and technical flag the engine can raise is lin
 test('literature presets: values in range, sourced, and distinct', () => {
   const refs = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../REFERENCES.md'), 'utf8');
   const sourced = P.PRESETS.filter(p => p.refs);
-  assert.ok(sourced.length >= 12);
+  assert.equal(sourced.length, P.PRESETS.length, 'every built-in preset cites literature');
   for (const p of sourced) {
     const r = P.validate(P.DEFAULTS, p.changes);
     assert.deepEqual(r.errors, [], p.id);
@@ -63,5 +63,26 @@ test('literature presets: values in range, sourced, and distinct', () => {
     assert.ok(p.note && p.refs.length, p.id);
     for (const n of p.refs) assert.match(refs, new RegExp('^' + n + '\\. \\*\\*', 'm'), p.id + ' ref ' + n);
     assert.equal(P.matchPreset(P.applyPreset(p.id).params), p.id, p.id + ' collides with another preset');
+  }
+});
+
+test('scenario groups: every built-in preset is in one listed group and no group is empty', () => {
+  const ids = P.SCENARIO_GROUPS.map(g => g.id);
+  assert.equal(new Set(ids).size, ids.length, 'duplicate group id');
+  for (const p of P.PRESETS) assert.ok(ids.includes(p.group), p.id + ' has unknown group ' + p.group);
+  for (const g of P.SCENARIO_GROUPS) assert.ok(P.PRESETS.some(p => p.group === g.id), 'empty group ' + g.id);
+  assert.equal(new Set(P.PRESETS.map(p => p.id)).size, P.PRESETS.length, 'duplicate preset id');
+});
+
+test('scenario summary references: generated file matches REFERENCES.md and covers every cited number', () => {
+  const fs = require('node:fs');
+  const gen = require('../../tools/gen-references.js');
+  assert.equal(fs.readFileSync(gen.JS, 'utf8'), gen.build(fs.readFileSync(gen.MD, 'utf8')),
+    'src/sim/references.js is stale: run node tools/gen-references.js');
+  const R = require('../../src/sim/references.js');
+  for (const p of P.PRESETS) for (const n of p.refs) {
+    assert.ok(R[n] && R[n].cite, p.id + ' ref ' + n + ' missing');
+    assert.ok(R[n].supports, 'ref ' + n + ' has no Supports line');
+    if (R[n].doi) assert.match(R[n].doi, /^10\.\d{4,9}\/\S+[^.,;]$/, 'ref ' + n + ' DOI');
   }
 });

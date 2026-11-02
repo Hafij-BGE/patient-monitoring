@@ -60,8 +60,10 @@
       const li = t => ul.append(el('li', { text: t }));
       for (const e of rep.errors || []) ul.append(el('li.err', { text: e }));
       if (ok) {
-        li('Format: ' + rep.format + (rep.mapping ? ' (' + rep.mapping.format + ' table)' : '') + '; rows read: ' + rep.rowsRead);
-        if (rep.mapping) {
+        // JSON reports carry an empty mapping; only CSV reports have a table layout and columns.
+        const csvMap = rep.mapping && rep.mapping.format ? rep.mapping : null;
+        li('Format: ' + rep.format + (csvMap ? ' (' + csvMap.format + ' table)' : '') + '; ' + (rep.format === 'json' ? 'records' : 'rows') + ' read: ' + rep.rowsRead);
+        if (csvMap) {
           li('Timestamp column: ' + (rep.mapping.timestamp || '?'));
           li('Columns mapped: ' + (rep.mapping.columns || []).map(c => c.column + ' → ' + c.param + (c.unit ? ' [' + c.unit + ']' : '')).join(', '));
           if (rep.mapping.ignored && rep.mapping.ignored.length) li('Columns ignored: ' + rep.mapping.ignored.join(', '));

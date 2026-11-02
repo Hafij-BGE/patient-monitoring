@@ -52,15 +52,24 @@ body.bedside .tile.sev-medium { box-shadow: inset 6px 0 0 var(--med); }
 body.bedside .tile.sev-low { box-shadow: inset 4px 0 0 var(--lo); }
 body.bedside .tile .row { display: none; }
 
-body.bedside .bs-keys { display: flex; flex: none; gap: 4px; padding: 5px 8px; background: #0b131d; border-top: 1px solid var(--bs-line);
-  overflow-x: auto; scrollbar-width: thin; }
+body.bedside .bs-keys { display: flex; flex: none; flex-wrap: wrap; gap: 4px; padding: 5px 8px; background: #0b131d; border-top: 1px solid var(--bs-line); }
 .bs-keys button, .bs-keys select { flex: 1 0 auto; min-width: 0; white-space: nowrap; min-height: 40px; background: var(--bs-key); color: var(--screen-text);
   border: 1px solid var(--bs-key-line); border-radius: 4px; padding: 4px 10px; font-size: 13px; font-weight: 600; }
-.bs-keys select { flex: 2 1 140px; max-width: 280px; font-weight: 500; }
+.bs-keys select { flex: 2 1 140px; min-width: 130px; max-width: 280px; font-weight: 500; }
+.bs-keys select.bs-speed { flex: 0 0 auto; min-width: 96px; }
 @media (max-width: 1000px) { .bs-keys button, .bs-keys select { padding: 4px 7px; font-size: 12px; } }
 .bs-keys button:hover { border-color: #5aa9e6; }
 .bs-keys button[aria-pressed="true"] { background: #4a3a10; color: #ffe39a; border-color: #8a6a1c; }
 .bs-keys .bs-exit { background: #1d2a3a; }
+
+/* "Edit values": the normal Controls panel as a drawer on the right, between the notice and the softkeys */
+body.bedside.bs-edit .panel[data-panel="controls"] { display: block !important; position: fixed; z-index: 15; right: 0;
+  top: var(--bs-edit-top, 28px); bottom: var(--bs-edit-bottom, 52px); width: min(480px, 100vw); margin: 0; border: none;
+  border-left: 1px solid var(--bs-key-line); border-radius: 0; overflow-y: auto; overscroll-behavior: contain; color: var(--text);
+  box-shadow: -10px 0 28px rgba(0, 0, 0, .55); }
+body.bedside.bs-edit .panel[data-panel="controls"] .share-row { display: none; }
+/* on wide screens the monitor moves left instead of being covered, so the numerics stay in view */
+@media (min-width: 1200px) { body.bedside.bs-edit { padding-right: 480px; } }
 
 @media (max-width: 760px) {
   body.bedside { height: auto; min-height: 100vh; overflow: visible; }
@@ -74,5 +83,6 @@ body.bedside .bs-keys { display: flex; flex: none; gap: 4px; padding: 5px 8px; b
   body.bedside .t-val { font-size: 36px; }
   body.bedside .tile.wide .t-val, body.bedside #tArt .t-val { font-size: 30px; }
   body.bedside .bs-keys { position: sticky; bottom: 0; }
+  body.bedside.bs-edit .panel[data-panel="controls"] { width: 100vw; border-left: none; }
   .bs-top .bs-scn { max-width: 100%; }
 }

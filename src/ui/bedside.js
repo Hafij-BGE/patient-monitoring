@@ -2,14 +2,16 @@
  * Bedside view: a full-screen monitor layout for the same live simulation.
  * It re-arranges the existing monitor with CSS (css/bedside.css) and adds a status
  * strip and a softkey bar. Every softkey forwards to an existing control, so the
- * simulation logic is unchanged. Toggle: toolbar button, the B key, or ?bedside=1.
+ * simulation logic is unchanged. "Edit values" shows the normal Controls panel as a drawer,
+ * so the scenario values can be changed without leaving the view (Esc closes it).
+ * Toggle: toolbar button, the B key, or ?bedside=1.
  */
 (function (root) {
   'use strict';
   const { $, el } = root.PM.dom;
   const KEY = 'pmsim.bedside';
   const body = document.body;
-  let top = null, keys = null, scn = null, timer = 0;
+  let top = null, keys = null, scn = null, spd = null, edit = null, timer = 0;
 
   function pref(v) {
     try { if (v === undefined) return root.localStorage.getItem(KEY) === '1'; root.localStorage.setItem(KEY, v ? '1' : '0'); } catch (e) { /* storage blocked */ }
@@ -38,6 +40,13 @@
     scn.addEventListener('change', () => {
       const s = $('#selPreset'); s.value = scn.value; s.dispatchEvent(new Event('change', { bubbles: true })); sync();
     });
+    spd = el('select.bs-speed', { 'aria-label': 'Playback speed (bedside)', title: 'Playback speed' });
+    spd.addEventListener('change', () => {
+      const s = $('#selSpeed'); s.value = spd.value; s.dispatchEvent(new Event('change', { bubbles: true })); sync();
+    });
+    edit = el('button', { type: 'button', text: 'Edit values', 'aria-pressed': 'false',
+      title: 'Show the Controls panel beside the monitor to change the scenario values' });
+    edit.addEventListener('click', () => setEdit(!body.classList.contains('bs-edit')));
     const fs = el('button', { type: 'button', text: 'Full screen', title: 'Toggle browser full screen' });
     fs.addEventListener('click', () => {
       const d = document;
@@ -51,7 +60,7 @@
       proxy('#btnAckAll', 'Acknowledge'), proxy('#btnMute', 'Audio pause'),
       proxy('#btnNibp', 'NIBP start'), proxy('#btnNibpStop', 'NIBP stop'),
       proxy('#btnFreeze', 'Freeze'), proxy('#btnRun', 'Pause'), proxy('#btnPng', 'Snapshot'),
-      scn, fs, exit
+      scn, spd, edit, fs, exit
     ]);
     $('#monitor').after(keys);
   }
@@ -60,13 +69,18 @@
   function sync() {
     if (!top) return;
     const sel = $('#selPreset'), opt = sel.options[sel.selectedIndex];
-    if (scn.options.length !== sel.options.length) scn.replaceChildren(...[...sel.options].map(o => el('option', { value: o.value, text: o.text })));
+    if (scn.options.length !== sel.options.length) scn.replaceChildren(...[...sel.children].map(n => n.cloneNode(true))); // keeps the menu groups
     scn.value = sel.value;
     $('#bsScn').textContent = 'Scenario: ' + (opt ? opt.text : '--');
-    const sp = $('#selSpeed'); $('#bsSpeed').textContent = sp && sp.selectedIndex >= 0 ? 'Speed ' + sp.options[sp.selectedIndex].text : '';
+    const sp = $('#selSpeed');
+    if (sp && spd.options.length !== sp.options.length)
+      spd.replaceChildren(...[...sp.options].map(o => el('option', { value: o.value, text: 'Speed ' + o.text })));
+    if (sp) spd.value = sp.value;
+    $('#bsSpeed').textContent = sp && sp.selectedIndex >= 0 ? 'Speed ' + sp.options[sp.selectedIndex].text : '';
     const paused = /resume|run|start/i.test($('#btnRun').textContent);
     const st = $('#bsState'); st.textContent = paused ? 'PAUSED' : 'RUNNING'; st.classList.toggle('paused', paused);
     $('#bsClock').textContent = $('#clock').textContent;
+    if (body.classList.contains('bs-edit')) drawerBounds();
     for (const b of keys.querySelectorAll('button[data-for]')) {
       const t = $(b.dataset.for); if (!t) continue;
       if (b.dataset.for === '#btnRun' || b.dataset.for === '#btnFreeze') b.textContent = t.textContent.replace(' display', '');
@@ -76,9 +90,32 @@
     }
   }
 
+  /** Keep the edit drawer clear of the notice and the softkeys (both can wrap to more lines). */
+  function drawerBounds() {
+    body.style.setProperty('--bs-edit-top', $('#notice').offsetHeight + 'px');
+    body.style.setProperty('--bs-edit-bottom', keys.offsetHeight + 'px');
+  }
+
+  /** Edit drawer: the normal Controls panel, shown over the right side between the notice and the softkeys. */
+  function setEdit(on) {
+    on = !!on && body.classList.contains('bedside');
+    if (on) {
+      if (root.PM.app && root.PM.app.showTab) root.PM.app.showTab('controls');
+      else { const t = $('#tabs [data-tab="controls"]'); if (t) t.click(); }
+      drawerBounds();
+    }
+    const drawer = $('section.panel[data-panel="controls"]');
+    const hadFocus = !on && drawer && drawer.contains(document.activeElement);
+    body.classList.toggle('bs-edit', on);
+    if (edit) edit.setAttribute('aria-pressed', String(on));
+    if (hadFocus && body.classList.contains('bedside')) edit.focus();
+    root.dispatchEvent(new Event('resize'));
+  }
+
   function set(on) {
     on = !!on;
     if (on && !top) build();
+    if (!on) setEdit(false);
     body.classList.toggle('bedside', on);
     const tb = $('#btnBedside'); if (tb) tb.setAttribute('aria-pressed', String(on));
     clearInterval(timer); timer = 0;
@@ -95,6 +132,7 @@
 
   document.addEventListener('keydown', e => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'Escape' && body.classList.contains('bs-edit')) { e.preventDefault(); setEdit(false); return; }
     if (e.target.closest && e.target.closest('input, select, textarea, [contenteditable]')) return;
     if (e.key === 'b' || e.key === 'B') { e.preventDefault(); set(!body.classList.contains('bedside')); }
     else if (e.key === 'Escape' && body.classList.contains('bedside') && !document.fullscreenElement) set(false);
@@ -103,5 +141,5 @@
   const q = new URLSearchParams(root.location.search);
   if (!q.has('selftest') && (q.get('bedside') === '1' || (!q.has('bedside') && pref()))) set(true);
 
-  root.PM.bedside = { set, isOn: () => body.classList.contains('bedside') };
+  root.PM.bedside = { set, setEdit, isOn: () => body.classList.contains('bedside') };
 })(this);

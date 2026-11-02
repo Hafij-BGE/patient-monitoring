@@ -8,8 +8,8 @@ VitalsLab, Patient Monitor Simulator. Updated 2026-10-29 after the simulation au
 
 | Test level | Result |
 |---|---|
-| Node unit tests (`node --test tests/unit/*.test.js`) | **145 tests in 17 files, 145 pass, 0 fail** (run 2026-10-29 after the community scenarios were added; 133 after the cuff strip change; 130 after the waveform audit, `SIMULATION_AUDIT.md` §9a; 116 after the arterial notch and finger volume pulse, see `SIMULATION_AUDIT.md` §4 and §6; 111 after the simulation audit; 98 after the profile use cases; 93 after the derived 12-lead ECG; 86 after the critical-illness, stroke, heart-failure and post-operative scenarios and the extreme-low alarms; 80 after the SVT scenario and the QRS beat-time fix, 79 after the NIBP set-point fix, 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
-| Browser self-test (`index.html?selftest=1`) | **17 entries: 16 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-10-29 after the waveform audit (§9a): **16 pass, 0 fail, 1 not run** (section 3), the same as before it. |
+| Node unit tests (`node --test tests/unit/*.test.js`) | **155 tests in 19 files, 155 pass, 0 fail** (run 2026-11-03 after the Glucose and Lessons tabs were removed, and before that after the import help and sample files; 152 after the Scenario details tab; 148 after the scenario source review and the scenario summary; 146 after the scenario groups and the 46 disease scenarios were added; 145 after the community scenarios; 133 after the cuff strip change; 130 after the waveform audit, `SIMULATION_AUDIT.md` §9a; 116 after the arterial notch and finger volume pulse, see `SIMULATION_AUDIT.md` §4 and §6; 111 after the simulation audit; 98 after the profile use cases; 93 after the derived 12-lead ECG; 86 after the critical-illness, stroke, heart-failure and post-operative scenarios and the extreme-low alarms; 80 after the SVT scenario and the QRS beat-time fix, 79 after the NIBP set-point fix, 78 after the glucose model, it was 64 tests before the scenario and glucose tests, and 47 before that) |
+| Browser self-test (`index.html?selftest=1`) | **17 entries: 16 automated scenarios plus 1 hardware entry that is always reported as "not run".** Browser run on 2026-11-03 after the Scenario details tab and again after the import help and sample files: **16 pass, 0 fail, 1 not run** each time, the same as on 2026-10-29 after the waveform audit (§9a, section 3). |
 | Manual interaction checks in a browser | 9 earlier checks (section 4.1), 5 checks of the new features made on 2026-10-28 (section 4.2), the derived 12-lead view (section 4.3) and the community scenarios on 2026-10-29 (section 4.4), all as expected. |
 | Hardware tests (watch data on Android through Health Connect, native BLE Heart Rate Service, export file) | **Not run.** No watch, heart-rate sensor or Health Connect store was used. |
 | Android app | Not tested on a device. An APK file (`release/VitalsLab-1.6.0-android.apk`) exists. The page-side bridge is unit-tested with mock records and packets, and the "On this phone" panel was checked in a desktop browser with a mock bridge object. No behaviour of the app has been verified on a phone. |
@@ -76,8 +76,8 @@ Performed on 2026-10-28 in the same browser pane, after capnography, the arteria
 | Monitor screen at desktop width and at 375 px | No horizontal overflow | No overflow at either width |
 | Reset | The new tiles (ART, EtCO₂) are cleared like the others | As expected |
 | Hypoventilation preset | EtCO₂-high alarm after its delay; EtCO₂ tile highlighted | Alarm raised and tile highlighted |
-| Signal chain and Lessons tabs | Both render and update | As expected; no console errors |
-| Android panel: normal browser, then with a mock `PMAndroid` object | Hidden in a normal browser. With the mock: Health Connect records stored, an out-of-range record rejected, a BLE packet decoded, an export routed to `saveText` | As expected |
+| Signal chain and Lessons tabs | Both render and update | As expected; no console errors (Lessons tab removed 2026-11-03) |
+| Android panel (removed 2026-11-03): normal browser, then with a mock `PMAndroid` object | Hidden in a normal browser. With the mock: Health Connect records stored, an out-of-range record rejected, a BLE packet decoded, an export routed to `saveText` | As expected |
 
 The mock object only imitates the app's interface in a desktop browser. It is not a test of the Android app, Health Connect or a Bluetooth device.
 
@@ -117,6 +117,73 @@ Performed on 2026-10-29 in the browser pane (Chromium) served from `localhost`. 
 
 Not tested: the GitHub side (issue form, the `community-scenarios.yml` workflow, the labels, the commit and the redeploy) has not run on GitHub yet; it is covered only by the unit tests of `tools/community-scenario.js`. The link was not clicked, so no issue was created. Opening the link from the Android app (allow-listed for this repository only) and from the Linux desktop app was not tested. The dialog was not checked in dark mode.
 
+### 4.5 Scenario groups and the bedside edit drawer
+
+Performed on 2026-11-03 in the browser pane (Chromium) served from `localhost`.
+
+| Check | Expected | Observed |
+|---|---|---|
+| Toolbar scenario list | 12 group headings, 95 scenarios plus *Custom (edited)* (96 before the review in 4.6) | 12 `<optgroup>`s, 97 options before the review, 96 after it; group sizes as in `TECHNICAL_REPORT.md` §3.12 |
+| Load *Postpartum-haemorrhage pattern* | Note and references shown | Note text and reference [132] shown; no console errors |
+| Bedside scenario list | Same groups and entries as the toolbar | 12 groups, 97 options before the review, 96 after it, same value |
+| Bedside speed list, choose 2× | Simulation speed 2×, toolbar list and status strip follow | Engine speed 2, toolbar value 2, strip "Speed 2×" |
+| *Edit values* at 1017 px wide | Controls panel as a drawer between the notice and the softkeys | Drawer from 24 px (notice bottom) to the softkey row; 112 inputs and lists |
+| Type HR 140 in the drawer (septic-shock scenario loaded) | Value applied; scenario shows *Custom (edited)* | Engine HR 140; toolbar, bedside list and strip show *Custom (edited)*; no error message |
+| <kbd>Esc</kbd> with focus in a drawer field | Drawer closes, bedside view stays, focus on *Edit values* | As expected |
+| *Edit values* at 1440 px wide | Monitor moves aside, not covered | Monitor right edge 960 px = drawer left edge |
+| *Edit values* at 375 px wide | Drawer full width, notice and softkeys visible, no sideways page scroll | Drawer 59–629 px, softkeys below; page width 375 px |
+| *Exit bedside* with the drawer open | Drawer closed, normal page layout | `bs-edit` removed, Controls panel back in its tab |
+
+Not tested: dark mode of the drawer, the Linux desktop app and the Android app (same page, not run for this change), touch scrolling inside the drawer on a real phone.
+
+### 4.6 Scenario sources and the scenario summary
+
+Performed on 2026-11-03. Unit tests: every built-in scenario cites at least one reference and has a note; every cited number has an entry in `REFERENCES.md` with a "Supports" line; `src/sim/references.js` is identical to what `tools/gen-references.js` builds from `REFERENCES.md`; an NIBP measurement at 230/130 mmHg succeeds on the first cycle by re-inflating in steps (target above 230 and at most 280 mmHg, SBP within 8 mmHg). Browser checks in the browser pane (Chromium) served from `localhost`:
+
+| Check | Expected | Observed |
+|---|---|---|
+| Page load | Summary of *Baseline adult* under the controls | Name, group, note, "No changes", 4 references with their Supports lines |
+| Load *Hypoventilation on room air (high EtCO2)* | Changed values next to defaults; DOI links open in a new tab | RR 6 / 14 br/min, EtCO₂ 58 / 38 mmHg, SpO₂ 92 / 97 %; 1 DOI link, `target=_blank`, `rel=noopener` |
+| Type HR 61 in Controls | Summary says the settings were edited by hand | List shows *Custom (edited)*; summary shows the edited message and the notice |
+| Reset | Summary back to *Baseline adult* | As expected |
+| Load *Blood-loss pattern, ATLS class III* in dark mode | Readable in dark theme; changed values highlighted | 5 rows highlighted, 3 references [28–30] with DOI links (screenshot) |
+| Load *Postpartum-haemorrhage pattern* from the bedside list | Summary follows the bedside list | Summary shows the scenario, 7 changed values, 1 reference |
+| Browser self-test | No change | 16 pass, 0 fail, 1 not run |
+
+A cached `index.html` from before this change, loaded together with the new `src/ui/app.js`, stopped the start-up script because the summary script was missing. `app.js` now skips the summary when its script or its section is absent; the page then starts as before. Not tested: a community scenario in the summary (none is approved yet), the Linux desktop app and the Android app (same page, not run for this change).
+
+### 4.7 Scenario details tab
+
+Performed on 2026-11-03. Unit tests (`tests/unit/scenarioDetails.test.js`, 4 tests): every built-in scenario has details with a known condition and a non-empty "shows" text, and no entry names an unknown scenario; every condition has a title, a valid kind and non-empty "what" and "happens" texts and is used; every cited reference exists; every heart rate, respiratory rate, blood pressure and EtCO₂ quoted in a "shows" text equals the scenario setting (more than 60 numbers checked). Browser checks in the browser pane (Chromium) served from `localhost`:
+
+| Check | Expected | Observed |
+|---|---|---|
+| Page load | Details of *Baseline adult* in the tab | "Normal resting adult", marked as a vital-sign pattern, not a diagnosis |
+| Load the DKA-type scenario, click the button in the summary | The Scenario details tab opens with that scenario | Tab selected; condition, body, monitor text and changes table shown |
+| Load *Carbon-monoxide pattern* from the bedside list | Tab follows the bedside list | Main list and tab show the CO scenario, 1 reference with its Supports line |
+| Change a control by hand | Tab says no details apply | *Custom (edited)* message and the notice |
+| Reset | Back to *Baseline adult* | As expected |
+| *Bradycardia* | Marked as a sign | "Sinus bradycardia", vital-sign pattern |
+| Browser self-test | No change | 16 pass, 0 fail, 1 not run |
+
+Not tested: a community scenario in the tab (none is approved yet), the Linux desktop app and the Android app (same page, not run for this change). The texts were written from the cited sources and the standard physiology they describe; they were not reviewed by a clinician.
+
+### 4.8 Import help, sample files and the device section
+
+Performed on 2026-11-03. Unit tests (`tests/unit/samples.test.js`, 3 tests): each of the four sample files imports with no invalid value and no error and at least 10 values; °F, lb, kPa and mmol/L are converted with the constants of `units.js`, `N/A` and `NA` stay missing, empty wide-table cells are not stored, a decimal comma is read; every unit listed by `acceptedUnits()` is accepted by `toCanonical()`. Browser checks in the browser pane (Chromium) served from `localhost` with caching off:
+
+| Check | Expected | Observed |
+|---|---|---|
+| Data tab | Three help blocks; parameter table with one row per parameter | 3 blocks, 22 rows |
+| Click the four download buttons | Four files with the right names and types | 4 files: three `text/csv`, one `application/json` |
+| Import the four downloaded files through the file input | Imported, no invalid value | 33, 11, 14 and 13 values imported, invalid 0 in each report |
+| JSON import report | No "undefined table" text | "Format: json; records read: 5" |
+| Device section in a desktop browser | Says routes 1 and 2 need the Android app; hardware note and disclaimer shown | As expected |
+| 375 px wide | No sideways page scroll | Page width 375 px |
+| Browser self-test | No change | 16 pass, 0 fail, 1 not run |
+
+Not tested: the Android app (the "you are in the Android app" text and the native save dialog for the sample files) and any real device.
+
 ## 5. Offline and `file://` operation
 
 The page was not opened from `file://` in a browser during this session. The local Chromium-based browser available here (a snap package) could not read files under `/tmp` or `/mnt` because of its sandbox, and the browser pane cannot open `file://` URLs. Instead the following was checked statically:
@@ -130,7 +197,7 @@ When served over `http://localhost`, the app made no network requests other than
 
 ## 6. Node unit and integration tests
 
-145 tests in 17 files (21 + 10 + 4 + 13 + 3 + 12 + 3 + 4 + 6 + 8 + 10 + 6 + 7 + 9 + 14 + 3 + 12). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
+146 tests in 17 files (21 + 10 + 4 + 13 + 3 + 12 + 3 + 4 + 7 + 8 + 10 + 6 + 7 + 9 + 14 + 3 + 12). Section numbers (§19.x) refer to the acceptance checks of the project prompt.
 
 The first five files were already described before the new features were added. Their counts did not change.
 
@@ -234,12 +301,13 @@ These tests check the analyser only on the simulator's own waveforms. They are n
 
 These tests use records and packets written in the test. They do not involve a phone, Health Connect or a Bluetooth device.
 
-### `tests/unit/scenario.test.js` (6 tests)
+### `tests/unit/scenario.test.js` (7 tests)
 
 - Every preset matches itself; a manual edit of a patient, physiology or sensor value gives "custom". Display and processing settings do not make a scenario custom.
 - Loading a scenario sets every patient and sensor value, not only the scenario's own changes.
 - Alarm colouring: the highest priority wins per tile, all messages are kept, and a technical alarm maps to its sensor control. Every alarm parameter and technical flag the engine can raise is linked to a tile.
 - Literature scenarios: values in range without clamping, references that exist in `REFERENCES.md`, and no two scenarios with the same settings.
+- Scenario groups: every built-in scenario is in exactly one group listed in `SCENARIO_GROUPS`, no group is empty, and no two scenarios have the same id.
 
 ### `tests/unit/glucose.test.js` (8 tests)
 

@@ -77,6 +77,17 @@ test('NIBP fails with a message under strong motion; re-inflates when SBP is abo
   assert.ok(r2 && !r2.error && r2.target > 175, 'target ' + (r2 && r2.target));
 });
 
+test('NIBP re-inflates in steps until occlusion: SBP 230 reads on the first measurement', () => {
+  const e = new Engine({ sbp: 230, dbp: 130 });
+  let res = null;
+  e.onNibp = r => { res = r; };
+  e.startNibp();
+  e.advance(150);
+  assert.ok(res && !res.error, 'error: ' + (res && res.error));
+  assert.ok(res.target > 230 && res.target <= 280, 'target ' + res.target);
+  assert.ok(Math.abs(res.sbp - 230) <= 8, 'SBP ' + res.sbp);
+});
+
 test('NIBP aborts when the pressure set point changes during a measurement; small drift is accepted', () => {
   // Reproduces the report defect: baseline 120/80, switch to 78/42 while the cuff deflates.
   const e = new Engine({});

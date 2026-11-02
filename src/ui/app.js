@@ -77,7 +77,6 @@
     applySeverity();
     if (visible('alarms')) PM.panels.renderAlarmHistory($('#alarmHistory tbody'), alarms.history);
     if (visible('trends') && !trendPaused && Math.floor(f.t) % 2 === 0) drawTrendNow();
-    if (visible('glucose') && Math.floor(f.t) % 2 === 0) glucose.draw();
     $('#clock').textContent = 't = ' + f.t.toFixed(0) + ' s';
     if (Math.floor(f.t) % 5 === 0) refreshExt();
   };
@@ -290,9 +289,17 @@
   });
   // The scenario select names the preset the patient and sensor settings match, or
   // "Custom" once any of them was edited by hand (display settings do not count).
+  let summaryFor = null;
   function syncScenario() {
     const sel = $('#selPreset');
     sel.value = P.matchPreset(engine.p, sel.value);
+    // Summary follows the menu, whether the change came from it, the bedside view, Reset or an edit.
+    // Guarded: a cached older index.html has neither the panel nor its script.
+    if (sel.value !== summaryFor && PM.scenarioSummary && $('#scenarioSummary')) {
+      summaryFor = sel.value;
+      PM.scenarioSummary.render($('#scenarioSummary'), sel.value, { openDetails: () => showTab('details') });
+      if ($('#scenarioDetails')) PM.scenarioSummary.renderDetails($('#scenarioDetails'), sel.value);
+    }
   }
   function afterParams() {
     syncScenario();
@@ -305,7 +312,11 @@
   // Community scenarios ship with the page (community/scenarios.js); an entry that fails the checks is skipped.
   const community = PM.community && PM.communityData ? PM.community.register(PM.communityData) : { added: [], rejected: [] };
   if (community.rejected.length) console.warn('Community scenarios skipped:', community.rejected);
-  for (const p of P.PRESETS) if (!p.community) $('#selPreset').append(el('option', { value: p.id, text: p.name }));
+  // One menu group per disease or condition group, in SCENARIO_GROUPS order.
+  for (const g of P.SCENARIO_GROUPS) {
+    const list = P.PRESETS.filter(p => !p.community && p.group === g.id);
+    if (list.length) $('#selPreset').append(el('optgroup', { label: g.label }, list.map(p => el('option', { value: p.id, text: p.name }))));
+  }
   if (community.added.length) {
     $('#selPreset').append(el('optgroup', { label: 'Community scenarios' },
       community.added.map(p => el('option', { value: p.id, text: p.name + ' (community)' }))));
@@ -319,8 +330,7 @@
     engine.startNibp(); // a fresh cuff reading for the new scenario
     controls.showMsgs({ errors: s.errors, warnings: s.warnings });
     $('#controlMsgs').prepend(el('div.ok', { text: 'Scenario "' + r.preset.name + '" applied' + (r.changed.length ? '. Changed: ' + r.changed.map(k => P.SPEC[k].label).join(', ') + '.' : ' (all patient and sensor settings at default).') }));
-    if (r.preset.community) $('#controlMsgs').prepend(el('div.ok', { text: 'Community scenario by @' + r.preset.author + ' (GitHub issue #' + r.preset.issue + ', added ' + r.preset.added + '). ' + (r.preset.note ? r.preset.note + ' ' : '') + 'Source given by the author: ' + r.preset.source + '. The maintainer checked the format and the parameter ranges, not the clinical content. Illustrative pattern for education only; values are not diagnostic.' }));
-    else if (r.preset.note) $('#controlMsgs').prepend(el('div.ok', { text: r.preset.note + ' References: ' + r.preset.refs.map(n => '[' + n + ']').join(' ') + ' in REFERENCES.md. Illustrative pattern for education only; real presentations vary and values are not diagnostic.' }));
+    $('#controlMsgs').append(el('div.ok', { text: 'Description, changed values and literature: see Scenario summary below the controls.' }));
     afterParams();
   });
 
@@ -394,18 +404,6 @@
   engine.enableTaps(true);
   const chain = PM.chainPanel.init({ getEngine: () => engine });
 
-  // ------------------------------------------------------------- lessons
-  PM.lessonsPanel.init({
-    applyPreset: id => { $('#selPreset').value = id; $('#selPreset').dispatchEvent(new Event('change')); },
-    setParams: update => {
-      const r = engine.setParams(update);
-      controls.sync(engine.p);
-      controls.showMsgs({ errors: r.errors, warnings: r.warnings });
-      afterParams();
-    },
-    showTab,
-    tabLabel: name => $('#tabs [data-tab="' + name + '"]').textContent,
-  });
 
   // ------------------------------------------------------------- tabs
   const visible = name => !$('section.panel[data-panel="' + name + '"]').hidden;
@@ -417,7 +415,6 @@
     if (name === 'alarms') PM.panels.renderAlarmHistory($('#alarmHistory tbody'), alarms.history);
     if (name === 'data' && dataPanel) dataPanel.renderSummary();
     if (name === 'chain') chain.draw();
-    if (name === 'glucose') glucose.draw();
   }
   $$('#tabs [role=tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
@@ -469,8 +466,7 @@
   });
   profile.refresh(engine.p);
   dataPanel = PM.dataPanel.init({ store, getEngine: () => engine, onChange: refreshExt });
-  PM.androidPanel.init({ store, onChange: refreshExt });
-  glucose = PM.glucosePanel.init({ getEngine: () => engine });
+  if (PM.importHelp) PM.importHelp.init();
   $('#btnSelfTest').addEventListener('click', () => PM.selftest.run());
 
   // ------------------------------------------------------------- start

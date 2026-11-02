@@ -85,6 +85,13 @@
     return !!p && Number.isFinite(value) && value >= p.min && value <= p.max;
   }
 
+  /** Unit spellings accepted for param (lower case, as compared after normUnit). */
+  function acceptedUnits(param) {
+    const p = PARAMS[param];
+    if (!p) return [];
+    return [...new Set([normUnit(p.unit)].concat(Object.keys(CONVERTERS[param] || {})))];
+  }
+
   const cToF = c => c * 9 / 5 + 32;
   const fToC = f => (f - 32) * 5 / 9;
   const kgToLb = kg => kg * LB_PER_KG;
@@ -98,6 +105,6 @@
   }
   const ftInToCm = (ft, inch) => (ft * 12 + inch) * 2.54;
 
-  return { PARAMS, toCanonical, inRange, normUnit, cToF, fToC, kgToLb, lbToKg, cmToFtIn, ftInToCm,
+  return { PARAMS, toCanonical, inRange, normUnit, acceptedUnits, cToF, fToC, kgToLb, lbToKg, cmToFtIn, ftInToCm,
            LB_PER_KG, MMHG_PER_KPA };
 });

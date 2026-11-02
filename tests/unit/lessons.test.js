@@ -7,7 +7,7 @@ const L = require('../../src/lessons/lessons.js');
 const params = require('../../src/sim/params.js');
 const { Engine } = require('../../src/sim/engine.js');
 
-const TABS = ['controls', 'nibp', 'alarms', 'trends', 'data', 'profile', 'chain', 'lessons', 'science', 'tests', 'refs'];
+const TABS = ['controls', 'nibp', 'alarms', 'trends', 'data', 'profile', 'chain', 'science', 'tests', 'refs'];
 
 test('lessons: presets, tabs and control changes are all valid', () => {
   const ids = new Set();

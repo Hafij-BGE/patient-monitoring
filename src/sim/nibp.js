@@ -96,8 +96,8 @@
       if (this.onDone) this.onDone(res);
     }
     finish(t, res) {
-      if (res.retryHigher && !this.retried && this.target < 280) {
-        // pulsations still present at the inflation pressure: re-inflate 50 mmHg higher once
+      if (res.retryHigher && this.target < 280) {
+        // pulsations still present at the inflation pressure: re-inflate 50 mmHg higher, up to the 280 mmHg limit
         this.retried = true; this.target = Math.min(280, this.target + 50);
         this.state = 'inflating'; this.seg = []; this.beats = []; this.msg = 're-inflating'; this.t0 = t;
         return;

@@ -29,7 +29,7 @@ The set point of every parameter is known, so the app shows each estimate next t
 | Data I/O | `src/data/csv.js`, `importer.js` | CSV/JSON parsing, column mapping, units, time zones, validation |
 | Lessons | `src/lessons/lessons.js` | Lesson content (objectives, steps, quiz questions) and quiz grading; no DOM |
 | Device parser and bridge | `src/devices/gatt.js`, `androidBridge.js` | Parser for the Bluetooth Heart Rate Measurement characteristic (0x2A37); conversion of Health Connect records and BLE packets from the Android app into observations |
-| UI | `src/ui/*.js` (including `chainPanel.js`, `lessonsPanel.js`, `androidPanel.js`, `glucosePanel.js`), `index.html`, `css/` | Canvas rendering, panels and wiring. Tabs: Controls, NIBP, Alarms, Trends, Glucose, Data import/export, Profile, Signal chain, Lessons, Science, Tests, References |
+| UI | `src/ui/*.js` (including `chainPanel.js`), `index.html`, `css/` | Canvas rendering, panels and wiring. Tabs: Controls, Scenario details, NIBP, Alarms, Trends, Data import/export, Profile, Signal chain, Science, Tests, References. The Glucose and Lessons tabs were removed on 2026-11-03; `glucosePanel.js`, `lessonsPanel.js` and `src/lessons/lessons.js` stay in the source tree but the page no longer loads them |
 | Android host | `android/` (Kotlin) | WebView wrapper around the same page, with a Health Connect reader, a native BLE Heart Rate client and a save dialog for exports (not tested with real hardware) |
 
 The simulation, alarm, data and parser modules never touch the DOM. Each uses a UMD wrapper, so the same file runs in the browser (`window.PM.*`) and in Node for the unit tests. There is no build step and no ES-module import, so `index.html` also works from `file://`.
@@ -308,7 +308,7 @@ The phase constants, the time constants and the 15 %/85 % split are **illustrati
 - All three are null if no breath was detected within the apnea delay.
 - A NaN sample within the last 1 s raises the technical condition "CO₂ no signal".
 
-Presets: *Hypoventilation on room air (high EtCO2)* (RR 6, EtCO₂ 58 mmHg, SpO₂ 92 %: by the alveolar gas equation PAO₂ ≈ 150 − 58/0.8 ≈ 78 mmHg), *Obstructed expiration* (obstruction 80 %, RR 22) and *CO2 rebreathing* (FiCO₂ 6 mmHg).
+Presets: *Hypoventilation on room air (high EtCO2)* (RR 6, EtCO₂ 58 mmHg, SpO₂ 92 %: by the alveolar gas equation PAO₂ ≈ 150 − 58/0.8 ≈ 78 mmHg), *Obstructed expiration* (obstruction 80 %, RR 22) and *CO2 rebreathing* (FiCO₂ 6 mmHg; EtCO₂ set point 46 mmHg, an illustrative rise above the default 38).
 
 ### 3.9 Invasive arterial pressure (fluid-filled line)
 
@@ -368,7 +368,7 @@ Without beats the Windkessel pressure decays toward P∞ with its time constant 
 
 These rules are **not a validated arrhythmia algorithm**. A clinical arrhythmia detector is tested against annotated ECG databases (IEC 60601-2-27); this one was not.
 
-### 3.11 Monitor screen, signal chain view and lessons
+### 3.11 Monitor screen, signal chain view and lessons (removed)
 
 **Signal chain tab** (`src/ui/chainPanel.js`). For one channel at a time the tab plots each stage of the chain from the engine taps, with its unit and a short note:
 
@@ -384,7 +384,7 @@ The last stage can be saved as a PNG image.
 
 **Controls tab** (`buildControls` in `src/ui/panels.js`). One row per parameter, built from `SPEC`. *Simple* view shows 16 main controls (the 5 patient profile fields: age, sex, height, weight, diabetes status; then HR, arrhythmia pattern, SYS, DIA, SpO₂, RR, EtCO₂, temperature, motion, SpO₂ probe state, NIBP interval). Any other control is shown as well when it is not at its default value or an active alarm points to it, so a scenario never hides what it changed. *Advanced* shows all 64. The explanation text is hidden unless *Show explanations* is ticked; it is also the tooltip of the control name.
 
-**Lessons tab** (`src/lessons/lessons.js`, `src/ui/lessonsPanel.js`). Eight guided lessons: ECG signal chain, pulse oximetry, NIBP, rhythms, capnography, arterial line, alarms and deterioration before cardiac arrest (8–10 min each). Each lesson has objectives, a button that loads its scenario (preset), steps that can set controls or open a tab, and a quiz of 3 multiple-choice questions with an explanation for each answer. A unit test checks that the quiz answers about the model (for example the ratio R of the desaturation preset) agree with the simulator. The best score per lesson is kept in the browser's `localStorage` only; it is not measurement data.
+**Lessons tab (removed from the page on 2026-11-03; the description is kept for the record).** (`src/lessons/lessons.js`, `src/ui/lessonsPanel.js`). Eight guided lessons: ECG signal chain, pulse oximetry, NIBP, rhythms, capnography, arterial line, alarms and deterioration before cardiac arrest (8–10 min each). Each lesson has objectives, a button that loads its scenario (preset), steps that can set controls or open a tab, and a quiz of 3 multiple-choice questions with an explanation for each answer. A unit test checks that the quiz answers about the model (for example the ratio R of the desaturation preset) agree with the simulator. The best score per lesson is kept in the browser's `localStorage` only; it is not measurement data.
 
 **Monitor screen.** Six sweeping waveforms: ECG, pleth (auto scale), ART (optimum scale: the range snaps to 20 mmHg steps around the visible sweep, e.g. 40–140 mmHg at 120/80, and is printed in the label), respiration (auto scale), CO₂ (0–60 mmHg) and cuff pressure (0–300 mmHg). Respiration, CO₂ and cuff sweep at 6.25 mm/s. The HR tile also shows the rhythm label and the PVC rate. The ART tile shows SYS/DIA (MAP) with the set point and the SYS limits. The EtCO₂ tile shows FiCO₂ and awRR. The page layout adapts to narrow screens (one column at 1100 px and below, a phone layout at 720 px and below).
 
@@ -392,7 +392,9 @@ The last stage can be saved as a PNG image.
 
 A scenario sets **every** patient-profile, physiological and sensor control: it starts from the defaults and applies its own changes, so nothing from the previous scenario remains. Processing and display settings (filters, sweep, averaging, NIBP interval, speed, seed) are kept. When any patient or sensor control is changed by hand, in Controls or in the Profile tab, the selector shows **Custom (edited)**. If the values are changed back to those of a scenario, the selector shows that scenario again (`matchPreset` in `src/sim/params.js`).
 
-There are 50 scenarios. The first 25 change one or two signs, or one sensor setting. The other 25 are **combined-sign patterns taken from the literature**. Each lists its sources (field `refs`, entries 28–44, 51 and 55–68 of `REFERENCES.md`) and a teaching note, which the app shows when the scenario is loaded.
+There are 95 scenarios, and **every one cites its sources** (field `refs`, numbers of `REFERENCES.md`) and has a teaching note. 25 change one or two signs, or one sensor setting; sources for 23 of them (entries 136–148 and earlier ones) were added on 2026-11-03; all 25 are listed under *Sources of the simple scenarios* below. The other 70 are **combined-sign patterns taken from the literature** (entries 28–44, 51, 55–68, 72, 73, 81 and 96–135). The first 24 are listed in the table below; the 46 added after v1.6.0 are listed under *Disease and condition scenarios*. On 2026-11-03 every scenario was re-checked against its sources. One scenario, "compensatory hyperventilation (low EtCO₂)", was removed: it set the same heart rate, blood pressure, breathing rate and EtCO₂ as the DKA-type scenario, only without the high glucose, so it added nothing the DKA-type scenario does not show.
+
+*Grouping.* Every scenario has a `group` field, and `SCENARIO_GROUPS` in `src/sim/params.js` lists 12 groups in menu order: single vital-sign changes (12), sensor and signal artefacts (6), heart rhythm (7), heart and circulation (8), bleeding, shock and sepsis (9), lungs and airway (10), brain and nerves (6), metabolic, endocrine and electrolytes (9), temperature, drugs and poisoning (13), anaesthesia and after surgery (8), pregnancy and birth (4), deterioration and cardiac arrest (3). The scenario list in the toolbar and in the bedside view shows each group as a heading (`<optgroup>`); community scenarios follow in their own group. A unit test checks that every scenario belongs to exactly one listed group, that no group is empty and that no two scenarios share an id.
 
 | Scenario | Values (others at default) | Sources |
 |---|---|---|
@@ -401,7 +403,6 @@ There are 50 scenarios. The first 25 change one or two signs, or one sensor sett
 | Infection screening (SIRS / qSOFA) | HR 112, RR 24, 96/58 mmHg, 38.7 °C | 31 |
 | Acute allergic reaction | 78/42 mmHg, HR 128, SpO₂ 90 %, obstruction 60 %, RR 24, EtCO₂ 30 | 32, 33, 35 |
 | Hypoventilation masked by O₂ | RR 7, EtCO₂ 55 (SpO₂ stays 97 %) | 34, 35 |
-| Compensatory hyperventilation | RR 28, EtCO₂ 24, HR 115, 102/64 mmHg | 35, 36 |
 | Dead-space pattern (PE-type) | HR 115, SpO₂ 89 %, 105/70 mmHg, EtCO₂ 30, RR 24 | 37, 38 |
 | Hypothermia stage II | 30.5 °C, HR 45, 92/58 mmHg, RR 9, PI 0.3 % | 39 |
 | Hypermetabolic, early (MH-type) | EtCO₂ 60, HR 125, RR 12, 37.6 °C | 40, 41 |
@@ -423,6 +424,103 @@ There are 50 scenarios. The first 25 change one or two signs, or one sensor sett
 | Post-operative pulmonary complication (atelectasis type) | SpO₂ 89 %, RR 26, HR 104, EtCO₂ 34 | 68 |
 
 Where a source gives a range (for example ATLS class III: HR 120–140, RR 30–40) the value lies inside it. Where a source gives only a direction (for example "pulse pressure decreased", "bradycardia"), the number is an **illustrative choice** in that direction. The ECG scale factors for raised potassium are illustrative; the source gives only the order of the changes, and the patterns carry no potassium values. The DKA-type pattern shows only glucose above 250 mg/dL together with the compensatory breathing of [35, 36]; ketones, pH and potassium are not modelled. The critical-illness and post-operative scenarios also show what the monitor **cannot** see, and their notes say so. In the peri-arrest pattern the low EtCO₂ comes from low pulmonary blood flow; pulseless electrical activity (PEA) is not modelled, because the model always couples a QRS complex to a pulse. The stroke pattern shows only the blood pressure (above the 185/110 mmHg limit for thrombolysis [61]); the neurological deficit is not visible on a monitor. The cold-wet heart-failure pattern has a proportional pulse pressure of (92 − 74)/92 < 25 % [64] but raises no default alarm, although it is the profile with the highest risk. Cardiogenic shock raises the same alarms as the blood-loss pattern; venous pressure and right-ventricular failure are not modelled. In the shivering pattern the SpO₂ of about 85 % is a motion artefact (set point 97 %) that the signal quality index does not flag (section 9). The monitor cannot tell atelectasis from pneumonia or pulmonary embolism. A unit test (`tests/unit/critical.test.js`) checks the alarms each of these scenarios raises. Every scenario is an illustrative pattern for education only. Real presentations vary and the values are not diagnostic. A unit test checks that every sourced scenario passes validation without clamping, that its references exist in `REFERENCES.md` and that no two scenarios have the same settings.
+
+#### Disease and condition scenarios
+
+The 46 scenarios below were added after v1.6.0. Each was built from the sources given (entries 96–135 of `REFERENCES.md` and earlier entries where they apply). Each source was checked against its PubMed record. Where the abstract does not give the figure used, `REFERENCES.md` marks it "(full text)": that figure comes from the body of the paper and was not re-read. As in the first table, a number inside a range given by a source lies in that range, and a number for which the source gives only a direction is an illustrative choice. Every note says what the monitor cannot show (for example the neurological deficit in brain injury, the carboxyhaemoglobin in carbon-monoxide poisoning, or the uterine tone in postpartum haemorrhage).
+
+| Group | Scenario | Values (others at default) | Sources |
+|---|---|---|---|
+| Single vital-sign changes | Trained-athlete resting pattern (sinus bradycardia) | HR 44, variability SD 90 ms, RR 10 | 108 |
+| Heart rhythm | AF with fast ventricular rate | AF rhythm, HR 160, 92/60 mmHg | 135 |
+| Heart and circulation | Hypertensive-emergency pattern | HR 96, 220/130 mmHg | 105 |
+| Heart and circulation | Wide pulse-pressure pattern (aortic-regurgitation-type) | HR 88, 160/45 mmHg | 106 |
+| Heart and circulation | Pericardial tamponade pattern | HR 125, 84/66 mmHg, RR 26, R wave 0.5 mV | 107 |
+| Heart and circulation | Dead-space pattern with shock (high-risk PE-type) | HR 130, 82/54 mmHg, RR 30, SpO₂ 84 %, EtCO₂ 22 | 37, 38 |
+| Bleeding, shock and sepsis | Blood-loss pattern, ATLS class I | HR 90, RR 18 | 28, 29 |
+| Bleeding, shock and sepsis | Blood-loss pattern, ATLS class IV | HR 145, 68/50 mmHg, RR 38, PI 0.3 % | 28–30 |
+| Bleeding, shock and sepsis | Septic-shock pattern (vasodilated) | HR 125, 82/40 mmHg, RR 28, 39.2 °C, PI 4 % | 31, 73 |
+| Bleeding, shock and sepsis | Neurogenic-shock pattern (low pressure, slow rate) | HR 48, 82/44 mmHg | 96 |
+| Bleeding, shock and sepsis | Reflex-syncope pattern (vasovagal) | HR 40, 72/40 mmHg | 97 |
+| Lungs and airway | Acute severe asthma pattern | HR 118, RR 28, SpO₂ 93 %, EtCO₂ 32, obstruction 85 % | 35, 98 |
+| Lungs and airway | Life-threatening asthma pattern (tiring) | HR 100, 96/60 mmHg, RR 14, SpO₂ 88 %, EtCO₂ 42, obstruction 95 % | 35, 98 |
+| Lungs and airway | Severe pneumonia pattern (CURB-65 ≥ 3) | age 72, HR 108, 104/58 mmHg, RR 30, SpO₂ 91 %, 38.6 °C | 99 |
+| Lungs and airway | Severe hypoxaemic failure pattern (ARDS-type) | HR 110, RR 30, SpO₂ 87 %, EtCO₂ 40 | 72, 100 |
+| Lungs and airway | Tension-pneumothorax pattern (ventilated) | HR 135, 74/48 mmHg, SpO₂ 82 %, EtCO₂ 25 | 101 |
+| Lungs and airway | Hyperventilation pattern (low CO2, normal SpO2) | HR 108, RR 30, SpO₂ 99 %, EtCO₂ 22 | 35, 102 |
+| Brain and nerves | Brain injury with secondary insults (hypotension, hypoxia) | HR 105, 88/52 mmHg, RR 10, SpO₂ 88 %, EtCO₂ 48 | 109, 110 |
+| Brain and nerves | Generalised seizure pattern (artefact-dominated) | HR 140, 170/100 mmHg, SpO₂ 88 %, 38.2 °C, motion 80 %, ECG noise 150 µV | 111 |
+| Brain and nerves | Autonomic-dysreflexia pattern (high spinal cord injury) | HR 52, 190/105 mmHg | 112 |
+| Brain and nerves | Neuromuscular respiratory failure pattern (GBS-type) | HR 112, RR 30, SpO₂ 95 %, EtCO₂ 46, breath impedance 0.6 Ω | 113 |
+| Metabolic, endocrine and electrolytes | Low-glucose pattern (level 2 hypoglycaemia) | type 1 diabetes, fasting glucose 50 mg/dL, HR 110, SBP 150 mmHg | 51 |
+| Metabolic, endocrine and electrolytes | Thyroid-storm pattern | AF rhythm, HR 150, 150/60 mmHg, RR 24, 39.4 °C | 114 |
+| Metabolic, endocrine and electrolytes | Myxoedema-coma pattern | HR 46, 92/60 mmHg, RR 8, EtCO₂ 52, 34.5 °C, R wave 0.6 mV | 115 |
+| Metabolic, endocrine and electrolytes | Adrenal-crisis pattern | HR 120, 78/44 mmHg, 38.4 °C, T 1.6× | 43, 116 |
+| Metabolic, endocrine and electrolytes | Catecholamine-crisis pattern (phaeochromocytoma-type) | HR 140, 230/125 mmHg, 38.4 °C | 117 |
+| Metabolic, endocrine and electrolytes | Missed-dialysis pattern (fluid overload and raised potassium) | HR 58, 178/98 mmHg, RR 26, SpO₂ 91 %, T 1.8×, P 0.4×, QRS width 1.4× | 43, 118 |
+| Temperature, drugs and poisoning | Cold-exposure pattern (hypothermia stage I, shivering) | HR 105, 140/88 mmHg, RR 22, 34 °C, motion 40 % | 39 |
+| Temperature, drugs and poisoning | Heatstroke pattern | HR 145, 92/50 mmHg, RR 30, EtCO₂ 28, 41.5 °C | 119 |
+| Temperature, drugs and poisoning | Neuroleptic-malignant pattern (NMS-type) | HR 120, 160/95 mmHg, RR 24, 39.5 °C | 120 |
+| Temperature, drugs and poisoning | Serotonin-toxicity pattern | HR 130, 165/95 mmHg, RR 24, 39 °C, motion 50 % | 121 |
+| Temperature, drugs and poisoning | Calcium-channel-blocker overdose pattern | fasting glucose 360 mg/dL, HR 42, 74/40 mmHg | 122 |
+| Temperature, drugs and poisoning | Tricyclic-overdose pattern (wide QRS) | HR 125, 84/50 mmHg, QRS width 1.6× | 123 |
+| Temperature, drugs and poisoning | Cholinergic-crisis pattern (organophosphate-type) | HR 46, 92/56 mmHg, RR 30, SpO₂ 86 %, obstruction 60 % | 124 |
+| Temperature, drugs and poisoning | Sympathomimetic-toxicity pattern (cocaine-type) | HR 140, 180/105 mmHg, RR 24, 39 °C | 125 |
+| Temperature, drugs and poisoning | Carbon-monoxide pattern (falsely normal SpO2) | HR 110, RR 22, SpO₂ 99 % | 126 |
+| Temperature, drugs and poisoning | Opioid-overdose pattern (room air) | HR 54, 98/58 mmHg, RR 4, SpO₂ 78 %, EtCO₂ 68 | 35, 104 |
+| Anaesthesia and after surgery | Post-induction hypotension pattern | HR 60, 78/42 mmHg, RR 12, EtCO₂ 35 | 127 |
+| Anaesthesia and after surgery | Oesophageal-intubation pattern (no exhaled CO2) | HR 110, SpO₂ 94 %, EtCO₂ 5 | 103 |
+| Anaesthesia and after surgery | Venous-air-embolism pattern | HR 120, 86/52 mmHg, RR 12, SpO₂ 90 %, EtCO₂ 22 | 128 |
+| Anaesthesia and after surgery | Local-anaesthetic-toxicity pattern (cardiac stage) | HR 40, 70/38 mmHg, QRS width 1.5× | 129 |
+| Pregnancy and birth | Pre-eclampsia with severe-range blood pressure | female, age 30, HR 96, 168/112 mmHg, SpO₂ 95 % | 131 |
+| Pregnancy and birth | Postpartum-haemorrhage pattern (raised shock index) | female, age 30, HR 120, 92/60 mmHg, RR 24, PI 0.8 % | 132 |
+| Pregnancy and birth | Amniotic-fluid-embolism pattern | female, age 30, HR 135, 66/36 mmHg, RR 32, SpO₂ 78 %, EtCO₂ 18 | 133 |
+| Pregnancy and birth | Spinal-anaesthesia hypotension at caesarean | female, age 30, HR 58, 82/44 mmHg | 130 |
+| Deterioration and cardiac arrest | After return of circulation (post-ROSC) | HR 110, 92/56 mmHg, SpO₂ 96 %, EtCO₂ 38 | 60, 134 |
+
+Some of these scenarios are limited by the model. The carbon-monoxide pattern shows a normal SpO₂ because a two-wavelength oximeter cannot see carboxyhaemoglobin; the model does not simulate the gas itself. The tamponade pattern shows a small R wave, but electrical alternans and pulsus paradoxus are not modelled. The ECG scale factors (T-wave, P-wave and QRS width) for adrenal crisis, missed dialysis, tricyclic overdose and local-anaesthetic toxicity are illustrative and carry no potassium or drug levels. The pregnancy scenarios set sex female and age 30; they show maternal signs only, with no fetal monitoring. The low-glucose pattern uses the glucose model (level 2: below 54 mg/dL). All scenarios pass validation without clamping or warnings, and the 30 s no-NaN simulation test runs each of them.
+
+#### Sources of the simple scenarios
+
+Until 2026-11-03, 23 of the 25 simple scenarios had no sources (hypoventilation and the under-damped arterial line already had). Each now cites literature (entries 136–148 of `REFERENCES.md`, and earlier entries where they apply), and each "Supports" line in `REFERENCES.md` says exactly what the source is cited for. Some sources give a number that the scenario uses, for example about 7.5 mmHg per 10 cm of transducer height error [143] or the 95 % range of normal temperature [145]. Others are cited only for the condition itself, because the guideline covers it but its abstract gives no threshold; `REFERENCES.md` marks these "(scope of the guideline)", for example the bradycardia guideline [136] and the ventricular-arrhythmia guideline [141]. The sensor scenarios cite work on what the artefact does to the reading and on false alarms [138, 139]. In every simple scenario the exact number is an illustrative choice; the arrhythmia patterns do not claim that the waveform matches any recorded ECG.
+
+| Scenario | Values (others at default) | Sources |
+|---|---|---|
+| Baseline adult | all defaults | 80, 78, 145, 144 |
+| Tachycardia (fast rate) | Heart rate 135 bpm | 55 |
+| Bradycardia (slow rate) | Heart rate 42 bpm | 136 |
+| Irregular beat timing | Rhythm timing irregular, Heart rate 95 bpm | 146, 135 |
+| Desaturation | Arterial O2 saturation (set point) 84 % | 42 |
+| Low blood pressure | Systolic pressure 80 mmHg, Diastolic pressure 46 mmHg | 127, 31 |
+| High blood pressure | Systolic pressure 175 mmHg, Diastolic pressure 105 mmHg | 105 |
+| Fast breathing | Respiratory rate 32 br/min | 144, 31, 99 |
+| Slow breathing | Respiratory rate 7 br/min | 144, 104, 66 |
+| Temperature elevation | Core temperature 38.9 °C | 137, 145, 31 |
+| Sensor disconnection | SpO2 probe state disconnected, Electrode contact quality 5 % | 139, 15 |
+| Motion artifact | Motion artifact 70 % | 138 |
+| Noisy ECG | ECG broadband noise (SD) 120 µV, Mains interference 80 µV, ECG baseline wander 0.4 mV, Electrode contact quality 60 % | 71, 27, 139 |
+| Missing observations | ECG dropouts 6 /min, PPG dropouts 6 /min, Respiration dropouts 6 /min, Temperature probe state unavailable | 139, 15 |
+| Apnea demonstration | Respiratory rate 0 br/min | 35, 142 |
+| AF pattern (irregular, no P waves) | Arrhythmia pattern af, Heart rate 110 bpm | 135, 146 |
+| Frequent PVCs | Arrhythmia pattern pvc, PVC rate (pvc pattern) 14 /min | 140, 141, 139 |
+| V-Tach pattern | Arrhythmia pattern vt, Heart rate 170 bpm, Systolic pressure 85 mmHg, Diastolic pressure 55 mmHg | 141, 60, 139 |
+| V-Fib pattern (no output) | Arrhythmia pattern vf | 60, 141 |
+| Asystole pattern | Arrhythmia pattern asystole | 60 |
+| Hypoventilation on room air (high EtCO2) | Respiratory rate 6 br/min, Alveolar CO2 (end-tidal set point) 58 mmHg, Arterial O2 saturation (set point) 92 % | 34, 35 |
+| Obstructed expiration | Expiratory airflow obstruction 80 %, Respiratory rate 22 br/min | 35, 147 |
+| CO2 rebreathing | Inspired CO2 (rebreathing) 6 mmHg, Alveolar CO2 (end-tidal set point) 46 mmHg | 148, 142, 26 |
+| Under-damped arterial line | Arterial line damping under-damped | 25 |
+| Transducer too high | Transducer height vs. heart level 20 cm | 143 |
+
+#### Scenario summary panel
+
+Below the controls, the **Scenario summary** (`src/ui/scenarioSummary.js`) shows the selected scenario: its name and group, its teaching note, a table of every value it changes next to the default, and the cited references. For each reference it shows the full citation, the "Supports" line of `REFERENCES.md` (what the source is cited for) and a DOI link, or a web link when there is no DOI. The page reads these from `src/sim/references.js`, which `tools/gen-references.js` generates from `REFERENCES.md`, so `REFERENCES.md` stays the only place to edit; a unit test fails when the generated file is out of date or when a scenario cites a number that has no entry. The summary follows the scenario list however it changes (toolbar, bedside view, Reset). When a control is edited by hand the list shows *Custom (edited)* and the summary says that no scenario and no references apply. For a community scenario it shows the author, the GitHub issue and the source given by the author, and says that the maintainer checked only the format and the ranges. All text is inserted as plain text, not HTML.
+
+#### Scenario details tab
+
+The **Scenario details** tab explains the selected scenario for a reader who does not know the condition. The text lives in `src/sim/scenarioDetails.js`: `CONDITIONS` holds 80 entries with a title, a kind (*clinical condition*; *vital-sign pattern, not a diagnosis*; or *technical problem: the patient may be well*), "what it is" and "what happens in the body"; `SCENARIOS` maps each of the 95 scenarios to one condition and says what that scenario shows on the monitor and what the monitor cannot show. Scenarios that are stages of one condition share it (ATLS classes I–IV, sepsis screen and septic shock, the two AF, PE, hypothermia, MH, hyperkalaemia, asthma and opioid scenarios, the three heart-failure profiles, deterioration and peri-arrest). The tab then shows the changed-values table, the teaching note and the scenario's references with their "Supports" lines.
+
+The background is a plain-language summary of standard physiology found in the cited sources. Specific numbers (thresholds, percentages, stage limits) are used only where the "Supports" line of a cited reference gives them, and the numbers in the "shows" text are the scenario's own settings. A unit test checks that every scenario has an entry with a known condition, every condition is complete and used, and every heart rate, respiratory rate, blood pressure and EtCO₂ quoted in a "shows" text equals the scenario's setting. The tab follows the scenario list like the summary (toolbar, bedside list, Reset); for hand-edited settings it says that no details apply, and a community scenario gets no background text, only its changes.
 
 #### Community scenarios
 
@@ -489,7 +587,7 @@ The model starts in steady state at the set fasting glucose Gb and the set basal
 
 **Controls** (group *Glucose and insulin* in the Controls tab): fasting glucose 50–400 mg/dL, fasting insulin 2–50 µU/mL, basal insulin 0–5 U/h. The *glucose model time scale* (1×, 10× or 60×) is in the processing group. The default is 60×: one simulated second is one model minute, so a meal response is visible within a few minutes. Diabetes status (none, type 1, type 2) and weight are in the patient profile, which is part of the Controls tab. Changing diabetes status, fasting glucose, fasting insulin or weight restarts the model in steady state. Changing the basal rate acts as a step change from the current state.
 
-**Glucose tab** (`src/ui/glucosePanel.js`). *Give now* adds a meal (0–200 g carbohydrate) or a subcutaneous bolus (0–30 U) to the running model. *Projection* runs a copy of the model forward 2, 3 or 4 h (`forecast()` in `glucose.js`) with an optional planned meal and bolus at chosen minutes. It draws this curve next to the same model with no further events. It reports the first time glucose crosses 70, 54, 180 and 250 mg/dL and the percentage of time in 70–180 mg/dL. The thresholds are the consensus CGM ranges of [52] and the level 1 and level 2 hypoglycaemia values of [51]. The plot and the tab carry the label "Model projection, not a clinical prediction". The projection uses population parameters. It is not fitted to any person, does not learn from data and is not dosing advice.
+**Glucose tab (removed from the page on 2026-11-03, because glucose is not part of a standard bedside monitor; the model, the GLU tile, its alarms and its Controls settings remain, and `forecast()` is still unit-tested).** (`src/ui/glucosePanel.js`). *Give now* adds a meal (0–200 g carbohydrate) or a subcutaneous bolus (0–30 U) to the running model. *Projection* runs a copy of the model forward 2, 3 or 4 h (`forecast()` in `glucose.js`) with an optional planned meal and bolus at chosen minutes. It draws this curve next to the same model with no further events. It reports the first time glucose crosses 70, 54, 180 and 250 mg/dL and the percentage of time in 70–180 mg/dL. The thresholds are the consensus CGM ranges of [52] and the level 1 and level 2 hypoglycaemia values of [51]. The plot and the tab carry the label "Model projection, not a clinical prediction". The projection uses population parameters. It is not fitted to any person, does not learn from data and is not dosing advice.
 
 **Monitor and alarms.** The GLU tile shows glucose in mg/dL and mmol/L, insulin in µU/mL and the model clock, with a "model" badge. There is no glucose sensor or CGM model, so the value shown is the model value. Glucose and insulin are stored as `simulated` observations with the method text "(model value, no sensor)". Alarm defaults: glucose < 70 or > 180 mg/dL (medium priority), and < 54 mg/dL (level 2, high priority).
 
@@ -671,6 +769,14 @@ CSV and JSON files are read locally with `FileReader`. The importer handles CSV 
 
 Imported data is stored as `imported` and never drives the simulation. Values can also be typed in (manual entry, source `user`) and exported as CSV or JSON by source.
 
+**Help and sample files in the Data tab** (`src/ui/importHelp.js`, `src/data/samples.js`, added 2026-11-03). Three folding blocks above the import report:
+
+- *How to import a file, and what it can contain*: the steps, the accepted file types and layouts, time formats, missing-value words, and a table of every parameter with its accepted names, units and range. The names, units, missing words and ranges are read from `importer.SYNONYMS`, `importer.NAMES`, `units.PARAMS` and `units.acceptedUnits()`, so the help shows exactly what the code accepts.
+- *Sample files*: four synthetic files to download, edit and import again: a wide CSV, a long CSV with kPa, °F, lb and mmol/L, a semicolon CSV with decimal commas and `DD.MM.YYYY` dates, and a JSON `records` file with nested `{value, unit}` objects and `null`. A unit test imports each one and requires no invalid value and no error, and checks the conversions.
+- *Data from a device*: the two routes the page offers (a CSV/JSON export from the device's own app, manual entry), and a note that the Health Connect and Bluetooth panel was removed on 2026-11-03.
+
+The JSON import report no longer shows a table layout and timestamp column, which exist only for CSV.
+
 ### 7.2 Watch data in the Android app (not tested with real hardware)
 
 On 2026-10-28 the Devices tab and all other device integration were removed from the web page: HL7 v2 (MLLP, serial, files), FHIR R4 and IEEE 11073 SDC import, the MDC code mapping, Web Bluetooth, Web Serial and the packet replay. The reason is the owner's decision to keep the project focused on the simulator. See `DEVICE_INTEGRATION_REPORT.md`.
@@ -688,7 +794,7 @@ Real wearable data now enters only through the Android app (`android/`), by thre
 - `healthConnectToObservations` turns Health Connect records into observations with source `device`. A record is rejected, with a reason, when its type is not supported, its value is not a number, it has no time, or its unit cannot be converted. A value outside the parameter's plausible range is rejected ("outside min–max unit"), never clamped. Exact duplicates (parameter, time, value) are dropped. The provenance records the route `health-connect`, the record type, the data origin (the app that wrote the record), the original value and unit, and that the time is the record time.
 - `bleHeartRateToObservations` takes the hex string of one 0x2A37 packet, parses it with `gatt.js` and stores the result as `device` with the route `ble-hrs`, the device name, the receive time and the raw hex.
 
-**"On this phone" panel** (`src/ui/androidPanel.js`, in the Data import/export tab). It is shown only when the page runs inside the Android app (`window.PMAndroid` exists). In a normal browser it stays hidden. It offers:
+**"On this phone" panel (removed from the page on 2026-11-03; the description is kept for the record. Without it the Android app has no control for Health Connect or the BLE sensor; the bridge code and its unit tests remain).** (`src/ui/androidPanel.js`, in the Data import/export tab). It is shown only when the page runs inside the Android app (`window.PMAndroid` exists). In a normal browser it stays hidden. It offers:
 
 - Health Connect: availability status, a button to request the read permissions, a period of the last 1, 7 or 30 days, a button to read the records, and a button to install or update Health Connect. The result message lists how many values were stored and rejected, with the reasons.
 - Bluetooth LE: scan, stop scan and disconnect; a list of found devices (name, address, signal strength) with a Connect button; the last heart rate, the contact state and RR intervals; the body sensor location if the device reports it. A malformed packet is ignored with a message.
@@ -734,7 +840,7 @@ These were observed or are known from the model design:
 - **Capnography and arterial line** parameters (wave shape constants, f_n, ζ, the perfusion time constants) are illustrative. They show the effects qualitatively and are not fitted to measured data.
 - **Watch data** (Android app only) has not been tested with any real watch, heart-rate sensor or Health Connect store. Consumer wearable readings are not clinical measurements (see `TEST_REPORT.md`).
 - **Glucose model.** Population parameters only; no person is fitted. Renal glucose excretion, glucagon, counter-regulation, exercise and the change of endogenous glucose output with insulin are not modelled. Without insulin action, glucose still returns towards fasting through SG (glucose effectiveness), so untreated type 1 hyperglycaemia resolves slowly in the model, unlike in reality. Minimal-model SI is lower than clamp-derived sensitivity (about 66 % lower in [54]), so a bolus has a modest effect. Secretion gain σ, the type 2 factor 0.5 and fasting insulin are illustrative. There is no CGM or glucose meter model (no sensor lag, no noise). Ketones and pH are not modelled.
-- Measurements are not persisted between sessions. Only the best lesson quiz scores, the Controls view choice, the Bedside view on/off state and the profile use-case switches are kept, in the browser's `localStorage` (keys `pmsim.lessons.v1`, `pmsim.controls.v1`, `pmsim.bedside`, `pmsim.usecases.v1`).
+- Measurements are not persisted between sessions. Only the Controls view choice, the Bedside view on/off state and the profile use-case switches are kept, in the browser's `localStorage` (keys `pmsim.controls.v1`, `pmsim.bedside`, `pmsim.usecases.v1`).
 - **Community scenarios** are checked for format and parameter ranges only. Their clinical content is the author's responsibility and is reviewed by a person, not by software. Submissions are public GitHub issues.
 
 ## 10. References

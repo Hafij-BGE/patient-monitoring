@@ -148,14 +148,13 @@
 
 <nav class="tabs" role="tablist" id="tabs">
   <button role="tab" data-tab="controls" aria-selected="true">Controls</button>
+  <button role="tab" data-tab="details">Scenario details</button>
   <button role="tab" data-tab="nibp">NIBP</button>
   <button role="tab" data-tab="alarms">Alarms</button>
   <button role="tab" data-tab="trends">Trends</button>
-  <button role="tab" data-tab="glucose">Glucose</button>
   <button role="tab" data-tab="data">Data import/export</button>
   <button role="tab" data-tab="profile">Profile</button>
   <button role="tab" data-tab="chain">Signal chain</button>
-  <button role="tab" data-tab="lessons">Lessons</button>
   <button role="tab" data-tab="science">Science</button>
   <button role="tab" data-tab="tests">Tests</button>
   <button role="tab" data-tab="refs">References</button>
@@ -169,6 +168,11 @@
     <span class="hint">Community scenarios are submitted as public GitHub issues and appear in the scenario list after a maintainer approves them.</span></p>
   <div id="controlMsgs" class="msgs" aria-live="polite"></div>
   <div id="controls" class="control-groups"></div>
+  <section id="scenarioSummary" class="scenario-summary" aria-label="Scenario summary"></section>
+</section>
+
+<section class="panel" data-panel="details" hidden>
+  <section id="scenarioDetails" class="scenario-summary scenario-details" aria-label="Scenario details"></section>
 </section>
 
 <section class="panel" data-panel="nibp" hidden>
@@ -222,41 +226,6 @@
     Hatched bands are intervals with missing values, or with no data for longer than 3 × the usual sample interval.</p>
 </section>
 
-<section class="panel" data-panel="glucose" hidden>
-  <p class="warn" id="gluNotice"></p>
-  <div class="split">
-    <div>
-      <h3>Give now</h3>
-      <div class="row wrap">
-        <label class="inline">Meal <input id="gluMealNow" inputmode="decimal" value="50" size="4" aria-label="Meal carbohydrate in grams"> g carbohydrate (0–200)</label>
-        <button id="gluMealBtn">Give meal</button>
-      </div>
-      <div class="row wrap">
-        <label class="inline">Insulin bolus <input id="gluBolusNow" inputmode="decimal" value="4" size="4" aria-label="Subcutaneous insulin bolus in units"> U subcutaneous (0–30)</label>
-        <button id="gluBolusBtn">Give bolus</button>
-      </div>
-      <div id="gluMsg" class="msgs" aria-live="polite"></div>
-      <p class="hint">Fasting glucose, fasting insulin and basal insulin are in Controls → Glucose and insulin; diabetes status and weight in Controls → Patient profile
-        (also in the Profile tab); the model time scale in Controls → Processing. Changing diabetes status, fasting values or weight restarts the model at its fasting steady state.</p>
-    </div>
-    <div>
-      <h3>Projection plan</h3>
-      <div class="form-grid">
-        <label>Horizon <select id="gluHorizon"><option value="120">2 h</option><option value="180" selected>3 h</option><option value="240">4 h</option></select></label>
-        <label>Planned meal (g) <input id="gluPlanMeal" inputmode="decimal" value="0"></label>
-        <label>Meal at minute <input id="gluPlanMealAt" inputmode="decimal" value="0"></label>
-        <label>Planned bolus (U) <input id="gluPlanBolus" inputmode="decimal" value="0"></label>
-        <label>Bolus at minute <input id="gluPlanBolusAt" inputmode="decimal" value="0"></label>
-      </div>
-    </div>
-  </div>
-  <canvas id="cvGlu" class="plot tall" aria-label="Glucose model projection over the chosen horizon"></canvas>
-  <div class="row"><button id="gluPng">PNG</button></div>
-  <div id="gluSummary" class="stats"></div>
-  <p class="hint">Solid line: projection with the planned events. Dashed line: the same model with no further events. Green band: 70–180 mg/dL target range;
-    dotted lines: 54 and 250 mg/dL level 2 thresholds (consensus CGM metrics [52]; ADA Standards of Care [51]). Time is model time; the projection updates every 2 s while this tab is open.
-    1 mmol/L = 18.016 mg/dL.</p>
-</section>
 
 <section class="panel" data-panel="data" hidden>
   <div class="split">
@@ -271,6 +240,7 @@
       </div>
       <p class="hint">Files are read in this browser tab only. Nothing is uploaded. Units are converted (°F→°C, lb→kg, kPa→mmHg, in→cm).
         Out-of-range values are rejected with their line number. Missing cells stay missing.</p>
+      <div id="importHelp"></div>
       <div id="impReport"></div>
       <div class="row"><button id="btnClearImported">Remove imported data</button></div>
     </div>
@@ -297,7 +267,6 @@
       <div id="storeSummary" class="table-wrap"></div>
     </div>
   </div>
-  <div id="androidPanel" class="android-panel" hidden></div>
 </section>
 
 <section class="panel" data-panel="profile" hidden>
@@ -373,14 +342,6 @@
   <p id="chReadout" class="chain-readout" aria-live="off"></p>
 </section>
 
-<section class="panel" data-panel="lessons" hidden>
-  <p class="hint">Short guided exercises on the simulator, each with a self-check quiz. The questions are about how this simulated monitor
-    measures; they are teaching material, not clinical guidance. Best scores are kept in this browser only.</p>
-  <div class="lessons">
-    <nav aria-label="Lessons"><ol id="lsList" class="ls-list"></ol></nav>
-    <article id="lsBody" class="ls-body"></article>
-  </div>
-</section>
 
 <section class="panel prose" data-panel="science" hidden>
   <h2>Models used (summary)</h2>
@@ -514,7 +475,7 @@
 <footer class="foot">
   VitalsLab (formerly PM-SIM) is an original educational design by Md. Hafijur Rahman. It does not reproduce the interface of any monitor manufacturer.
   Source code: <a href="https://github.com/Hafij-BGE/patient-monitoring" target="_blank" rel="noopener">github.com/Hafij-BGE/patient-monitoring</a>.
-  It runs fully offline. It makes no network requests. Community scenarios are part of the page; "Share as community scenario" opens a GitHub issue only when you click it. Measurements are not saved between sessions. Browser storage keeps only the best lesson scores, the Controls view choice and whether Bedside view is on.
+  It runs fully offline. It makes no network requests. Community scenarios are part of the page; "Share as community scenario" opens a GitHub issue only when you click it. Measurements are not saved between sessions. Browser storage keeps only the Controls view choice and whether Bedside view is on.
 </footer>
 
 <!-- logic modules (no DOM) -->
@@ -532,6 +493,8 @@
 <script src="src/sim/nibp.js"></script>
 <script src="src/sim/detectors.js"></script>
 <script src="src/sim/params.js"></script>
+<script src="src/sim/references.js"></script>
+<script src="src/sim/scenarioDetails.js"></script>
 <script src="src/core/community.js"></script>
 <script src="community/scenarios.js"></script>
 <script src="src/sim/glucose.js"></script>
@@ -540,9 +503,9 @@
 <script src="src/alarms/severity.js"></script>
 <script src="src/data/csv.js"></script>
 <script src="src/data/importer.js"></script>
+<script src="src/data/samples.js"></script>
 <script src="src/devices/gatt.js"></script>
 <script src="src/devices/androidBridge.js"></script>
-<script src="src/lessons/lessons.js"></script>
 <!-- UI -->
 <script src="src/ui/dom.js"></script>
 <script src="src/ui/waveforms.js"></script>
@@ -552,10 +515,9 @@
 <script src="src/ui/panels.js"></script>
 <script src="src/ui/dataPanel.js"></script>
 <script src="src/ui/chainPanel.js"></script>
-<script src="src/ui/lessonsPanel.js"></script>
-<script src="src/ui/androidPanel.js"></script>
-<script src="src/ui/glucosePanel.js"></script>
+<script src="src/ui/importHelp.js"></script>
 <script src="src/ui/selftest.js"></script>
+<script src="src/ui/scenarioSummary.js"></script>
 <script src="src/ui/app.js"></script>
 <script src="src/ui/bedside.js"></script>
 </body>
