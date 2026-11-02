@@ -2,7 +2,7 @@
 
 Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.
 
-## Unreleased
+## v1.7.0 (2026-11-03)
 
 ### Glucose and Lessons tabs removed, 2026-11-03
 

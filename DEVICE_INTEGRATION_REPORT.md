@@ -20,12 +20,12 @@ The Data import tab now reads CSV/JSON tables only. Manual entry and CSV/JSON ex
 
 - `src/devices/gatt.js`, trimmed to a parser for the Bluetooth **Heart Rate Measurement** characteristic (0x2A37, Heart Rate Service 0x180D) [16, 17, 18]. The Android app's BLE route uses it. `tests/unit/devices.test.js` has 3 tests for it, and the browser self-test has one scenario for it.
 - `src/devices/androidBridge.js`, which turns Health Connect records and BLE packets from the Android app into observations (section 3.1). `tests/unit/androidBridge.test.js` has 4 tests for it, and the browser self-test has one scenario for it.
-- `src/ui/androidPanel.js`, the "On this phone" panel (section 3.1). It is shown only inside the Android app.
+- `src/ui/androidPanel.js`, the "On this phone" panel (section 3.1). It was removed from the page on 2026-11-03; the file stays in the source tree, but the page no longer shows the panel.
 - Simulated, imported (CSV/JSON), device and manually entered data, each kept in its own series with its source.
 
 ## 3. Watch data: Android app only
 
-The Android app (`android/`, package `edu.deu.pmsim`, version 1.6.0) wraps the same web page in a WebView. It is the **only** place where real watch data enters VitalsLab. The watch can be an HONOR watch or any other watch. There are three routes:
+The Android app (`android/`, package `edu.deu.pmsim`, version 1.7.0) wraps the same web page in a WebView. It is the **only** place where real watch data enters VitalsLab. The watch can be an HONOR watch or any other watch. There are three routes:
 
 | Route | How it works | Limits |
 |---|---|---|
@@ -34,6 +34,8 @@ The Android app (`android/`, package `edu.deu.pmsim`, version 1.6.0) wraps the s
 | Import of a health-app export file | CSV/JSON export from the user's health app, read by the table importer. | Needs a file in a column layout the importer recognises. |
 
 ### 3.1 The "On this phone" panel
+
+**Removed from the page on 2026-11-03.** The description below is kept for the record. Without the panel the Android app has no control for Health Connect or the BLE sensor; the bridge code and its unit tests remain. Device readings now come in as an export file or by manual entry.
 
 The first two routes are operated from a panel in the **Data import/export** tab. The panel is shown only when the page runs inside the Android app (the app provides a `window.PMAndroid` object). In a normal browser it stays hidden.
 
@@ -64,4 +66,4 @@ A download link does nothing inside the Android WebView. When `window.PMAndroid`
 
 ## 5. Status
 
-**Not tested with real hardware.** An APK file has been built (`release/VitalsLab-1.6.0-android.apk`), but no watch, heart-rate sensor or Health Connect store has been used with it, and the app has not been tested on a phone. The page-side bridge is checked by unit tests with records and packets written in the test, and the panel was checked in a desktop browser with a mock `PMAndroid` object (records stored, an out-of-range record rejected, a BLE packet decoded, an export routed to `saveText`). A mock only imitates the app's interface; it is not a device test. The browser self-test lists "Watch data on Android (Health Connect / BLE / export file, hardware)" as **not run**, and it must stay that way until a real device test has been done and recorded. The parser is checked only against packets written from the specification (see `TEST_REPORT.md`).
+**Not tested with real hardware.** An APK file has been built (`release/VitalsLab-1.7.0-android.apk`), but no watch, heart-rate sensor or Health Connect store has been used with it, and the app has not been tested on a phone. The page-side bridge is checked by unit tests with records and packets written in the test, and the panel was checked in a desktop browser with a mock `PMAndroid` object (records stored, an out-of-range record rejected, a BLE packet decoded, an export routed to `saveText`). A mock only imitates the app's interface; it is not a device test. The browser self-test lists "Watch data on Android (Health Connect / BLE / export file, hardware)" as **not run**, and it must stay that way until a real device test has been done and recorded. The parser is checked only against packets written from the specification (see `TEST_REPORT.md`).

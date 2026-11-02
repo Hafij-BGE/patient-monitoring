@@ -111,15 +111,15 @@ Return to **Baseline adult**.
 
 **Say:** every number on the monitor comes out of a chain like this. Each stage can add error.
 
-## 8. A guided lesson (7:30–8:30)
+## 8. Scenario details (7:30–8:30)
 
-**Click:** the **Lessons** tab and open **Capnography: reading the CO₂ waveform** (or any other lesson).
+**Use:** the preset selector. Choose **Septic-shock pattern (vasodilated)** (or any other disease scenario).
 
-1. Show the objectives and click **Load the scenario**.
-2. Click one **Do it** button. The controls change and the effect shows on the monitor.
-3. Answer the 3 quiz questions. Each answer shows an explanation.
+1. Under Controls, show the **Scenario summary**: the settings the scenario changes against the defaults, its teaching note and its numbered sources.
+2. Click **What is this condition? Open scenario details**, or open the **Scenario details** tab.
+   - *Expected:* what the condition is, what happens in the body, what this scenario shows on the monitor, the changed settings and the literature. The label says whether it is a clinical condition, a vital-sign pattern or a technical problem.
 
-**Say:** the quiz is graded in the browser. Only the best score is remembered, in this browser only. It is not measurement data.
+**Say:** the background text is a plain-language summary of the cited sources; the specific numbers come only from what each source supports. It has not been reviewed by a clinician, and it is a teaching pattern, not a diagnosis.
 
 ## 9. Real data next to the simulation (8:30–9:30)
 
@@ -131,38 +131,15 @@ Return to **Baseline adult**.
    - *Expected:* stored as 37.5 °C with source `user`.
 3. Open the **Trends** tab and choose temperature. Simulated, imported and user values are drawn as separate series. Nothing is merged, and gaps are breaks, not zeros.
 
-## 9a. Glucose model and projection (optional, about 1 min)
+## 10. Data from a device (9:30–10:00)
 
-Use this step if time allows; it is not counted in the 11 minutes.
-
-**Click:** Controls → Patient profile, set **Diabetes status** to *type 1*. Under **Glucose and insulin**, set basal insulin to 0.8 U/h. The scenario label shows **Custom (edited)**.
-
-**Click:** the **Glucose** tab. Under *Projection*, plan a 60 g meal at minute 15 and a 4 U bolus at minute 0, horizon 3 h.
-
-- *Expected:* a solid blue curve (with the plan) and a dashed grey curve (no further events), the green 70–180 mg/dL band, and the time each threshold is crossed. The plot is labelled "Model projection, not a clinical prediction".
-
-**Click:** **Give meal** (50 g, under *Give now*). The GLU tile rises over the next minutes (model time runs at 60× by default). Above 180 mg/dL the tile turns amber and a GLUCOSE-high alarm appears.
-
-**Say:** this is a population model (Bergman minimal model with Hovorka meal and insulin absorption, parameters from published studies). It is not fitted to any person, it has no sensor model, and it is not dosing advice. Reset afterwards.
-
-## 10. Watch data on Android (9:30–10:00)
-
-This part is a short spoken note, or an optional demonstration if a phone is available. Real watch data enters VitalsLab only through the Android app, which wraps the same page. In a normal browser the "On this phone" panel is hidden. The Android app has **not been tested with real hardware**, so do not present any result from it as verified.
+This part is a short spoken note. The page does not connect to a watch or sensor directly. The "On this phone" panel (Health Connect and Bluetooth heart-rate sensor in the Android app) was removed on 2026-11-03.
 
 **Say:**
 
-- The Android app has three routes for watch data: reading Android Health Connect (with the user's permission), a native Bluetooth LE connection to the standard Heart Rate Service (0x180D), and import of a health-app export file.
-- The watch may be an HONOR watch or any other watch that writes to Health Connect or exposes the standard heart-rate service. HONOR's own protocol is proprietary and is not used.
-- Watch readings are consumer wearable values. In the app they are meant to be shown next to the simulation with their source, and they are never used to generate the ECG.
-- The app has no internet permission, and the data stays on the phone.
-
-**Optional, only if a phone is available:** install the APK (`release/VitalsLab-1.6.0-android.apk`) and open the **Data import/export** tab. The "On this phone" panel appears there.
-
-1. Under **Health Connect**, tap **Allow reading…**, choose a period and tap **Read records**. The message lists the stored and rejected values. The values appear in **Trends** as a separate `device` series.
-2. Under **Bluetooth heart-rate sensor**, tap **Scan**, then **Connect** on a heart-rate device. The last heart rate is shown.
-3. Export a CSV. The Android save dialog opens.
-
-This has not been done on a real device yet. Until it has, report it as planned, not as a result.
+- Readings from a watch, cuff, oximeter or scale come in as a CSV/JSON export from the device's own app, or by manual entry. The Data tab has help on what can be imported and four sample files to download and edit.
+- Device readings are consumer values. They are shown next to the simulation with their source and never drive it.
+- No real watch or sensor was tested.
 
 ## 11. Tests (10:00–10:30)
 
@@ -170,12 +147,12 @@ This has not been done on a real device yet. Until it has, report it as planned,
 
 **Expected:** 16 pass, 0 fail, 1 not run. Each row shows the input, the expected result and the observed result.
 
-**Say:** the one hardware entry (watch data on Android through Health Connect, BLE or an export file) is reported as "not run" because no watch was connected. The app never marks a hardware test as passed without hardware. The same models and parsers are also checked by 133 Node unit tests (`node --test tests/unit/*.test.js`).
+**Say:** the one hardware entry (watch data on Android through Health Connect, BLE or an export file) is reported as "not run" because no watch was connected. The app never marks a hardware test as passed without hardware. The same models and parsers are also checked by 155 Node unit tests (`node --test tests/unit/*.test.js`).
 
 ## 12. Closing (10:30–10:45)
 
 **Say:**
 
-- The model, its equations, assumptions and limitations are in `TECHNICAL_REPORT.md`, with sources in `REFERENCES.md`. The Android-only watch routes and their status are in `DEVICE_INTEGRATION_REPORT.md`. The page is online at https://hafij-bge.github.io/patient-monitoring/.
+- The model, its equations, assumptions and limitations are in `TECHNICAL_REPORT.md`, with sources in `REFERENCES.md`. The device routes and their status are in `DEVICE_INTEGRATION_REPORT.md`. The page is online at https://hafij-bge.github.io/patient-monitoring/.
 - Limitations to name aloud: the waveforms come from simplified models, the SpO₂ calibration is a textbook example, NIBP fails under strong motion, the rhythm analyser is not validated, the capnography and arterial-line constants are illustrative, and no real watch or sensor was tested.
 - Educational simulation only.

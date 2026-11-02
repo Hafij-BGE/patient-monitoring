@@ -1,6 +1,6 @@
 {
   "name": "pm-sim",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "VitalsLab: educational patient monitor simulator (ECG, SpO2, NIBP, respiration, temperature)",
   "private": true,
   "license": "MIT",
