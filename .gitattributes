@@ -1,0 +1,3 @@
+# Check out text files with LF line endings on every platform, so generated
+# files such as community/scenarios.js compare equal on Windows runners too.
+* text=auto eol=lf
