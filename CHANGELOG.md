@@ -2,6 +2,12 @@
 
 Educational simulation only. Simulated values and consumer wearable readings are not a substitute for clinical monitoring or medical advice.
 
+## Unreleased
+
+- **All waveforms sweep together.** Respiration and CO₂ now use the selected sweep speed (25 mm/s by default) like ECG, pleth and ART, instead of a fixed 6.25 mm/s. Their write cursors and erase bars now move at the same position. Only the cuff strip stays at 6.25 mm/s, so a whole NIBP cycle fits. At 25 mm/s and a 961 px wide strip, the respiration and CO₂ traces show about 10 s (2 breaths at 12 /min).
+- **Respiration and CO₂ no longer shake.** The renderer placed every sample relative to the current time instead of the sample's own time. At 50 Hz and 25 mm/s that moved the whole trace back and forth by up to one sample (1.9 px) from frame to frame. Samples are now placed at their own time (the newest at floor(t·fs)/fs); the write cursor stays at the current time, so all cursors still line up.
+- Checked: 155 unit tests pass; in the browser all five erase bars sit at the same x position (screenshot at t = 23 s). A fixed sample was tracked over 30 frames at 60 frames/s: before the fix it moved 1.6 px (respiration, CO₂) and 0.66 px (pleth); after the fix it moved 0 px. Over 8 s the respiration auto-scale moved it 0.43 px vertically.
+
 ## v1.7.0 (2026-11-03)
 
 ### Glucose and Lessons tabs removed, 2026-11-03

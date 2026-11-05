@@ -146,7 +146,7 @@
     nibp_kd:     { group: 'processing', label: 'Diastolic ratio Kd', unit: '', type: 'num', min: 0.4, max: 0.95, step: 0.01, def: 0.55,
                    help: 'DBP = cuff pressure below the maximum where oscillation amplitude falls to Kd × maximum.' },
     sweep:       { group: 'processing', label: 'Sweep speed', unit: 'mm/s', type: 'sel', options: [6.25, 12.5, 25, 50], def: 25,
-                   help: 'Horizontal scale of the waveforms (screen calibration assumed 96 dpi).' },
+                   help: 'Horizontal scale of the ECG, pleth, ART, respiration and CO2 waveforms, which sweep together; the cuff strip stays at 6.25 mm/s (screen calibration assumed 96 dpi).' },
     ecg_gain:    { group: 'processing', label: 'ECG gain', unit: 'mm/mV', type: 'sel', options: [5, 10, 20], def: 10,
                    help: 'Vertical scale of the ECG trace.' },
     glu_clock:   { group: 'processing', label: 'Glucose model time scale', unit: '×', type: 'sel', options: [1, 10, 60], def: 60,

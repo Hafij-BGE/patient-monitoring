@@ -90,7 +90,12 @@
         map = v => h - 6 - (v - (L - pad)) / ((H + pad) - (L - pad)) * (h - 22);
       }
 
-      const xOf = j => (((tNow - (n - 1 - j) / fs) % Tw) + Tw) % Tw * pxPerSec;
+      // Samples are taken on the k/fs grid, so the newest one is at floor(tNow·fs)/fs, not at tNow.
+      // Placing each sample at its own time keeps it still between frames; using tNow made 50 Hz
+      // traces (respiration, CO2) jitter by up to one sample (1.9 px at 25 mm/s).
+      const tLast = Math.floor(tNow * fs + 1e-6) / fs;
+      const xAt = t => ((t % Tw) + Tw) % Tw * pxPerSec;
+      const xOf = j => xAt(tLast - (n - 1 - j) / fs);
       const spp = fs / pxPerSec;                    // samples per pixel
       const stride = spp > 3 ? Math.floor(spp / 2) : 1;
       ctx.strokeStyle = this.o.color; ctx.lineWidth = 1.5; ctx.lineJoin = 'miter'; ctx.miterLimit = 3; // sharp corners (QRS, systolic peak, notch)
@@ -129,8 +134,8 @@
         const [a, b] = gaps[gaps.length - 1];
         if (b - a > 60) ctx.fillText('no signal', a + 6, h / 2);
       }
-      // write cursor
-      const xc = xOf(n - 1);
+      // write cursor at the current time, so every channel's cursor is at the same x
+      const xc = xAt(tNow);
       ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(xc + 1, 0, 1, h);
       return { n, gaps: gaps.length, Tw };
     }

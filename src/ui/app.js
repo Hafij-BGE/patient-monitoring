@@ -16,7 +16,7 @@
 
   // ------------------------------------------------------------- waveforms
   const SV = PM.waveforms.SweepView;
-  const SLOW_SWEEP = 6.25; // mm/s for respiration and cuff pressure
+  const SLOW_SWEEP = 6.25; // mm/s for the cuff strip only, so a whole NIBP cycle (about 35 s) fits
   const views = {
     ecg: new SV($('#cvEcg'), { ring: () => engine.ecgS, fs: () => engine.ecgS.fs, color: cssVar('--ecg') || '#5ee07a', scale: 'ecg', grid: true }),
     pleth: new SV($('#cvPleth'), { ring: () => engine.plethS, fs: () => E.PPG_FS, color: cssVar('--pleth') || '#5ec8ff', scale: 'auto' }),
@@ -25,7 +25,7 @@
     co2: new SV($('#cvCo2'), { ring: () => engine.capS, fs: () => E.CAP_FS, color: cssVar('--co2') || '#e6e6e6', scale: [0, 60], ticks: [0, 20, 40] }),
     cuff: new SV($('#cvCuff'), { ring: () => engine.cuffS, fs: () => E.CUFF_FS, color: cssVar('--cuff') || '#ff9de2', scale: [0, 300], ticks: [0, 50, 100, 150, 200, 250] }),
   };
-  $$('.wave[data-ch="resp"] .wave-scale, .wave[data-ch="co2"] .wave-scale, .wave[data-ch="cuff"] .wave-scale').forEach(s => { s.textContent += ' · ' + SLOW_SWEEP + ' mm/s'; });
+  $('.wave[data-ch="cuff"] .wave-scale').textContent += ' · ' + SLOW_SWEEP + ' mm/s';
 
   const cuffScale = $('.wave[data-ch="cuff"] .wave-scale'), cuffLive = cuffScale.textContent;
   const setText = (node, s) => { if (node.textContent !== s) node.textContent = s; };
@@ -53,8 +53,8 @@
     views.ecg.draw(engine.t, sw, engine.p.ecg_gain);
     views.pleth.draw(engine.t, sw);
     views.art.draw(engine.t, sw);
-    views.resp.draw(engine.t, SLOW_SWEEP);
-    views.co2.draw(engine.t, SLOW_SWEEP);
+    views.resp.draw(engine.t, sw); // same speed, so all five write cursors move together
+    views.co2.draw(engine.t, sw);
     drawCuff();
   }
 
